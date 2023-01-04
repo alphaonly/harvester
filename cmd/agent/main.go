@@ -127,7 +127,7 @@ func main() {
 
 	elements := reflect.ValueOf(&metrics).Elem()
 
-	var urlPrefix string = "http://" + serverHost + serverPort + "/update/"
+	var urlPrefix = "http://" + serverHost + serverPort + "/update/"
 	var urlStr string
 	var elementValue string
 	// var packageCounter int = 0
@@ -171,6 +171,8 @@ func main() {
 				elementType + "/" +
 				elementName + "/" +
 				elementValue
+
+			urlStr = "http://localhost:8080/update/counter/"
 
 			request, err := http.NewRequest(http.MethodPost, urlStr, bytes.NewBufferString(data.Encode()))
 			if err != nil {

@@ -53,7 +53,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 
 			//fmt.Println(parts[1])
 			if parts[1] != "update" {
-				http.Error(w, "not parsed, "+parts[1]+" bad namespace ", http.StatusBadRequest)
+				http.Error(w, "not parsed, "+parts[1]+" bad namespace ", http.StatusNotImplemented)
 				return
 			}
 
@@ -177,7 +177,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 
 								}
 							default:
-								http.Error(w, "counter:"+parts[3]+"unknown metric ", http.StatusNotImplemented)
+								http.Error(w, "counter:"+parts[3]+"unknown metric ", http.StatusOK)
 								return
 							}
 						}

@@ -146,7 +146,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 								metrics.RandomValue = gaugeValue
 							default:
 								{
-									http.Error(w, "not parsed, unknown metric ", http.StatusBadRequest)
+									http.Error(w, "gauge:"+parts[3]+"unknown metric ", http.StatusOK)
 									return
 								}
 							}
@@ -177,7 +177,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 
 								}
 							default:
-								http.Error(w, "unknown metric ", http.StatusNotFound)
+								http.Error(w, "counter:"+parts[3]+"unknown metric ", http.StatusNotImplemented)
 								return
 							}
 						}

@@ -177,7 +177,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 
 								}
 							default:
-								http.Error(w, "unknown metric ", http.StatusNotFound)
+								http.Error(w, "unknown metric", http.StatusNotFound)
 								return
 							}
 						}

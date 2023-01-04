@@ -34,7 +34,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 		counterValue storage.Counter
 	)
 
-	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 	dataServer := h.dataServer
 

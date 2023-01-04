@@ -181,8 +181,8 @@ func main() {
 			}
 			//fmt.Println(urlStr)
 
-			request.Header.Set("Content-Type", "text/plain; charset=UTF-8")
-			request.Header.Add("Accept", "text/plain")
+			request.Header.Set("Content-Type", "text/plain; charset=utf-8")
+			request.Header.Add("Accept", "text/plain; charset=utf-8")
 
 			response, err := client.Do(request)
 			if err != nil {

@@ -37,7 +37,7 @@ func TestHandleMetric(t *testing.T) {
 
 	metricsRequestsParam := make(map[string]requestParams)
 
-	contentType := "text/plain; charset=UTF-8"
+	contentType := "text/plain; charset=utf-8"
 
 	//Check Url Ok
 	urlStr = urlPrefix + "/update/main.gauge/Alloc/2.36912E+05"
@@ -137,7 +137,9 @@ func TestHandleMetric(t *testing.T) {
 				fmt.Println(w.Body.String())
 
 			}
-			if (response.StatusCode == http.StatusOK) && (response.Header.Get("Content-type") != tt.want.contentType) {
+
+			if (response.StatusCode == http.StatusOK) &&
+				(response.Header.Get("Content-type") != tt.want.contentType) {
 				t.Errorf("error contentType %v want %v", response.Header.Get("Content-type"), tt.want.contentType)
 			}
 

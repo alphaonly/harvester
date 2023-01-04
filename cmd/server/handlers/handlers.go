@@ -183,7 +183,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				default:
-					http.Error(w, "not recognized type", http.StatusBadRequest)
+					http.Error(w, "not recognized type ", http.StatusBadRequest)
 					return
 				}
 			}

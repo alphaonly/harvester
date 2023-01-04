@@ -183,7 +183,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 				default:
-					http.Error(w, parts[2]+" not recognized type ", http.StatusNotImplemented)
+					http.Error(w, parts[2]+" not recognized type", http.StatusNotImplemented)
 					return
 				}
 			}

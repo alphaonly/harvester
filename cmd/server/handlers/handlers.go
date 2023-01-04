@@ -51,7 +51,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 			parts := strings.SplitN(r.URL.String(), "/", 5)
 			//fmt.Println(parts)
 
-			fmt.Println(parts[1])
+			//fmt.Println(parts[1])
 			if parts[1] != "update" {
 				http.Error(w, "not parsed, "+parts[1]+" bad namespace ", http.StatusBadRequest)
 				return

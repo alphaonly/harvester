@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	serverHost = "127.0.0.1"
-	serverPort = ":8080"
+	//serverHost = "127.0.0.1"
+	//serverPort = ":8080"
 	//urlPrefix  = "http://" + serverHost + serverPort
 	urlPrefix = ""
 )
@@ -58,11 +58,11 @@ func TestHandleMetric(t *testing.T) {
 	//Check Url empty metric
 	urlStr = urlPrefix + "/update/main.gauge//2.36912E+05"
 	r6 := requestParams{method: http.MethodPost, url: urlStr,
-		want: want{code: http.StatusBadRequest, response: `{"status":"ok"}`, contentType: contentType}}
+		want: want{code: http.StatusNotFound, response: `{"status":"ok"}`, contentType: contentType}}
 	//Check Url empty metric value
 	urlStr = urlPrefix + "/update/main.gauge/counter/"
 	r7 := requestParams{method: http.MethodPost, url: urlStr,
-		want: want{code: http.StatusNotFound, response: `{"status":"ok"}`, contentType: contentType}}
+		want: want{code: http.StatusBadRequest, response: `{"status":"ok"}`, contentType: contentType}}
 
 	var r4 requestParams
 

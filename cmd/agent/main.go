@@ -20,7 +20,7 @@ import (
 
 const (
 	pollInterval   = 2
-	reportInterval = 10
+	reportInterval = 3 //10
 
 	serverHost = "127.0.0.1"
 	serverPort = ":8080"
@@ -104,11 +104,14 @@ func updateMemStatsMetrics(ctx context.Context, metrics *Metrics) {
 				metrics.StackSys = gauge(m.StackSys)
 				metrics.Sys = gauge(m.Sys)
 				metrics.TotalAlloc = gauge(m.TotalAlloc)
-
 			}
 
 		case <-ctx.Done():
-			fmt.Println("Metrics reading cancelled by context")
+			{
+				fmt.Println("Metrics reading cancelled by context")
+				isCancelled = true
+
+			}
 		}
 
 	}
@@ -153,7 +156,14 @@ func main() {
 			case "PollCount":
 				elementValue = strconv.FormatUint(uint64(elements.Field(i).Interface().(counter)), 10)
 			default:
-				elementValue = strconv.FormatUint(uint64(elements.Field(i).Interface().(gauge)), 10)
+
+				//fmt.Println(
+				//	elements.Field(i).Interface(), " ",
+				//	elements.Field(i).Interface().(gauge), " ",
+				//	float64(elements.Field(i).Interface().(gauge)), " ",
+				//	strconv.FormatFloat(float64(elements.Field(i).Interface().(gauge)), 'f', -1, 64),
+				//)
+				elementValue = strconv.FormatFloat(float64(elements.Field(i).Interface().(gauge)), 'E', -1, 64)
 
 			}
 
@@ -165,27 +175,24 @@ func main() {
 			request, err := http.NewRequest(http.MethodPost, urlStr, bytes.NewBufferString(data.Encode()))
 			if err != nil {
 				log.Fatal(err)
-				fmt.Println(request)
+				//fmt.Println(request)
 			}
 			//fmt.Println(urlStr)
 
 			request.Header.Set("Content-Type", "text/plain; charset=UTF-8")
 			request.Header.Add("Accept", "text/plain")
 
-			reponse, err := client.Do(request)
+			response, err := client.Do(request)
 			if err != nil {
 				log.Fatal(err)
 				fmt.Println(err)
 				os.Exit(1)
 			}
 
-			fmt.Println(reponse.Status)
+			fmt.Println(response.Status)
 
-			reponse.Body.Close()
 		}
 
 	}
-
-	fmt.Println(runtime.CPUProfile())
 
 }

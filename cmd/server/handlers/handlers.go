@@ -61,7 +61,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 					return
 				} else {
 					switch parts[2] {
-					case "main.gauge":
+					case "main.gauge", "gauge":
 						{
 							float64Value, err := strconv.ParseFloat(parts[4], 64)
 							if err != nil {
@@ -145,7 +145,7 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 								}
 							}
 						}
-					case "main.counter":
+					case "main.counter", "counter":
 						{
 							intValue, err := strconv.ParseInt(parts[4], 10, 64)
 							if err != nil {

@@ -172,7 +172,7 @@ func main() {
 				elementName + "/" +
 				elementValue
 
-			//urlStr = "http://localhost:8080/update/counter/"
+			//urlStr = "http://localhost:8080/update/unknown/testCounter/100"
 
 			request, err := http.NewRequest(http.MethodPost, urlStr, bytes.NewBufferString(data.Encode()))
 			if err != nil {
@@ -186,8 +186,7 @@ func main() {
 
 			response, err := client.Do(request)
 			if err != nil {
-				log.Fatal(err)
-				fmt.Println(err)
+
 				os.Exit(1)
 			}
 

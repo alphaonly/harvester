@@ -56,10 +56,16 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				if parts[2] == "" {
+				if parts[3] == "" {
 					http.Error(w, "not parsed, empty metric name ", http.StatusBadRequest)
 					return
 				} else {
+
+					if parts[4] == "" {
+						http.Error(w, "not parsed, empty metric name ", http.StatusNotFound)
+						return
+					}
+
 					switch parts[2] {
 					case "main.gauge", "gauge":
 						{

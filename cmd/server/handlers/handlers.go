@@ -58,12 +58,12 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if parts[3] == "" {
-				http.Error(w, "not parsed, empty metric name ", http.StatusBadRequest)
+				http.Error(w, "not parsed, empty metric name ", http.StatusNotFound)
 				return
 			} else {
 
 				if parts[4] == "" {
-					http.Error(w, "not parsed, empty metric name ", http.StatusNotFound)
+					http.Error(w, "not parsed, empty metric value", http.StatusBadRequest)
 					return
 				}
 
@@ -176,6 +176,9 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 									}
 
 								}
+							default:
+								http.Error(w, "unknown metric ", http.StatusNotFound)
+								return
 							}
 						}
 					}

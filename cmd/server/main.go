@@ -22,7 +22,7 @@ func NewRouter(ds *storage.DataServer) chi.Router {
 	r := chi.NewRouter()
 	h := handlers.Handlers{}
 	h.SetDataServer(ds)
-
+	//
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", h.HandleGetMetricFieldList)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)

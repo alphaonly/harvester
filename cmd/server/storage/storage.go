@@ -61,7 +61,7 @@ func (m Metrics) GetValue(field string) (v interface{}, err error) {
 
 	value := reflect.Indirect(r).FieldByName(field)
 	if value.IsZero() {
-		return nil, errors.New("no value (isZero=true)")
+		return nil, errors.New("no value (isZero==true)")
 	}
 
 	switch field {

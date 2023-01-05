@@ -70,7 +70,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	dataServer := h.dataServer
 
 	if &dataServer == nil {
-		http.Error(w, "dataserver is not initialized", http.StatusInternalServerError)
+		http.Error(w, "dataServer is not initialized", http.StatusInternalServerError)
 		return
 	}
 

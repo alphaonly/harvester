@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/golang-collections/collections/stack"
+	"reflect"
 )
 
 type Gauge float64
@@ -45,6 +46,34 @@ type Metrics struct {
 	PollCount Counter
 }
 
+func (m Metrics) StringValue(field string) (value string, err error) {
+
+	v, err := m.GetValue(field)
+	if err != nil {
+		return "", err
+	}
+	return v.(string), nil
+}
+
+func (m Metrics) GetValue(field string) (v interface{}, err error) {
+
+	r := reflect.ValueOf(m)
+
+	value := reflect.Indirect(r).FieldByName(field)
+	if value.IsZero() {
+		return nil, errors.New("no value (isZero=true)")
+	}
+
+	switch field {
+	case "PollCount":
+		v = Counter(value.Uint())
+	default:
+		v = Gauge(value.Float())
+	}
+	return v, nil
+
+}
+
 type MetricsStorage struct {
 	metricsStack *stack.Stack
 	metricsMap   *map[Counter]Metrics
@@ -52,14 +81,15 @@ type MetricsStorage struct {
 
 type metricMemRepository interface {
 	GetMetric(ctx context.Context, PollCount Counter) (*MetricsStorage, error)
+	GetCurrentMetric(ctx context.Context) (*MetricsStorage, error)
 	SaveMetric(ctx context.Context, metrics Metrics) error
 	DeleteMetric(ctx context.Context, PollCount Counter) (*MetricsStorage, error)
 	GetAllMetric(ctx context.Context, PollCount Counter) (*MetricsStorage, error)
 }
 
 type DataServer struct {
-	//MetricsMemRepository metricMemRepository
-	metricsStorage MetricsStorage
+	metricsMemRepository metricMemRepository
+	metricsStorage       MetricsStorage
 }
 
 func (DataServer) New() (m *DataServer) {
@@ -105,4 +135,20 @@ func (m DataServer) DeleteMetric(ctx context.Context, PollCount Counter) (*Metri
 }
 func (m DataServer) GetAllMetrics(ctx context.Context, PollCount Counter) (*stack.Stack, error) {
 	return nil, nil
+}
+func (m DataServer) GetCurrentMetric(ctx context.Context) (Metrics, error) {
+	var (
+		err error
+		ms  = m.metricsStorage
+	)
+	stack := ms.metricsStack
+	if &stack == nil {
+		return Metrics{}, nil
+	}
+	currentMetrics := stack.Peek().(Metrics)
+	if &currentMetrics == nil {
+		err = errors.New("Unexpectedly no data in stack")
+	}
+
+	return currentMetrics, err
 }

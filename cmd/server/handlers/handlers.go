@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/alphaonly/harvester/cmd/server/storage"
+	"github.com/go-chi/chi/v5"
 	"net/http"
+	"reflect"
 	"strconv"
-	"strings"
 )
 
 //type gauge float64
@@ -26,13 +27,89 @@ func (h *Handlers) SetDataServer(dataServer *storage.DataServer) {
 	h.dataServer = dataServer
 
 }
+func (h *Handlers) HandleGetMetricFieldList(w http.ResponseWriter, r *http.Request) {
 
-func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	val := reflect.ValueOf(&storage.Metrics{}).Elem()
+
+	w.Write([]byte("<h1><ul>"))
+	for i := 0; i < val.NumField(); i++ {
+		w.Write([]byte(" <li>" + val.Type().Field(i).Name + "</li>"))
+	}
+
+	w.Write([]byte("</ul></h1>"))
+
+	w.WriteHeader(http.StatusOK)
+}
+func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	//metricValue := chi.URLParam(r, "value")
+	metricType := chi.URLParam(r, "TYPE")
+	metricName := chi.URLParam(r, "NAME")
+
+	if metricName == "" {
+		http.Error(w, "is not parsed, empty metric name ", http.StatusNotFound)
+	}
+	if metricType == "" {
+		http.Error(w, metricType+"is not recognized type", http.StatusNotImplemented)
+		return
+
+	}
+
+	dataServer := h.dataServer
+
+	if &dataServer == nil {
+		http.Error(w, "dataserver is not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	ctx := context.Background()
+	metricsValues, err := dataServer.GetCurrentMetric(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	metricValue, err := metricsValues.StringValue(metricName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusOK)
+		return
+	}
+	writeString := metricValue
+	_, err = w.Write([]byte(writeString))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", "text/text; charset=utf-8")
+
+}
+func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 
 	var (
 		gaugeValue   storage.Gauge
 		counterValue storage.Counter
+		parts        [5]string
 	)
+
+	metricType := chi.URLParam(r, "TYPE")
+	metricName := chi.URLParam(r, "NAME")
+	metricValue := chi.URLParam(r, "VALUE")
+
+	w.Write([]byte("type:" + metricType))
+	w.Write([]byte("name:" + metricName))
+	w.Write([]byte("value:" + metricValue))
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
@@ -48,7 +125,14 @@ func (h *Handlers) HandleMetric(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
 		{
-			parts := strings.SplitN(r.URL.String(), "/", 5)
+
+			parts[0] = ""
+			parts[1] = "update"
+			parts[2] = metricType
+			parts[3] = metricName
+			parts[4] = metricValue
+
+			//parts = strings.SplitN(r.URL.String(), "/", 5)
 			//fmt.Println(parts)
 
 			//fmt.Println(parts[1])

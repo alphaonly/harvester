@@ -124,7 +124,7 @@ func TestHandleMetric(t *testing.T) {
 			w := httptest.NewRecorder()
 			h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				handlers := Handlers{}
-				handlers.HandleMetric(w, r)
+				handlers.HandlePostMetric(w, r)
 			})
 
 			h.ServeHTTP(w, request)

@@ -199,9 +199,12 @@ func (m DataServer) GetCurrentMetric(ctx context.Context) (Metrics, error) {
 	if &stack == nil {
 		return Metrics{}, nil
 	}
+	if stack.Len() == 0 {
+		return Metrics{}, nil
+	}
 	currentMetrics := stack.Peek().(Metrics)
 	if &currentMetrics == nil {
-		err = errors.New("Unexpectedly no data in stack")
+		err = errors.New("unexpectedly no data in stack")
 	}
 
 	return currentMetrics, err

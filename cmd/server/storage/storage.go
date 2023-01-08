@@ -54,41 +54,37 @@ type Metrics struct {
 	PollCount Counter
 }
 
-type metricTypesConstraint interface {
-	~float64 | ~int64
-}
-
 type MetricValue interface {
 	SetValue(interface{})
 	GetValue() interface{}
 	GetString() string
 }
 
-type gaugeValue struct {
+type GaugeValue struct {
 	value Gauge
 }
 
-func (v *gaugeValue) GetValue() interface{} {
+func (v *GaugeValue) GetValue() interface{} {
 	return v.value
 }
-func (v *gaugeValue) SetValue(value interface{}) {
+func (v *GaugeValue) SetValue(value interface{}) {
 	v.value = value.(Gauge)
 }
-func (v *gaugeValue) GetString() string {
+func (v *GaugeValue) GetString() string {
 	return strconv.FormatFloat(float64(v.value), 'E', -1, 64)
 }
 
-type counterValue struct {
+type CounterValue struct {
 	value Counter
 }
 
-func (v *counterValue) GetValue() interface{} {
+func (v *CounterValue) GetValue() interface{} {
 	return v.value
 }
-func (v *counterValue) SetValue(value interface{}) {
+func (v *CounterValue) SetValue(value interface{}) {
 	v.value = value.(Counter)
 }
-func (v *counterValue) GetString() string {
+func (v *CounterValue) GetString() string {
 	return strconv.FormatUint(uint64(v.value), 10)
 }
 
@@ -101,10 +97,10 @@ func (m *Metrics) GetValue(field string) (mv *MetricValue, err error) {
 		var metricValue MetricValue
 		switch field {
 		case "PollCount":
-			metricValue = &counterValue{}
+			metricValue = &CounterValue{}
 			metricValue.SetValue(Counter(value.Uint()))
 		default:
-			metricValue = &gaugeValue{}
+			metricValue = &GaugeValue{}
 			vf := value.Float()
 			fvf := Gauge(vf)
 			metricValue.SetValue(fvf)
@@ -127,13 +123,15 @@ func (m *Metrics) StringValue(field string) (value string, err error) {
 }
 
 type MetricsStorage struct {
-	metricsStack *stack.Stack
-	metricsMap   *map[Counter]Metrics
+	metricsStack    *stack.Stack
+	mapMetricsStack *stack.Stack
+	metricsMap      *map[string]MetricValue
 }
 
 type metricMemRepository interface {
 	GetMetric(ctx context.Context, PollCount Counter) (*MetricsStorage, error)
 	GetCurrentMetric(ctx context.Context) (*MetricsStorage, error)
+	AddCurrentToMap(ctx context.Context, name string, value MetricValue) (r error)
 	SaveMetric(ctx context.Context, metrics Metrics) error
 	DeleteMetric(ctx context.Context, PollCount Counter) (*MetricsStorage, error)
 	GetAllMetric(ctx context.Context, PollCount Counter) (*MetricsStorage, error)
@@ -148,8 +146,11 @@ func (DataServer) New() (m *DataServer) {
 
 	m = &DataServer{}
 	m.metricsStorage.metricsStack = &stack.Stack{}
-	//msmap := make(map[Counter]Metrics)
-	//m.metricsStorage.metricsMap = &msmap
+
+	maps := make(map[string]MetricValue)
+	m.metricsStorage.metricsMap = &maps
+
+	m.metricsStorage.mapMetricsStack = &stack.Stack{}
 	return m
 }
 
@@ -157,6 +158,14 @@ func (m DataServer) GetMetric(ctx context.Context, PollCount Counter) (ms *Metri
 
 	return nil, errors.New("no data")
 }
+func (m DataServer) AddCurrentToMap(ctx context.Context, name string, value MetricValue) (r error) {
+
+	mp := *m.metricsStorage.metricsMap
+	mp[name] = value
+
+	return nil
+}
+
 func (m DataServer) SaveMetric(ctx context.Context, metrics Metrics) (r error) {
 	ms := m.metricsStorage
 
@@ -164,16 +173,20 @@ func (m DataServer) SaveMetric(ctx context.Context, metrics Metrics) (r error) {
 	//	ms.ID = time.Now()
 	//}
 
-	lenBefore := ms.metricsStack.Len()
+	lenBefore := ms.mapMetricsStack.Len()
 
 	ms.metricsStack.Push(metrics)
+	ms.mapMetricsStack.Push(ms.metricsMap)
+
+	mp := make(map[string]MetricValue)
+	ms.metricsMap = &mp
 
 	//msmap := *ms.metricsMap
 	//msmap[metrics.PollCount] = metrics
 	//
 	//fmt.Println(ms.metricsStack.Len())
 
-	lenAfter := ms.metricsStack.Len()
+	lenAfter := ms.mapMetricsStack.Len()
 	if lenAfter == lenBefore {
 		return errors.New("Stack adding error")
 	}

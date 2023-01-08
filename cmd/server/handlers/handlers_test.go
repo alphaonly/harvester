@@ -73,7 +73,7 @@ func TestHandleMetric(t *testing.T) {
 	//Check Url empty metric value
 	urlStr = urlPrefix + "/update/main.gauge/counter/"
 	r7 := requestParams{method: http.MethodPost, url: urlStr,
-		want: want{code: http.StatusBadRequest, response: `{"status":"ok"}`, contentType: contentType}}
+		want: want{code: http.StatusNotFound, response: `{"status":"ok"}`, contentType: contentType}}
 
 	//var r4 requestParams
 

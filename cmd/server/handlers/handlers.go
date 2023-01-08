@@ -150,135 +150,149 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "not parsed, empty metric name!"+parts[4], http.StatusNotFound)
 				fmt.Println(parts)
 				return
-			} else {
+			}
 
-				if parts[4] == "" {
-					http.Error(w, "not parsed, empty metric value", http.StatusBadRequest)
-					w.WriteHeader(http.StatusBadRequest)
-					return
-				}
+			if parts[4] == "" {
+				http.Error(w, "not parsed, empty metric value", http.StatusBadRequest)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
 
-				switch parts[2] {
-				case "main.gauge", "gauge":
-					{
-						float64Value, err := strconv.ParseFloat(parts[4], 64)
-						if err != nil {
-							http.Error(w, "value:"+parts[4]+" not parsed, value cast error", http.StatusBadRequest)
-							w.WriteHeader(http.StatusBadRequest)
-							return
-						} else {
+			gValue := storage.GaugeValue{}
+			cValue := storage.CounterValue{}
 
-							//metricsMap[parts[2]] = gauge(float64Value)
-							//reflect.ValueOf().Field(i).SetFloat( float64Value )
-							gaugeValue = storage.Gauge(float64Value)
+			switch parts[2] {
+			case "main.gauge", "gauge":
+				{
+					float64Value, err := strconv.ParseFloat(parts[4], 64)
+					if err != nil {
+						http.Error(w, "value:"+parts[4]+" not parsed, value cast error", http.StatusBadRequest)
+						w.WriteHeader(http.StatusBadRequest)
+						return
+					}
 
-							switch parts[3] {
-							case "Alloc":
-								{
-									fmt.Println("Начало последовательности данных")
-									//Начало последовательности данных
-									//Очищаю
-									metrics = storage.Metrics{}
+					//metricsMap[parts[2]] = gauge(float64Value)
+					//reflect.ValueOf().Field(i).SetFloat( float64Value )
+					gaugeValue = storage.Gauge(float64Value)
 
-									metrics.Alloc = gaugeValue
-								}
-							case "BuckHashSys":
-								metrics.BuckHashSys = gaugeValue
-							case "Frees":
-								metrics.Frees = gaugeValue
-							case "GCCPUFraction":
-								metrics.GCCPUFraction = gaugeValue
-							case "GCSys":
-								metrics.GCCPUFraction = gaugeValue
-							case "HeapAlloc":
-								metrics.GCCPUFraction = gaugeValue
-							case "HeapIdle":
-								metrics.HeapIdle = gaugeValue
-							case "HeapInuse":
-								metrics.HeapInuse = gaugeValue
-							case "HeapObjects":
-								metrics.HeapObjects = gaugeValue
-							case "HeapReleased":
-								metrics.HeapReleased = gaugeValue
-							case "HeapSys":
-								metrics.HeapSys = gaugeValue
-							case "LastGC":
-								metrics.LastGC = gaugeValue
-							case "Lookups":
-								metrics.Lookups = gaugeValue
-							case "MCacheInuse":
-								metrics.MCacheInuse = gaugeValue
-							case "MCacheSys":
-								metrics.MCacheSys = gaugeValue
-							case "MSpanInuse":
-								metrics.MSpanInuse = gaugeValue
-							case "MSpanSys":
-								metrics.MSpanSys = gaugeValue
-							case "Mallocs":
-								metrics.Mallocs = gaugeValue
-							case "NextGC":
-								metrics.NextGC = gaugeValue
-							case "NumForcedGC":
-								metrics.NumForcedGC = gaugeValue
-							case "NumGC":
-								metrics.NumGC = gaugeValue
-							case "OtherSys":
-								metrics.OtherSys = gaugeValue
-							case "PauseTotalNs":
-								metrics.PauseTotalNs = gaugeValue
-							case "StackInuse":
-								metrics.StackInuse = gaugeValue
-							case "StackSys":
-								metrics.StackSys = gaugeValue
-							case "Sys":
-								metrics.Sys = gaugeValue
-							case "TotalAlloc":
-								metrics.TotalAlloc = gaugeValue
-							case "RandomValue":
-								metrics.RandomValue = gaugeValue
-							default:
-								{
-									http.Error(w, "gauge:"+parts[3]+"unknown metric ", http.StatusOK)
-									return
-								}
-							}
+					gValue.SetValue(gaugeValue)
+					err2 := dataServer.AddCurrentToMap(ctx, metricName, &gValue)
+					if err2 != nil {
+						http.Error(w, "internal value add error", http.StatusInternalServerError)
+						return
+					}
+
+					switch parts[3] {
+					case "Alloc":
+						{
+							fmt.Println("Начало последовательности данных")
+							//Начало последовательности данных
+							//Очищаю
+							metrics = storage.Metrics{}
+
+							metrics.Alloc = gaugeValue
+						}
+					case "BuckHashSys":
+						metrics.BuckHashSys = gaugeValue
+					case "Frees":
+						metrics.Frees = gaugeValue
+					case "GCCPUFraction":
+						metrics.GCCPUFraction = gaugeValue
+					case "GCSys":
+						metrics.GCCPUFraction = gaugeValue
+					case "HeapAlloc":
+						metrics.GCCPUFraction = gaugeValue
+					case "HeapIdle":
+						metrics.HeapIdle = gaugeValue
+					case "HeapInuse":
+						metrics.HeapInuse = gaugeValue
+					case "HeapObjects":
+						metrics.HeapObjects = gaugeValue
+					case "HeapReleased":
+						metrics.HeapReleased = gaugeValue
+					case "HeapSys":
+						metrics.HeapSys = gaugeValue
+					case "LastGC":
+						metrics.LastGC = gaugeValue
+					case "Lookups":
+						metrics.Lookups = gaugeValue
+					case "MCacheInuse":
+						metrics.MCacheInuse = gaugeValue
+					case "MCacheSys":
+						metrics.MCacheSys = gaugeValue
+					case "MSpanInuse":
+						metrics.MSpanInuse = gaugeValue
+					case "MSpanSys":
+						metrics.MSpanSys = gaugeValue
+					case "Mallocs":
+						metrics.Mallocs = gaugeValue
+					case "NextGC":
+						metrics.NextGC = gaugeValue
+					case "NumForcedGC":
+						metrics.NumForcedGC = gaugeValue
+					case "NumGC":
+						metrics.NumGC = gaugeValue
+					case "OtherSys":
+						metrics.OtherSys = gaugeValue
+					case "PauseTotalNs":
+						metrics.PauseTotalNs = gaugeValue
+					case "StackInuse":
+						metrics.StackInuse = gaugeValue
+					case "StackSys":
+						metrics.StackSys = gaugeValue
+					case "Sys":
+						metrics.Sys = gaugeValue
+					case "TotalAlloc":
+						metrics.TotalAlloc = gaugeValue
+					case "RandomValue":
+						metrics.RandomValue = gaugeValue
+					default:
+						{
+							//http.Error(w, "gauge:"+parts[3]+"unknown metric ", http.StatusOK)
+
 						}
 					}
-				case "main.counter", "counter":
-					{
-						intValue, err := strconv.ParseInt(parts[4], 10, 64)
-						if err != nil {
-							http.Error(w, "value:"+parts[4]+" not parsed", http.StatusBadRequest)
-							return
-						} else {
 
-							counterValue = storage.Counter(intValue)
-							//metricsMap[parts[2]] = counter(intValue)
+				}
+			case "main.counter", "counter":
+				{
+					intValue, err := strconv.ParseInt(parts[4], 10, 64)
+					if err != nil {
+						http.Error(w, "value:"+parts[4]+" not parsed", http.StatusBadRequest)
+						return
+					}
 
-							switch parts[3] {
-							case "PollCount":
-								{
-									metrics.PollCount = counterValue
-									//Конец последовательности, сохраняю
-									fmt.Println("Конец последовательности, сохраняю")
-									err := dataServer.SaveMetric(ctx, metrics)
-									if err != nil {
-										http.Error(w, "safe operation error", http.StatusInternalServerError)
-										return
-									}
+					cValue.SetValue(counterValue)
+					dataServer.AddCurrentToMap(ctx, metricName, &cValue)
 
-								}
-							default:
-								http.Error(w, "counter:"+parts[3]+"unknown metric ", http.StatusOK)
+					counterValue = storage.Counter(intValue)
+					//metricsMap[parts[2]] = counter(intValue)
+
+					switch parts[3] {
+					case "PollCount":
+						{
+							metrics.PollCount = counterValue
+
+							//Конец последовательности, сохраняю
+							fmt.Println("Конец последовательности, сохраняю")
+							err := dataServer.SaveMetric(ctx, metrics)
+							if err != nil {
+								http.Error(w, "safe operation error", http.StatusInternalServerError)
 								return
 							}
+
 						}
+					default:
+						//http.Error(w, "counter:"+parts[3]+"unknown metric ", http.StatusOK)
+						//return
 					}
-				default:
-					http.Error(w, parts[2]+" not recognized type", http.StatusNotImplemented)
-					return
+
 				}
+			default:
+				http.Error(w, parts[2]+" not recognized type", http.StatusNotImplemented)
+				return
 			}
+
 		}
 	default:
 		http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
@@ -288,7 +302,13 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 }
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
 
-	http.Error(w, "Unknown request", http.StatusBadRequest)
+	http.Error(w, "Unknown request", http.StatusNotFound)
+	return
+
+}
+func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.Request) {
+
+	http.Error(w, "Unknown request", http.StatusNotFound)
 	return
 
 }
@@ -304,7 +324,7 @@ func NewRouter(ds *storage.DataServer) chi.Router {
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
-		r.Post("/update/{TYPE}/", h.HandlePostErrorPattern)
+		r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)
 	})
 
 	return r

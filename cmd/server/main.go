@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/alphaonly/harvester/cmd/server/handlers"
 	"github.com/alphaonly/harvester/cmd/server/storage"
-	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
 	"os"
@@ -17,22 +16,6 @@ const serverPort = ":8080"
 type Server struct {
 }
 
-func NewRouter(ds *storage.DataServer) chi.Router {
-
-	r := chi.NewRouter()
-	h := handlers.Handlers{}
-	h.SetDataServer(ds)
-	//
-	r.Route("/", func(r chi.Router) {
-		r.Get("/", h.HandleGetMetricFieldList)
-		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
-		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
-
-	})
-
-	return r
-}
-
 func (s Server) run(ctx context.Context) error {
 
 	dataServer := storage.DataServer{}.New()
@@ -42,7 +25,7 @@ func (s Server) run(ctx context.Context) error {
 
 	// маршрутизация запросов обработчику
 
-	router := NewRouter(dataServer)
+	router := handlers.NewRouter(dataServer)
 
 	//http.HandleFunc("/update/", h.HandlePostMetric)
 

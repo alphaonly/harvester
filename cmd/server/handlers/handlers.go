@@ -103,13 +103,19 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 		parts        [5]string
 	)
 
+	fmt.Println(r)
+
 	metricType := chi.URLParam(r, "TYPE")
 	metricName := chi.URLParam(r, "NAME")
 	metricValue := chi.URLParam(r, "VALUE")
 
-	w.Write([]byte("type:" + metricType))
-	w.Write([]byte("name:" + metricName))
-	w.Write([]byte("value:" + metricValue))
+	fmt.Println("metricType :" + metricType)
+	fmt.Println("metricName :" + metricName)
+	fmt.Println("metricValue :" + metricValue)
+
+	//w.Write([]byte("type:" + metricType))
+	//w.Write([]byte("name:" + metricName))
+	//w.Write([]byte("value:" + metricValue))
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
@@ -133,7 +139,6 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 			parts[4] = metricValue
 
 			//parts = strings.SplitN(r.URL.String(), "/", 5)
-			//fmt.Println(parts)
 
 			//fmt.Println(parts[1])
 			if parts[1] != "update" {
@@ -142,12 +147,14 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if parts[3] == "" {
-				http.Error(w, "not parsed, empty metric name ", http.StatusNotFound)
+				http.Error(w, "not parsed, empty metric name!"+parts[4], http.StatusNotFound)
+				fmt.Println(parts)
 				return
 			} else {
 
 				if parts[4] == "" {
 					http.Error(w, "not parsed, empty metric value", http.StatusBadRequest)
+					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
 
@@ -157,6 +164,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						float64Value, err := strconv.ParseFloat(parts[4], 64)
 						if err != nil {
 							http.Error(w, "value:"+parts[4]+" not parsed, value cast error", http.StatusBadRequest)
+							w.WriteHeader(http.StatusBadRequest)
 							return
 						} else {
 
@@ -277,4 +285,27 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
+
+	http.Error(w, "Unknown request", http.StatusBadRequest)
+	return
+
+}
+
+func NewRouter(ds *storage.DataServer) chi.Router {
+
+	r := chi.NewRouter()
+	h := Handlers{}
+	h.SetDataServer(ds)
+	//
+	r.Route("/", func(r chi.Router) {
+		r.Get("/", h.HandleGetMetricFieldList)
+		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
+		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
+		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
+		r.Post("/update/{TYPE}/", h.HandlePostErrorPattern)
+	})
+
+	return r
 }

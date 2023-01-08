@@ -167,17 +167,20 @@ func main() {
 
 			}
 
+			//elementType = "main.gauge"
+			//elementName = "counter"
+			//elementValue = ""
 			urlStr = urlPrefix +
 				elementType + "/" +
 				elementName + "/" +
 				elementValue
 
-			//urlStr = "http://localhost:8080/update/unknown/testCounter/100"
-
+			urlStr = "http://127.0.0.1:8080:/update/main.gauge/counter/"
+			fmt.Println("url from agent:" + urlStr)
 			request, err := http.NewRequest(http.MethodPost, urlStr, bytes.NewBufferString(data.Encode()))
 			if err != nil {
 				log.Fatal(err)
-				//fmt.Println(request)
+
 			}
 			//fmt.Println(urlStr)
 

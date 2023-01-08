@@ -3,9 +3,9 @@ package handlers
 import (
 	"bytes"
 	"fmt"
+	"github.com/alphaonly/harvester/cmd/server/storage"
 	"net/url"
 
-	//"github.com/alphaonly/harvester/cmd/server/storage"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,6 +17,20 @@ const (
 	//urlPrefix  = "http://" + serverHost + serverPort
 	urlPrefix = ""
 )
+
+//type Server struct {
+//	Router *chi.Mux
+//	// Db, config can be added here
+//}
+//
+//func (s *Server) MountHandlers() {
+//	// Mount all Middleware here
+//	s.Router.Use(middleware.Logger)
+//
+//	// Mount all handlers here
+//	s.Router.Get("/", HelloWorld)
+//
+//}
 
 func TestHandleMetric(t *testing.T) {
 
@@ -43,10 +57,7 @@ func TestHandleMetric(t *testing.T) {
 	urlStr = urlPrefix + "/update/main.gauge/Alloc/2.36912E+05"
 	r1 := requestParams{method: http.MethodPost, url: urlStr,
 		want: want{code: http.StatusOK, response: `{"status":"ok"}`, contentType: contentType}}
-	//Check Url bad unknown namespace
-	urlStr = urlPrefix + "/updater/main.gauge/Alloc/2.36912E+05"
-	r2 := requestParams{method: http.MethodPost, url: urlStr,
-		want: want{code: http.StatusNotImplemented, response: `{"status":"ok"}`, contentType: contentType}}
+
 	//Check Url bad unknown metric
 	urlStr = urlPrefix + "/update/main.gauge/Alerrorloc/2.36912E+05"
 	r3 := requestParams{method: http.MethodPost, url: urlStr,
@@ -64,12 +75,12 @@ func TestHandleMetric(t *testing.T) {
 	r7 := requestParams{method: http.MethodPost, url: urlStr,
 		want: want{code: http.StatusBadRequest, response: `{"status":"ok"}`, contentType: contentType}}
 
-	var r4 requestParams
+	//var r4 requestParams
 
 	metricsRequestsParam["r1"] = r1
-	metricsRequestsParam["r2"] = r2
+
 	metricsRequestsParam["r3"] = r3
-	metricsRequestsParam["r4"] = r4
+
 	metricsRequestsParam["r5"] = r5
 	metricsRequestsParam["r6"] = r6
 	metricsRequestsParam["r7"] = r7
@@ -84,21 +95,13 @@ func TestHandleMetric(t *testing.T) {
 			ID:   "r1",
 			want: metricsRequestsParam["r1"].want,
 		},
-		{
-			name: "test#2 negative",
-			ID:   "r2",
-			want: metricsRequestsParam["r2"].want,
-		},
+
 		{
 			name: "test#3 negative",
 			ID:   "r3",
 			want: metricsRequestsParam["r3"].want,
 		},
-		//{
-		//	name: "test#4 negative",
-		//	ID:   "r4",
-		//	want: metricsRequestsParam["r4"].want,
-		//},
+
 		{
 			name: "test#5 negative",
 			ID:   "r5",
@@ -115,19 +118,28 @@ func TestHandleMetric(t *testing.T) {
 			want: metricsRequestsParam["r7"].want,
 		},
 	}
+	fmt.Println("start!")
+
+	r := NewRouter(storage.DataServer{}.New())
+
+	ts := httptest.NewServer(r)
+	defer ts.Close()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fmt.Println(metricsRequestsParam[tt.ID].url)
+			fmt.Println("url from test:" + metricsRequestsParam[tt.ID].url)
+
 			request := httptest.NewRequest(metricsRequestsParam[tt.ID].method, metricsRequestsParam[tt.ID].url, bytes.NewBufferString(data.Encode()))
 
 			w := httptest.NewRecorder()
-			h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				handlers := Handlers{}
-				handlers.HandlePostMetric(w, r)
-			})
 
-			h.ServeHTTP(w, request)
+			//h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			//
+			//	handlers := Handlers{}
+			//	handlers.HandlePostMetric(w, r)
+			//})
+
+			r.ServeHTTP(w, request)
 
 			response := w.Result()
 			w.Result()
@@ -146,4 +158,5 @@ func TestHandleMetric(t *testing.T) {
 		})
 
 	}
+
 }

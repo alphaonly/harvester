@@ -97,24 +97,22 @@ func (m *Metrics) GetValue(field string) (mv *MetricValue, err error) {
 	r := reflect.ValueOf(m)
 
 	value := reflect.Indirect(r).FieldByName(field)
-	if value.IsZero() {
-		return nil, errors.New("no value (isZero==true)")
+	if value.Kind() == reflect.String {
+		var metricValue MetricValue
+		switch field {
+		case "PollCount":
+			metricValue = &counterValue{}
+			metricValue.SetValue(Counter(value.Uint()))
+		default:
+			metricValue = &gaugeValue{}
+			vf := value.Float()
+			fvf := Gauge(vf)
+			metricValue.SetValue(fvf)
+			//v.SetValue(Gauge(value.Float()))
+		}
+		return &metricValue, nil
 	}
-
-	var metricValue MetricValue
-	switch field {
-	case "PollCount":
-		metricValue = &counterValue{}
-		metricValue.SetValue(Counter(value.Uint()))
-	default:
-		metricValue = &gaugeValue{}
-		vf := value.Float()
-		fvf := Gauge(vf)
-		metricValue.SetValue(fvf)
-		//v.SetValue(Gauge(value.Float()))
-	}
-	return &metricValue, nil
-
+	return nil, errors.New(" reflect error")
 }
 
 func (m *Metrics) StringValue(field string) (value string, err error) {

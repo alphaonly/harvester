@@ -83,7 +83,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 
 	metricValue, err := metricsValues.StringValue(metricName)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusOK)
+		http.Error(w, "no value", http.StatusOK)
 		return
 	}
 	writeString := metricValue

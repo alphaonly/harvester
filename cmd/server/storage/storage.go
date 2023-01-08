@@ -5,13 +5,21 @@ import (
 	"errors"
 	"github.com/golang-collections/collections/stack"
 	"reflect"
+	"strconv"
 )
 
 type Gauge float64
 type Counter int64
 
-//type MetricsMap map[string]interface{}
-//type MetricsGaugeKeys map[string]
+func (v Gauge) toString() (s string) {
+	return strconv.FormatFloat(float64(v), 'E', -1, 64)
+}
+func (v Counter) toString() (s string) {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+//type MetricsMap map[toString]interface{}
+//type MetricsGaugeKeys map[toString]
 
 type Metrics struct {
 	Alloc         Gauge
@@ -46,16 +54,45 @@ type Metrics struct {
 	PollCount Counter
 }
 
-func (m Metrics) StringValue(field string) (value string, err error) {
-
-	v, err := m.GetValue(field)
-	if err != nil {
-		return "", err
-	}
-	return v.(string), nil
+type metricTypesConstraint interface {
+	~float64 | ~int64
 }
 
-func (m Metrics) GetValue(field string) (v interface{}, err error) {
+type MetricValue interface {
+	SetValue(interface{})
+	GetValue() interface{}
+	GetString() string
+}
+
+type gaugeValue struct {
+	value Gauge
+}
+
+func (v *gaugeValue) GetValue() interface{} {
+	return v.value
+}
+func (v *gaugeValue) SetValue(value interface{}) {
+	v.value = value.(Gauge)
+}
+func (v *gaugeValue) GetString() string {
+	return strconv.FormatFloat(float64(v.value), 'E', -1, 64)
+}
+
+type counterValue struct {
+	value Counter
+}
+
+func (v *counterValue) GetValue() interface{} {
+	return v.value
+}
+func (v *counterValue) SetValue(value interface{}) {
+	v.value = value.(Counter)
+}
+func (v *counterValue) GetString() string {
+	return strconv.FormatUint(uint64(v.value), 10)
+}
+
+func (m *Metrics) GetValue(field string) (mv *MetricValue, err error) {
 
 	r := reflect.ValueOf(m)
 
@@ -64,13 +101,30 @@ func (m Metrics) GetValue(field string) (v interface{}, err error) {
 		return nil, errors.New("no value (isZero==true)")
 	}
 
+	var metricValue MetricValue
 	switch field {
 	case "PollCount":
-		v = Counter(value.Uint())
+		metricValue = &counterValue{}
+		metricValue.SetValue(Counter(value.Uint()))
 	default:
-		v = Gauge(value.Float())
+		metricValue = &gaugeValue{}
+		vf := value.Float()
+		fvf := Gauge(vf)
+		metricValue.SetValue(fvf)
+		//v.SetValue(Gauge(value.Float()))
 	}
-	return v, nil
+	return &metricValue, nil
+
+}
+
+func (m *Metrics) StringValue(field string) (value string, err error) {
+
+	v, err := m.GetValue(field)
+	if err != nil {
+		return "", err
+	}
+
+	return (*v).GetString(), nil
 
 }
 

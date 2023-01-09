@@ -10,15 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-//type gauge float64
-//type counter int64
-
-var (
-	//metrics      storage.Metrics = storage.Metrics{}
-	//metricsMap                   = make(storage.MetricsMap)
-	metrics = storage.Metrics{}
-)
-
 type Handlers struct {
 	dataServer *storage.DataServer
 }
@@ -84,7 +75,8 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	ctx := context.Background()
 	metricsValue, err := dataServer.GetCurrentMetricMap(ctx, metricName)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "404", http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 

@@ -221,21 +221,23 @@ func (m DataServer) GetAllMetricsNames(ctx context.Context) (map[string]MetricVa
 
 }
 func (m DataServer) GetCurrentMetricMap(ctx context.Context, name string) (MetricValue, error) {
-	var (
-		err error
-		ms  = m.metricsStorage
-	)
+
+	ms := m.metricsStorage
 
 	if &ms.metricsMap == nil {
 		return nil, errors.New("no map initialized")
 	}
 
 	if len(*ms.metricsMap) == 0 {
-		return nil, errors.New("no data ")
+		return nil, nil
 	}
 
 	mp := *ms.metricsMap
+	value := mp[name]
+	if value == nil {
+		return nil, errors.New("404")
+	}
 
-	return mp[name], err
+	return value, nil
 
 }

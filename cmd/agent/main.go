@@ -193,6 +193,7 @@ func main() {
 			}
 
 			fmt.Println(response.Status)
+			response.Body.Close()
 
 		}
 

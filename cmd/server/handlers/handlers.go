@@ -67,7 +67,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 
 	dataServer := h.dataServer
 
-	if &dataServer == nil {
+	if dataServer == nil {
 		http.Error(w, "dataServer is not initialized", http.StatusInternalServerError)
 		return
 	}
@@ -116,7 +116,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 
 	dataServer := h.dataServer
 
-	if &dataServer == nil {
+	if dataServer == nil {
 		http.Error(w, "dataserver not detected", http.StatusInternalServerError)
 		return
 	}
@@ -214,13 +214,11 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
 
 	http.Error(w, "Unknown request", http.StatusNotFound)
-	return
 
 }
 func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.Request) {
 
 	http.Error(w, "Unknown request", http.StatusNotFound)
-	return
 
 }
 

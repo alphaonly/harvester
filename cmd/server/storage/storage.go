@@ -195,18 +195,6 @@ func (m DataServer) SaveMetricToMap(ctx context.Context, name string, value Metr
 	return nil
 }
 
-func (m DataServer) SaveMetric(ctx context.Context, metrics Metrics) (r error) {
-	ms := m.metricsStorage
-
-	// ms.metricsStack.Push(metrics)
-	// ms.mapMetricsStack.Push(ms.metricsMap)
-
-	mp := make(map[string]MetricValue)
-	ms.metricsMap = &mp
-
-	return nil
-}
-
 func (m DataServer) DeleteMetric(ctx context.Context, PollCount Counter) (*MetricsStorage, error) {
 
 	return nil, nil
@@ -225,7 +213,8 @@ func (m DataServer) GetCurrentMetricMap(ctx context.Context, name string) (Metri
 	ms := m.metricsStorage
 
 	err := errors.New("404 - not found")
-	if &ms.metricsMap == nil || len(*ms.metricsMap) == 0 {
+
+	if ms.metricsMap == nil || len(*ms.metricsMap) == 0 {
 		return nil, err
 	}
 

@@ -75,12 +75,12 @@ func (v *GaugeValue) SetValue(value interface{}) {
 func (v *GaugeValue) GetString() string {
 	return strconv.FormatFloat(float64(v.value), 'E', -1, 64)
 }
-func (v *GaugeValue) AddValue(v1 interface{}) interface{} {
+func (v *GaugeValue) AddValue(v1 MetricValue) MetricValue {
 	ret := GaugeValue{}
-	gValue := v1.(GaugeValue)
+	gValue := v1.(*GaugeValue)
 	ret.SetValue(v.valueFloat + float64(gValue.valueFloat))
 
-	return ret
+	return MetricValue(&ret)
 }
 
 type CounterValue struct {
@@ -101,13 +101,13 @@ func (v *CounterValue) SetValue(value interface{}) {
 func (v *CounterValue) GetString() string {
 	return strconv.FormatUint(uint64(v.value), 10)
 }
-func (v *CounterValue) AddValue(v1 interface{}) interface{} {
+func (v *CounterValue) AddValue(v1 MetricValue) MetricValue {
 
 	ret := CounterValue{}
-	cValue := v1.(CounterValue)
-	ret.SetValue(v.valueInt + cValue.valueInt)
+	cValue := v1.(*CounterValue)
+	ret.SetValue(Counter(v.valueInt + cValue.valueInt))
 
-	return ret
+	return MetricValue(&ret)
 
 }
 
@@ -176,7 +176,7 @@ func (DataServer) New() (m *DataServer) {
 
 	// m.metricsStorage.mapMetricsStack = &stack.Stack{}
 
-	// m.metricsStorage.metricsDistinctSet = &mDistSet
+	// m.metricsStorage.metricsDistinctSet = &mDistSett
 
 	return m
 }
@@ -235,6 +235,7 @@ func (m DataServer) GetCurrentMetricMap(ctx context.Context, name string) (Metri
 	}
 
 	mp := *ms.metricsMap
+
 	return mp[name], err
 
 }

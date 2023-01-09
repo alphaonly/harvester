@@ -174,7 +174,6 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-
 					gaugeValue = storage.Gauge(float64Value)
 
 					gValue.SetValue(gaugeValue)
@@ -191,22 +190,21 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 					if err != nil {
 						http.Error(w, "value:"+parts[4]+" not parsed", http.StatusBadRequest)
 						return
-					}				
+					}
 
-					
-					prevMetricValue,err:= dataServer.GetCurrentMetricMap(ctx,metricName)
-					if err==nil
-					
+					prevMetricValue, err := dataServer.GetCurrentMetricMap(ctx, metricName)
+
+					if err != nil || prevMetricValue == nil {
+
+						prevMetricValue = &storage.CounterValue{}
+						// prevMetricValue.SetValue(CounterValue(0))
+					}
+
 					counterValue = storage.Counter(intValue)
 
 					cValue.SetValue(counterValue)
-					
-					 
-					
-					dataServer.SaveMetricToMap(ctx, metricName, &cValue)
 
-					
-
+					dataServer.SaveMetricToMap(ctx, metricName, cValue.AddValue(prevMetricValue))
 
 				}
 			default:

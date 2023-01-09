@@ -180,7 +180,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 				{
 					intValue, err := strconv.ParseInt(parts[4], 10, 64)
 					if err != nil {
-						http.Error(w, "value:"+parts[4]+" not parsed", http.StatusBadRequest)
+						http.Error(w, "value: "+parts[4]+" not parsed", http.StatusBadRequest)
 						return
 					}
 

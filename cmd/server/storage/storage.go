@@ -73,7 +73,7 @@ func (v *GaugeValue) SetValue(value interface{}) {
 	v.valueFloat = float64(v.value)
 }
 func (v *GaugeValue) GetString() string {
-	return strconv.FormatFloat(float64(v.value), 'E', -1, 64)
+	return strconv.FormatFloat(float64(v.value), 'f', -1, 64)
 }
 func (v *GaugeValue) AddValue(v1 MetricValue) MetricValue {
 	ret := GaugeValue{}

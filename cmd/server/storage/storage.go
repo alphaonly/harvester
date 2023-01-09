@@ -224,18 +224,15 @@ func (m DataServer) GetCurrentMetricMap(ctx context.Context, name string) (Metri
 
 	ms := m.metricsStorage
 
-	if &ms.metricsMap == nil {
-		return nil, errors.New("no map initialized")
-	}
-
-	if len(*ms.metricsMap) == 0 {
-		return nil, nil
+	err := errors.New("404 - not found")
+	if &ms.metricsMap == nil || len(*ms.metricsMap) == 0 {
+		return nil, err
 	}
 
 	mp := *ms.metricsMap
 	value := mp[name]
 	if value == nil {
-		return nil, errors.New("404")
+		return nil, err
 	}
 
 	return value, nil

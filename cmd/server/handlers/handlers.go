@@ -75,7 +75,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	ctx := context.Background()
 	metricsValue, err := dataServer.GetCurrentMetricMap(ctx, metricName)
 	if err != nil {
-		http.Error(w, "404", http.StatusNotFound)
+		http.Error(w, "404 - not found", http.StatusNotFound)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}

@@ -174,86 +174,14 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					//metricsMap[parts[2]] = gauge(float64Value)
-					//reflect.ValueOf().Field(i).SetFloat( float64Value )
+
 					gaugeValue = storage.Gauge(float64Value)
 
 					gValue.SetValue(gaugeValue)
-					err2 := dataServer.AddCurrentToMap(ctx, metricName, &gValue)
+					err2 := dataServer.SaveMetricToMap(ctx, metricName, &gValue)
 					if err2 != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
-					}
-
-					switch parts[3] {
-					case "Alloc":
-						{
-							fmt.Println("Начало последовательности данных")
-							//Начало последовательности данных
-							//Очищаю
-							metrics = storage.Metrics{}
-
-							metrics.Alloc = gaugeValue
-						}
-					case "BuckHashSys":
-						metrics.BuckHashSys = gaugeValue
-					case "Frees":
-						metrics.Frees = gaugeValue
-					case "GCCPUFraction":
-						metrics.GCCPUFraction = gaugeValue
-					case "GCSys":
-						metrics.GCCPUFraction = gaugeValue
-					case "HeapAlloc":
-						metrics.GCCPUFraction = gaugeValue
-					case "HeapIdle":
-						metrics.HeapIdle = gaugeValue
-					case "HeapInuse":
-						metrics.HeapInuse = gaugeValue
-					case "HeapObjects":
-						metrics.HeapObjects = gaugeValue
-					case "HeapReleased":
-						metrics.HeapReleased = gaugeValue
-					case "HeapSys":
-						metrics.HeapSys = gaugeValue
-					case "LastGC":
-						metrics.LastGC = gaugeValue
-					case "Lookups":
-						metrics.Lookups = gaugeValue
-					case "MCacheInuse":
-						metrics.MCacheInuse = gaugeValue
-					case "MCacheSys":
-						metrics.MCacheSys = gaugeValue
-					case "MSpanInuse":
-						metrics.MSpanInuse = gaugeValue
-					case "MSpanSys":
-						metrics.MSpanSys = gaugeValue
-					case "Mallocs":
-						metrics.Mallocs = gaugeValue
-					case "NextGC":
-						metrics.NextGC = gaugeValue
-					case "NumForcedGC":
-						metrics.NumForcedGC = gaugeValue
-					case "NumGC":
-						metrics.NumGC = gaugeValue
-					case "OtherSys":
-						metrics.OtherSys = gaugeValue
-					case "PauseTotalNs":
-						metrics.PauseTotalNs = gaugeValue
-					case "StackInuse":
-						metrics.StackInuse = gaugeValue
-					case "StackSys":
-						metrics.StackSys = gaugeValue
-					case "Sys":
-						metrics.Sys = gaugeValue
-					case "TotalAlloc":
-						metrics.TotalAlloc = gaugeValue
-					case "RandomValue":
-						metrics.RandomValue = gaugeValue
-					default:
-						{
-							//http.Error(w, "gauge:"+parts[3]+"unknown metric ", http.StatusOK)
-
-						}
 					}
 
 				}
@@ -263,33 +191,22 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 					if err != nil {
 						http.Error(w, "value:"+parts[4]+" not parsed", http.StatusBadRequest)
 						return
-					}
+					}				
 
+					
+					prevMetricValue,err:= dataServer.GetCurrentMetricMap(ctx,metricName)
+					if err==nil
+					
 					counterValue = storage.Counter(intValue)
 
 					cValue.SetValue(counterValue)
-					dataServer.AddCurrentToMap(ctx, metricName, &cValue)
+					
+					 
+					
+					dataServer.SaveMetricToMap(ctx, metricName, &cValue)
 
-					//metricsMap[parts[2]] = counter(intValue)
+					
 
-					switch parts[3] {
-					case "PollCount":
-						{
-							metrics.PollCount = counterValue
-
-							//Конец последовательности, сохраняю
-							fmt.Println("Конец последовательности, сохраняю")
-							err := dataServer.SaveMetric(ctx, metrics)
-							if err != nil {
-								http.Error(w, "safe operation error", http.StatusInternalServerError)
-								return
-							}
-
-						}
-					default:
-						//http.Error(w, "counter:"+parts[3]+"unknown metric ", http.StatusOK)
-						//return
-					}
 
 				}
 			default:

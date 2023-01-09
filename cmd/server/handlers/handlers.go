@@ -75,19 +75,15 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := context.Background()
-	metricsValues, err := dataServer.GetCurrentMetric(ctx)
+	metricsValue, err := dataServer.GetCurrentMetricMap(ctx, metricName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	metricValue, err := metricsValues.StringValue(metricName)
-	if err != nil {
-		http.Error(w, "no value", http.StatusOK)
-		return
-	}
-	writeString := metricValue
-	_, err = w.Write([]byte(writeString))
+	metricValue := metricsValue.GetString()
+
+	_, err = w.Write([]byte(metricValue))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

@@ -201,6 +201,26 @@ func (m DataServer) DeleteMetric(ctx context.Context, PollCount Counter) (*Metri
 func (m DataServer) GetAllMetrics(ctx context.Context, PollCount Counter) (*stack.Stack, error) {
 	return nil, nil
 }
+func (m DataServer) GetCurrentMetricMap(ctx context.Context, name string) (MetricValue, error) {
+	var (
+		err error
+		ms  = m.metricsStorage
+	)
+	stack := ms.mapMetricsStack
+	if &stack == nil {
+		return nil, errors.New("no stack initialized")
+	}
+	if stack.Len() == 0 {
+		return nil, errors.New("no data in stack")
+	}
+	peekPtr := stack.Peek().(*map[string]MetricValue)
+	if peekPtr == nil {
+		err = errors.New("unexpectedly no map data in stack")
+	}
+	currentMetric := *peekPtr
+	return currentMetric[name], err
+
+}
 func (m DataServer) GetCurrentMetric(ctx context.Context) (Metrics, error) {
 	var (
 		err error

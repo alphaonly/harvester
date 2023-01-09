@@ -3,11 +3,11 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/alphaonly/harvester/cmd/server/storage"
 	"github.com/go-chi/chi/v5"
-	"net/http"
-	"reflect"
-	"strconv"
 )
 
 //type gauge float64
@@ -36,11 +36,18 @@ func (h *Handlers) HandleGetMetricFieldList(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-	val := reflect.ValueOf(&storage.Metrics{}).Elem()
+	// val := reflect.ValueOf(&storage.Metrics{}).Elem()
+
+	ms, err := h.dataServer.GetAllMetricsNames(context.Background())
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	w.Write([]byte("<h1><ul>"))
-	for i := 0; i < val.NumField(); i++ {
-		w.Write([]byte(" <li>" + val.Type().Field(i).Name + "</li>"))
+	for key := range ms {
+		w.Write([]byte(" <li>" + key + "</li>"))
 	}
 
 	w.Write([]byte("</ul></h1>"))
@@ -88,7 +95,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	w.Header().Set("Content-Type", "text/text; charset=utf-8")
+	w.Header().Set("Content-Type", "plain/text; charset=utf-8")
 
 }
 func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
@@ -258,10 +265,11 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
+					counterValue = storage.Counter(intValue)
+
 					cValue.SetValue(counterValue)
 					dataServer.AddCurrentToMap(ctx, metricName, &cValue)
 
-					counterValue = storage.Counter(intValue)
 					//metricsMap[parts[2]] = counter(intValue)
 
 					switch parts[3] {

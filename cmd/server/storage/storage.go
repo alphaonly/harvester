@@ -3,9 +3,10 @@ package storage
 import (
 	"context"
 	"errors"
-	"github.com/golang-collections/collections/stack"
 	"reflect"
 	"strconv"
+
+	"github.com/golang-collections/collections/stack"
 )
 
 type Gauge float64
@@ -123,9 +124,10 @@ func (m *Metrics) StringValue(field string) (value string, err error) {
 }
 
 type MetricsStorage struct {
-	metricsStack    *stack.Stack
-	mapMetricsStack *stack.Stack
-	metricsMap      *map[string]MetricValue
+	metricsStack       *stack.Stack
+	mapMetricsStack    *stack.Stack
+	metricsMap         *map[string]MetricValue
+	metricsDistinctSet *map[string]bool
 }
 
 type metricMemRepository interface {
@@ -151,6 +153,11 @@ func (DataServer) New() (m *DataServer) {
 	m.metricsStorage.metricsMap = &maps
 
 	m.metricsStorage.mapMetricsStack = &stack.Stack{}
+
+	mDistSet := make(map[string]bool)
+
+	m.metricsStorage.metricsDistinctSet = &mDistSet
+
 	return m
 }
 
@@ -161,17 +168,15 @@ func (m DataServer) GetMetric(ctx context.Context, PollCount Counter) (ms *Metri
 func (m DataServer) AddCurrentToMap(ctx context.Context, name string, value MetricValue) (r error) {
 
 	mp := *m.metricsStorage.metricsMap
-	mp[name] = value
+	ms := *m.metricsStorage.metricsDistinctSet
 
+	mp[name] = value
+	ms[name] = true
 	return nil
 }
 
 func (m DataServer) SaveMetric(ctx context.Context, metrics Metrics) (r error) {
 	ms := m.metricsStorage
-
-	//if ms.ID.IsZero() && metrics.PollCount == 1 {
-	//	ms.ID = time.Now()
-	//}
 
 	lenBefore := ms.mapMetricsStack.Len()
 
@@ -180,11 +185,6 @@ func (m DataServer) SaveMetric(ctx context.Context, metrics Metrics) (r error) {
 
 	mp := make(map[string]MetricValue)
 	ms.metricsMap = &mp
-
-	//msmap := *ms.metricsMap
-	//msmap[metrics.PollCount] = metrics
-	//
-	//fmt.Println(ms.metricsStack.Len())
 
 	lenAfter := ms.mapMetricsStack.Len()
 	if lenAfter == lenBefore {
@@ -198,8 +198,14 @@ func (m DataServer) DeleteMetric(ctx context.Context, PollCount Counter) (*Metri
 
 	return nil, nil
 }
-func (m DataServer) GetAllMetrics(ctx context.Context, PollCount Counter) (*stack.Stack, error) {
-	return nil, nil
+func (m DataServer) GetAllMetricsNames(ctx context.Context) (map[string]bool, error) {
+
+	if m.metricsStorage.metricsDistinctSet == nil {
+		return nil, errors.New("no list of metrics names")
+	}
+
+	return *m.metricsStorage.metricsDistinctSet, nil
+
 }
 func (m DataServer) GetCurrentMetricMap(ctx context.Context, name string) (MetricValue, error) {
 	var (

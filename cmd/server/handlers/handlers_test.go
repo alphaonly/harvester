@@ -142,7 +142,6 @@ func TestHandleMetric(t *testing.T) {
 			r.ServeHTTP(w, request)
 
 			response := w.Result()
-			w.Result()
 			if response.StatusCode != tt.want.code {
 				t.Errorf("error code %v want %v", response.StatusCode, tt.want.code)
 				fmt.Println(response)
@@ -154,7 +153,10 @@ func TestHandleMetric(t *testing.T) {
 				(response.Header.Get("Content-type") != tt.want.contentType) {
 				t.Errorf("error contentType %v want %v", response.Header.Get("Content-type"), tt.want.contentType)
 			}
-
+			err := response.Body.Close()
+			if err != nil {
+				t.Errorf("response body close error: %v response", response.Body)
+			}
 		})
 
 	}

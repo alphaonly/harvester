@@ -2,17 +2,19 @@ package main
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/alphaonly/harvester/internal/agent"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdateMemStatsMetrics(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		value Metrics
+		value agent.Metrics
 		want  bool
 	}{
 		{
@@ -25,10 +27,9 @@ func TestUpdateMemStatsMetrics(t *testing.T) {
 
 		t.Run(tt.name, func(tst *testing.T) {
 			ctx := context.Background()
-			//ctxMetrics, cancel := context.WithCancel(ctx)
 			ctxMetrics, cancel := context.WithTimeout(ctx, time.Second*3)
 			defer cancel()
-			go updateMemStatsMetrics(ctxMetrics, &tt.value)
+			go agent.UpdateMemStatsMetrics(ctxMetrics, &tt.value)
 
 			time.Sleep(time.Second * 4)
 

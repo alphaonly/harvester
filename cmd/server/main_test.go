@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/alphaonly/harvester/internal/server"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRun(t *testing.T) {
@@ -28,7 +30,7 @@ func TestRun(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			go func() {
-				err = Server{}.run(ctx)
+				err = server.Run(ctx)
 			}()
 
 			if !assert.Equal(t, tt.want, err) {

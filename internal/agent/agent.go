@@ -124,7 +124,7 @@ func Run(ctx context.Context) {
 
 	var elementValue string
 
-	baseUrl := url.URL{
+	baseURL := url.URL{
 
 		Scheme: "http",
 		Host:   serverHost + serverPort,
@@ -158,7 +158,7 @@ func Run(ctx context.Context) {
 				elementValue = strconv.FormatFloat(float64(elements.Field(i).Interface().(gauge)), 'E', -1, 64)
 			}
 
-			url := baseUrl.
+			url := baseURL.
 				JoinPath("update").
 				JoinPath(elementType).
 				JoinPath(elementName).

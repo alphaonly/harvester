@@ -16,6 +16,9 @@ cmd/agent/main
 cmd/agent/agent
 cmd/server/main
 cmd/server/server
+/internal/server/server
+/internal/agent/agent
+/cmd/httplib/
 
 # Dependency directories (remove the comment below to include it)
 vendor/
@@ -23,3 +26,5 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+
+#others

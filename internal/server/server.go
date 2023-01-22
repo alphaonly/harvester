@@ -2,40 +2,48 @@ package server
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/alphaonly/harvester/internal/server/handlers"
-	"github.com/alphaonly/harvester/internal/server/storage"
 )
 
-const serverPort = ":8080"
-
-type Server struct {
+type Configuration struct {
+	serverPort string
 }
 
-func Run(ctx context.Context) error {
+type Server struct {
+	handlers      *handlers.Handlers
+	configuration *Configuration
+}
 
-	dataServer := storage.DataServer{}.New()
+func NewConfiguration(serverPort string) *Configuration {
+	return &Configuration{serverPort: ":" + serverPort}
+}
 
-	h := handlers.Handlers{}
-	h.SetDataServer(dataServer)
+func New(handlers *handlers.Handlers, configuration *Configuration) (server Server) {
+	return Server{
+		handlers:      handlers,
+		configuration: configuration,
+	}
+}
+
+func (s Server) Run(ctx context.Context) error {
 
 	// маршрутизация запросов обработчику
 
-	router := handlers.NewRouter(dataServer)
-
-	//http.HandleFunc("/update/", h.HandlePostMetric)
-
 	server := http.Server{
-		Addr: serverPort,
+		Addr: s.configuration.serverPort,
 	}
-	var err error
 
 	go func() {
-		err = http.ListenAndServe(serverPort, router)
+		err := http.ListenAndServe(s.configuration.serverPort, s.handlers.NewRouter())
+		if err != nil {
+			log.Fatal(err)
+		}
 	}()
 
 	// Setting up signal capturing
@@ -54,7 +62,7 @@ func Run(ctx context.Context) error {
 		}
 	}
 
-	err = server.Shutdown(ctx2)
-
+	err := server.Shutdown(ctx2)
+	log.Println("Server shutdown")
 	return err
 }

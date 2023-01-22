@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
+	"github.com/alphaonly/harvester/internal/agent"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/alphaonly/harvester/internal/agent"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdateMemStatsMetrics(t *testing.T) {
@@ -24,19 +23,18 @@ func TestUpdateMemStatsMetrics(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-
 		t.Run(tt.name, func(tst *testing.T) {
 			ctx := context.Background()
+			//ctxMetrics, cancel := context.WithCancel(ctx)
 			ctxMetrics, cancel := context.WithTimeout(ctx, time.Second*3)
 			defer cancel()
-			go agent.UpdateMemStatsMetrics(ctxMetrics, &tt.value)
+			go agent.Agent{}.Update(ctxMetrics, &tt.value)
 
 			time.Sleep(time.Second * 4)
 
 			if !assert.Equal(t, tt.want, reflect.ValueOf(tt.value).IsZero()) {
-				t.Error("UpdateMemStatsMetrics doesn't form runtime values")
+				t.Error("UpdateMemStatsMetrics is not received form runtime values")
 			}
-
 		})
 	}
 

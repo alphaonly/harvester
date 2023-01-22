@@ -3,9 +3,8 @@ package handlers
 import (
 	"bytes"
 	"fmt"
-	"net/url"
 
-	"github.com/alphaonly/harvester/internal/server/storage"
+	"net/url"
 
 	"net/http"
 	"net/http/httptest"
@@ -121,7 +120,8 @@ func TestHandleMetric(t *testing.T) {
 	}
 	fmt.Println("start!")
 
-	r := NewRouter(storage.DataServer{}.New())
+	h := Handlers{}
+	r := h.NewRouter()
 
 	ts := httptest.NewServer(r)
 	defer ts.Close()

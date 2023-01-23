@@ -7,15 +7,13 @@ import (
 	"net/http"
 	"strconv"
 
+	J "github.com/alphaonly/harvester/internal/server/JSON"
 	M "github.com/alphaonly/harvester/internal/server/interfaces"
 	C "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/CounterValue"
 	G "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/Gaugevalue"
 	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
-	J "github.com/alphaonly/harvester/internal/server/JSON"
 	"github.com/go-chi/chi/v5"
 )
-
-var j J.MetricsJSON
 
 type Handlers struct {
 	Storage *S.Storage
@@ -242,7 +240,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 
 					if err != nil || prevMetricValue == nil {
 
-						*prevMetricValue = &C.CounterValue{}
+						prevMetricValue = C.NewCounterValue()
 
 					}
 					sum := C.NewInt(intValue).AddValue(*prevMetricValue)

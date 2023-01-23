@@ -11,6 +11,11 @@ type CounterValue struct {
 	valueInt int64
 }
 
+func NewCounterValue() *interfaces.MetricValue {
+	var m interfaces.MetricValue = &CounterValue{}
+	return &m
+}
+
 func (v *CounterValue) New(c interfaces.Counter) *CounterValue {
 	v.value = c
 	v.valueInt = int64(c)

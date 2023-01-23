@@ -8,7 +8,8 @@ import (
 	s "github.com/alphaonly/harvester/internal/server"
 	h "github.com/alphaonly/harvester/internal/server/handlers"
 	m "github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
-	"github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,10 +35,10 @@ func TestRun(t *testing.T) {
 			defer cancel()
 			go func() {
 				var (
-					mapStorage          interfaces.Storage = m.New()
-					handlers                               = h.New(&mapStorage)
-					serverConfiguration                    = s.NewConfiguration("8080")
-					server                                 = s.New(handlers, serverConfiguration)
+					mapStorage          storage.Storage = m.New()
+					handlers                            = h.New(&mapStorage)
+					serverConfiguration                 = s.NewConfiguration("8080")
+					server                              = s.New(handlers, serverConfiguration)
 				)
 				err := server.Run(ctx)
 				if err != nil {

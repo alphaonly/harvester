@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	interfaces "github.com/alphaonly/harvester/internal/server/interfaces"
+	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 
 type MapStorage struct {
@@ -13,7 +14,7 @@ type MapStorage struct {
 	metricsMap *map[string]interfaces.MetricValue
 }
 
-func New() (sr MapStorage) {
+func New() (sr storage.Storage) {
 	map_ := make(map[string]interfaces.MetricValue)
 	return MapStorage{
 		mutex:      &sync.Mutex{},

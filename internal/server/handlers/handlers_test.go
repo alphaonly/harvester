@@ -9,28 +9,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 )
 
 const (
-	//serverHost = "127.0.0.1"
-	//serverPort = ":8080"
-	//urlPrefix  = "http://" + serverHost + serverPort
 	urlPrefix = ""
 )
-
-//type Server struct {
-//	Router *chi.Mux
-//	// Db, config can be added here
-//}
-//
-//func (s *Server) MountHandlers() {
-//	// Mount all Middleware here
-//	s.Router.Use(middleware.Logger)
-//
-//	// Mount all handlers here
-//	s.Router.Get("/", HelloWorld)
-//
-//}
 
 func TestHandleMetric(t *testing.T) {
 
@@ -54,24 +39,24 @@ func TestHandleMetric(t *testing.T) {
 	contentType := "text/plain; charset=utf-8"
 
 	//Check Url Ok
-	urlStr = urlPrefix + "/update/main.gauge/Alloc/2.36912E+05"
+	urlStr = urlPrefix + "/update/gauge/Alloc/2.36912E+05"
 	r1 := requestParams{method: http.MethodPost, url: urlStr,
 		want: want{code: http.StatusOK, response: `{"status":"ok"}`, contentType: contentType}}
 
 	//Check Url bad unknown metric
-	urlStr = urlPrefix + "/update/main.gauge/Alerrorloc/2.36912E+05"
+	urlStr = urlPrefix + "/update/gauge/Alerrorloc/2.36912E+05"
 	r3 := requestParams{method: http.MethodPost, url: urlStr,
 		want: want{code: http.StatusOK, response: ``, contentType: contentType}}
 	//Check Url bad method
-	urlStr = urlPrefix + "/update/main.gauge/Alloc/2.36912E+05"
+	urlStr = urlPrefix + "/update/gauge/Alloc/2.36912E+05"
 	r5 := requestParams{method: http.MethodGet, url: urlStr,
 		want: want{code: http.StatusMethodNotAllowed, response: `{"status":"ok"}`, contentType: contentType}}
 	//Check Url empty metric
-	urlStr = urlPrefix + "/update/main.gauge//2.36912E+05"
+	urlStr = urlPrefix + "/update/gauge//2.36912E+05"
 	r6 := requestParams{method: http.MethodPost, url: urlStr,
 		want: want{code: http.StatusNotFound, response: `{"status":"ok"}`, contentType: contentType}}
 	//Check Url empty metric value
-	urlStr = urlPrefix + "/update/main.gauge/counter/"
+	urlStr = urlPrefix + "/update/gauge/counter/"
 	r7 := requestParams{method: http.MethodPost, url: urlStr,
 		want: want{code: http.StatusNotFound, response: `{"status":"ok"}`, contentType: contentType}}
 
@@ -120,7 +105,9 @@ func TestHandleMetric(t *testing.T) {
 	}
 	fmt.Println("start!")
 
-	h := Handlers{}
+	s := mapstorage.New()
+	h := New(&s)
+
 	r := h.NewRouter()
 
 	ts := httptest.NewServer(r)

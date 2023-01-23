@@ -10,17 +10,18 @@ import (
 	M "github.com/alphaonly/harvester/internal/server/interfaces"
 	C "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/CounterValue"
 	G "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/Gaugevalue"
-	"github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	J "github.com/alphaonly/harvester/internal/server/JSON"
 	"github.com/go-chi/chi/v5"
 )
 
-var m interfaces.MetricsJSON
+var j J.MetricsJSON
 
 type Handlers struct {
-	Storage *interfaces.Storage
+	Storage *S.Storage
 }
 
-func New(storage *interfaces.Storage) *Handlers {
+func New(storage *S.Storage) *Handlers {
 	return &Handlers{Storage: storage}
 }
 
@@ -106,7 +107,8 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Unrecognized json request ", http.StatusBadRequest)
 		return
 	}
-	var requestMetricsJSON interfaces.MetricsJSON
+
+	var requestMetricsJSON J.MetricsJSON
 
 	err = json.Unmarshal(requestByteData, &requestMetricsJSON)
 	if err != nil {
@@ -252,7 +254,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, metricType+" not recognized type", http.StatusNotImplemented)
 				return
 			}
-
+			w.WriteHeader(http.StatusOK)
 		}
 	default:
 		http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
@@ -281,7 +283,7 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 				http.Error(w, "unrecognized request body", http.StatusBadRequest)
 				return
 			}
-			var metricsJSON interfaces.MetricsJSON
+			var metricsJSON J.MetricsJSON
 			err = json.Unmarshal(byteData, &metricsJSON)
 
 			if err != nil {

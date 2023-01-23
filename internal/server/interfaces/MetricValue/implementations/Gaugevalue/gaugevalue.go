@@ -3,7 +3,7 @@ package gaugevalue
 import (
 	"strconv"
 
-	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
+	interfaces "github.com/alphaonly/harvester/internal/server/interfaces"
 )
 
 type GaugeValue struct {

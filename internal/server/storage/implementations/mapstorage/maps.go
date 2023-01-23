@@ -1,11 +1,11 @@
-package MapStorage
+package mapstorage
 
 import (
 	"context"
 	"errors"
 	"sync"
 
-	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
+	interfaces "github.com/alphaonly/harvester/internal/server/interfaces"
 )
 
 type MapStorage struct {

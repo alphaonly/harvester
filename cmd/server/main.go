@@ -6,7 +6,7 @@ import (
 
 	s "github.com/alphaonly/harvester/internal/server"
 	h "github.com/alphaonly/harvester/internal/server/handlers"
-	m "github.com/alphaonly/harvester/internal/server/storage/implementations/MapStorage"
+	m "github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 	"github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 

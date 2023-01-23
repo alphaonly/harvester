@@ -2,8 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"io"
 
 	"log"
@@ -26,72 +24,40 @@ type Configuration struct {
 	UseJSON        bool
 }
 
-type gauge float64
-type counter int64
+type Gauge float64
+type Counter int64
 
 type Metrics struct {
-	Alloc         gauge
-	BuckHashSys   gauge
-	Frees         gauge
-	GCCPUFraction gauge
-	GCSys         gauge
-	HeapAlloc     gauge
-	HeapIdle      gauge
-	HeapInuse     gauge
-	HeapObjects   gauge
-	HeapReleased  gauge
-	HeapSys       gauge
-	LastGC        gauge
-	Lookups       gauge
-	MCacheInuse   gauge
-	MCacheSys     gauge
-	MSpanInuse    gauge
-	MSpanSys      gauge
-	Mallocs       gauge
-	NextGC        gauge
-	NumForcedGC   gauge
-	NumGC         gauge
-	OtherSys      gauge
-	PauseTotalNs  gauge
-	StackInuse    gauge
-	StackSys      gauge
-	Sys           gauge
-	TotalAlloc    gauge
-	RandomValue   gauge
+	Alloc         Gauge
+	BuckHashSys   Gauge
+	Frees         Gauge
+	GCCPUFraction Gauge
+	GCSys         Gauge
+	HeapAlloc     Gauge
+	HeapIdle      Gauge
+	HeapInuse     Gauge
+	HeapObjects   Gauge
+	HeapReleased  Gauge
+	HeapSys       Gauge
+	LastGC        Gauge
+	Lookups       Gauge
+	MCacheInuse   Gauge
+	MCacheSys     Gauge
+	MSpanInuse    Gauge
+	MSpanSys      Gauge
+	Mallocs       Gauge
+	NextGC        Gauge
+	NumForcedGC   Gauge
+	NumGC         Gauge
+	OtherSys      Gauge
+	PauseTotalNs  Gauge
+	StackInuse    Gauge
+	StackSys      Gauge
+	Sys           Gauge
+	TotalAlloc    Gauge
+	RandomValue   Gauge
 
-	PollCount counter
-}
-
-type MetricsJSON struct {
-	ID    string   `json:"id"`              // имя метрики
-	MType string   `json:"type"`            // параметр, пID    string   `json:"id"`              // имя метрикиринимающий значение gauge или counter
-	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
-	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
-}
-
-func (j MetricsJSON) newMetricJson(name string, MType string, value interface{}) (ret MetricsJSON) {
-
-	j = MetricsJSON{}
-	if name == "" || MType == "" {
-		panic(errors.New("name or type is empty"))
-	}
-
-	j.ID = name
-	j.MType = MType
-
-	if value != nil {
-		switch MType {
-		case "agent.gauge", "gauge":
-			var val = float64(value.(gauge))
-			j.Value = &val
-		case "agent.counter", "counter":
-			var val = int64(value.(counter))
-			j.Delta = &val
-		default:
-			panic(errors.New("unknown type"))
-		}
-	}
-	return j
+	PollCount Counter
 }
 
 type Agent struct {
@@ -109,44 +75,7 @@ func NewAgent(c *Configuration) Agent {
 	}
 }
 
-func (a Agent) GetMetricJson(name string, MType string) (mj MetricsJSON) {
-
-	metricsJsonRequest := MetricsJSON{}.newMetricJson(name, MType, nil)
-	data, err := json.Marshal(metricsJsonRequest)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	URL := a.baseURL.JoinPath("value")
-	request, err := http.NewRequest(http.MethodGet, URL.String(), bytes.NewBuffer(data))
-	if err != nil {
-		log.Fatal(err)
-	}
-	request.Header.Set("Content-Type", "application/json; charset=utf-8")
-	request.Header.Add("Accept", "application/json; charset=utf-8")
-
-	client := http.Client{}
-	if err != nil {
-		log.Fatal(err)
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		log.Fatal(err)
-	}
-	responseData, err := io.ReadAll(response.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var metricsJsonResponse MetricsJSON
-	err = json.Unmarshal(responseData, &metricsJsonResponse)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return metricsJsonResponse
-
-}
-
-func AddCounterData(urlPref *url.URL, val counter, name string, data *map[sendData]bool) {
+func AddCounterData(urlPref *url.URL, val Counter, name string, data *map[sendData]bool) {
 	URL := urlPref.
 		JoinPath("counter").
 		JoinPath(name).
@@ -158,7 +87,7 @@ func AddCounterData(urlPref *url.URL, val counter, name string, data *map[sendDa
 	(*data)[sd] = true
 
 }
-func AddGaugeData(urlPref *url.URL, val gauge, name string, data *map[sendData]bool) {
+func AddGaugeData(urlPref *url.URL, val Gauge, name string, data *map[sendData]bool) {
 
 	URL := urlPref.
 		JoinPath("gauge").
@@ -191,6 +120,7 @@ func (data sendData) sendDataURL(client *http.Client) error {
 		log.Fatal(err)
 	}
 	log.Println("response from server:" + response.Status)
+	response.Body.Close()
 	return err
 }
 
@@ -204,33 +134,33 @@ repeatAgain:
 		{
 			runtime.ReadMemStats(&m)
 
-			metrics.Alloc = gauge(m.Alloc)
-			metrics.BuckHashSys = gauge(m.BuckHashSys)
-			metrics.Frees = gauge(m.Frees)
-			metrics.GCCPUFraction = gauge(m.GCCPUFraction)
-			metrics.GCSys = gauge(m.GCSys)
-			metrics.HeapAlloc = gauge(m.HeapAlloc)
-			metrics.HeapIdle = gauge(m.HeapIdle)
-			metrics.HeapInuse = gauge(m.HeapInuse)
-			metrics.HeapObjects = gauge(m.HeapObjects)
-			metrics.HeapReleased = gauge(m.HeapReleased)
-			metrics.HeapSys = gauge(m.HeapSys)
-			metrics.LastGC = gauge(m.LastGC)
-			metrics.Lookups = gauge(m.Lookups)
-			metrics.MCacheInuse = gauge(m.MCacheInuse)
-			metrics.MCacheSys = gauge(m.MCacheSys)
-			metrics.MSpanInuse = gauge(m.MSpanInuse)
-			metrics.MSpanSys = gauge(m.MSpanSys)
-			metrics.Mallocs = gauge(m.Mallocs)
-			metrics.NextGC = gauge(m.NextGC)
-			metrics.NumForcedGC = gauge(m.NumForcedGC)
-			metrics.NumGC = gauge(m.NumGC)
-			metrics.OtherSys = gauge(m.OtherSys)
-			metrics.PauseTotalNs = gauge(m.PauseTotalNs)
-			metrics.StackInuse = gauge(m.StackInuse)
-			metrics.StackSys = gauge(m.StackSys)
-			metrics.Sys = gauge(m.Sys)
-			metrics.TotalAlloc = gauge(m.TotalAlloc)
+			metrics.Alloc = Gauge(m.Alloc)
+			metrics.BuckHashSys = Gauge(m.BuckHashSys)
+			metrics.Frees = Gauge(m.Frees)
+			metrics.GCCPUFraction = Gauge(m.GCCPUFraction)
+			metrics.GCSys = Gauge(m.GCSys)
+			metrics.HeapAlloc = Gauge(m.HeapAlloc)
+			metrics.HeapIdle = Gauge(m.HeapIdle)
+			metrics.HeapInuse = Gauge(m.HeapInuse)
+			metrics.HeapObjects = Gauge(m.HeapObjects)
+			metrics.HeapReleased = Gauge(m.HeapReleased)
+			metrics.HeapSys = Gauge(m.HeapSys)
+			metrics.LastGC = Gauge(m.LastGC)
+			metrics.Lookups = Gauge(m.Lookups)
+			metrics.MCacheInuse = Gauge(m.MCacheInuse)
+			metrics.MCacheSys = Gauge(m.MCacheSys)
+			metrics.MSpanInuse = Gauge(m.MSpanInuse)
+			metrics.MSpanSys = Gauge(m.MSpanSys)
+			metrics.Mallocs = Gauge(m.Mallocs)
+			metrics.NextGC = Gauge(m.NextGC)
+			metrics.NumForcedGC = Gauge(m.NumForcedGC)
+			metrics.NumGC = Gauge(m.NumGC)
+			metrics.OtherSys = Gauge(m.OtherSys)
+			metrics.PauseTotalNs = Gauge(m.PauseTotalNs)
+			metrics.StackInuse = Gauge(m.StackInuse)
+			metrics.StackSys = Gauge(m.StackSys)
+			metrics.Sys = Gauge(m.Sys)
+			metrics.TotalAlloc = Gauge(m.TotalAlloc)
 
 			goto repeatAgain
 		}
@@ -301,7 +231,7 @@ repeatAgain:
 	case <-ticker.C:
 		{
 			metrics.PollCount++
-			metrics.RandomValue = gauge(rand.Int63())
+			metrics.RandomValue = Gauge(rand.Int63())
 			dataPackage := a.prepareData(metrics)
 
 			for key := range dataPackage {

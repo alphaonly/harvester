@@ -3,7 +3,7 @@ package countervalue
 import (
 	"strconv"
 
-	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
+	interfaces "github.com/alphaonly/harvester/internal/server/interfaces"
 )
 
 type CounterValue struct {

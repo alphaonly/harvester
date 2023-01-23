@@ -3,7 +3,7 @@ package interfaces
 import (
 	"context"
 
-	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
+	interfaces "github.com/alphaonly/harvester/internal/server/interfaces"
 )
 
 type Gauge float64

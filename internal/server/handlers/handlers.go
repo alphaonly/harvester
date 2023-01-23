@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"strconv"
 
-	M "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
+	M "github.com/alphaonly/harvester/internal/server/interfaces"
 	C "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/CounterValue"
 	G "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/Gaugevalue"
 	"github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/go-chi/chi/v5"
 )
+
+var m interfaces.MetricsJSON
 
 type Handlers struct {
 	Storage *interfaces.Storage
@@ -104,20 +106,20 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Unrecognized json request ", http.StatusBadRequest)
 		return
 	}
-	var requestMetricsJson interfaces.MetricsJSON
+	var requestMetricsJSON interfaces.MetricsJSON
 
-	err = json.Unmarshal(requestByteData, &requestMetricsJson)
+	err = json.Unmarshal(requestByteData, &requestMetricsJSON)
 	if err != nil {
 		http.Error(w, "Error json-marshal request data", http.StatusBadRequest)
 		return
 	}
-	if !(requestMetricsJson.Delta == nil && requestMetricsJson.Value == nil) {
+	if !(requestMetricsJSON.Delta == nil && requestMetricsJSON.Value == nil) {
 		http.Error(w, "not empty values in json-marshal request data", http.StatusBadRequest)
 		return
 	}
 
-	metricType := requestMetricsJson.MType
-	metricName := requestMetricsJson.ID
+	metricType := requestMetricsJSON.MType
+	metricName := requestMetricsJSON.ID
 
 	if metricName == "" {
 		http.Error(w, "is not parsed, empty metric name ", http.StatusNotFound)
@@ -141,18 +143,18 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var responseMetricsJSon = requestMetricsJson
+	var responseMetricsJSON = requestMetricsJSON
 
-	switch requestMetricsJson.MType {
+	switch requestMetricsJSON.MType {
 	case "agent.gauge":
 		{
 			v := (*metricsValue).GetInternalValue().(float64)
-			responseMetricsJSon.Value = &v
+			responseMetricsJSON.Value = &v
 		}
 	case "agent.counter":
 		{
 			v := (*metricsValue).GetInternalValue().(int64)
-			responseMetricsJSon.Delta = &v
+			responseMetricsJSON.Delta = &v
 		}
 	default:
 		{
@@ -160,7 +162,7 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 			return
 		}
 	}
-	responseByteData, err := json.Marshal(responseMetricsJSon)
+	responseByteData, err := json.Marshal(responseMetricsJSON)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -279,31 +281,31 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 				http.Error(w, "unrecognized request body", http.StatusBadRequest)
 				return
 			}
-			var metricsJson interfaces.MetricsJSON
-			err = json.Unmarshal(byteData, &metricsJson)
+			var metricsJSON interfaces.MetricsJSON
+			err = json.Unmarshal(byteData, &metricsJSON)
 
 			if err != nil {
 				http.Error(w, "Unrecognized json", http.StatusBadRequest)
 				return
 			}
 
-			if metricsJson.ID == "" {
-				http.Error(w, "not parsed, empty metric name!"+metricsJson.ID, http.StatusNotFound)
+			if metricsJSON.ID == "" {
+				http.Error(w, "not parsed, empty metric name!"+metricsJSON.ID, http.StatusNotFound)
 				return
 			}
 
-			if metricsJson.Delta == nil && metricsJson.Value == nil {
+			if metricsJSON.Delta == nil && metricsJSON.Value == nil {
 				http.Error(w, "not parsed, empty metric value", http.StatusBadRequest)
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 
 			//logic
-			switch metricsJson.MType {
+			switch metricsJSON.MType {
 			case "gauge":
 				{
-					var m M.MetricValue = G.NewFloat(*metricsJson.Value)
-					err := (*h.Storage).SaveMetric(r.Context(), metricsJson.ID, &m)
+					var m M.MetricValue = G.NewFloat(*metricsJSON.Value)
+					err := (*h.Storage).SaveMetric(r.Context(), metricsJSON.ID, &m)
 					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
@@ -313,24 +315,24 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 			case "counter":
 				{
 
-					prevMetricValue, err := (*h.Storage).GetMetric(r.Context(), metricsJson.ID)
+					prevMetricValue, err := (*h.Storage).GetMetric(r.Context(), metricsJSON.ID)
 
 					if err != nil || prevMetricValue == nil {
 
 						*prevMetricValue = &C.CounterValue{}
 
 					}
-					sum := C.NewInt(*metricsJson.Delta).AddValue(*prevMetricValue)
+					sum := C.NewInt(*metricsJSON.Delta).AddValue(*prevMetricValue)
 
-					(*h.Storage).SaveMetric(r.Context(), metricsJson.ID, &sum)
+					(*h.Storage).SaveMetric(r.Context(), metricsJSON.ID, &sum)
 
 				}
 			default:
-				http.Error(w, metricsJson.MType+" not recognized type", http.StatusNotImplemented)
+				http.Error(w, metricsJSON.MType+" not recognized type", http.StatusNotImplemented)
 				return
 			}
 
-			byteData, err2 := json.Marshal(metricsJson)
+			byteData, err2 := json.Marshal(metricsJSON)
 			if err2 != nil || byteData == nil {
 				http.Error(w, " json response forming error", http.StatusInternalServerError)
 				return

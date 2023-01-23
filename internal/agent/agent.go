@@ -195,13 +195,9 @@ func (data sendData) sendDataURL(client *http.Client) error {
 }
 
 func (a Agent) Update(ctx context.Context, metrics *Metrics) {
-
 	var m runtime.MemStats
-
 	ticker := time.NewTicker(time.Duration(a.Configuration.PollInterval) * time.Second)
-
 	defer ticker.Stop()
-
 repeatAgain:
 	select {
 	case <-ticker.C:
@@ -238,7 +234,6 @@ repeatAgain:
 
 			goto repeatAgain
 		}
-
 	case <-ctx.Done():
 		{
 			log.Println("Metrics reading cancelled by context")

@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"log"
+
 	s "github.com/alphaonly/harvester/internal/server"
 	h "github.com/alphaonly/harvester/internal/server/handlers"
-	m "github.com/alphaonly/harvester/internal/server/storage/implementions/MapStorage"
+	m "github.com/alphaonly/harvester/internal/server/storage/implementations/MapStorage"
 	"github.com/alphaonly/harvester/internal/server/storage/interfaces"
-	"log"
 )
 
 func main() {

@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"github.com/alphaonly/harvester/internal/agent"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+
+	"github.com/alphaonly/harvester/internal/agent"
 )
 
 func main() {
@@ -30,11 +31,5 @@ func main() {
 
 	<-channel
 	log.Print("Agent shutdown")
-
-	//go func() {
-	//	for sig := range channel {
-	//		sig.
-	//	}
-	//}()
 
 }

@@ -1,7 +1,9 @@
-package GaugeValue
+package gaugevalue
+
 import (
-	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
 	"strconv"
+
+	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
 )
 
 type GaugeValue struct {
@@ -9,35 +11,34 @@ type GaugeValue struct {
 	valueFloat float64
 }
 
-func (v GaugeValue) New(g interfaces.Gauge) *GaugeValue {
+func (v *GaugeValue) New(g interfaces.Gauge) *GaugeValue {
 	v.value = g
 	v.valueFloat = float64(g)
-	return &v
-}
-func (v GaugeValue) NewFloat(g float64) *GaugeValue {
-	v.value = interfaces.Gauge(g)
-	v.valueFloat = g
-	return &v
-}
-func (v GaugeValue) SetValue(gauge interfaces.MetricValue) {
-	v.value = interfaces.Gauge(gauge.(GaugeValue).value)
-	v.valueFloat = float64(v.value)
-}
-func (v GaugeValue) GetValue() interfaces.MetricValue {
 	return v
 }
-func (v GaugeValue) GetInternalValue() interface{} {
+func NewFloat(g float64) *GaugeValue {
+	return &GaugeValue{
+		value:      interfaces.Gauge(g),
+		valueFloat: g,
+	}
+}
+func (v *GaugeValue) SetValue(gauge interfaces.MetricValue) {
+	v.value = interfaces.Gauge(gauge.(*GaugeValue).value)
+	v.valueFloat = float64(v.value)
+}
+func (v *GaugeValue) GetValue() interfaces.MetricValue {
+	return v
+}
+func (v *GaugeValue) GetInternalValue() interface{} {
 	return v.valueFloat
 }
-func (v GaugeValue) GetString() string {
+func (v *GaugeValue) GetString() string {
 	return strconv.FormatFloat(float64(v.value), 'f', -1, 64)
 }
 
-func (v GaugeValue) AddValue(v1 interfaces.MetricValue) interfaces.MetricValue {
+func (v *GaugeValue) AddValue(v1 interfaces.MetricValue) interfaces.MetricValue {
 	return v //Mocked, as it's needed for counter only
 }
 
-
-
-//check
-var m interfaces.MetricValue = GaugeValue{}
+// check
+var m interfaces.MetricValue = &GaugeValue{}

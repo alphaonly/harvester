@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strconv"
 
-	i "github.com/alphaonly/harvester/internal/server/interfaces"
-	c "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/CounterValue"
-	g "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/GaugeValue"
+	M "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
+	C "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/CounterValue"
+	G "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/Gaugevalue"
 	"github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/go-chi/chi/v5"
 )
@@ -18,10 +18,10 @@ type Handlers struct {
 	Storage *interfaces.Storage
 }
 
-func (h *Handlers) SetDataServer(storage *interfaces.Storage) {
-	h.Storage = storage
-
+func New(storage *interfaces.Storage) *Handlers {
+	return &Handlers{Storage: storage}
 }
+
 func (h *Handlers) HandleGetMetricFieldList(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
@@ -59,6 +59,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 
 	if metricName == "" {
 		http.Error(w, "is not parsed, empty metric name ", http.StatusNotFound)
+		return
 	}
 	if metricType == "" {
 		http.Error(w, metricType+"is not recognized type", http.StatusNotImplemented)
@@ -84,6 +85,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	_, err = w.Write([]byte(metricValue))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "plain/text; charset=utf-8")
@@ -215,10 +217,10 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusBadRequest)
 						return
 					}
-					var m i.MetricValue = *(g.GaugeValue{}.NewFloat(float64Value))
+					var m M.MetricValue = G.NewFloat(float64Value)
 
-					err2 := (*h.Storage).SaveMetric(r.Context(), metricName, m)
-					if err2 != nil {
+					err = (*h.Storage).SaveMetric(r.Context(), metricName, &m)
+					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
 					}
@@ -236,10 +238,10 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 
 					if err != nil || prevMetricValue == nil {
 
-						*prevMetricValue = c.CounterValue{}
+						*prevMetricValue = &C.CounterValue{}
 
 					}
-					sum := c.CounterValue{}.NewInt(intValue).AddValue(*prevMetricValue)
+					sum := C.NewInt(intValue).AddValue(*prevMetricValue)
 
 					(*h.Storage).SaveMetric(r.Context(), metricName, &sum)
 
@@ -300,8 +302,8 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 			switch metricsJson.MType {
 			case "gauge":
 				{
-					var gValue i.MetricValue = i.GaugeValue{}.NewFloat(*metricsJson.Value)
-					err := (*h.Storage).SaveMetric(r.Context(), metricsJson.ID, &gValue)
+					var m M.MetricValue = G.NewFloat(*metricsJson.Value)
+					err := (*h.Storage).SaveMetric(r.Context(), metricsJson.ID, &m)
 					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
@@ -315,10 +317,10 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 
 					if err != nil || prevMetricValue == nil {
 
-						*prevMetricValue = i.CounterValue{}
+						*prevMetricValue = &C.CounterValue{}
 
 					}
-					sum := i.CounterValue{}.NewInt(*metricsJson.Delta).AddValue(*prevMetricValue)
+					sum := C.NewInt(*metricsJson.Delta).AddValue(*prevMetricValue)
 
 					(*h.Storage).SaveMetric(r.Context(), metricsJson.ID, &sum)
 
@@ -343,14 +345,13 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
-
 	http.Error(w, "Unknown request", http.StatusNotFound)
-
+	r.Body.Close()
 }
 func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.Request) {
 
 	http.Error(w, "Unknown request", http.StatusNotFound)
-
+	r.Body.Close()
 }
 
 func (h *Handlers) NewRouter() chi.Router {
@@ -362,7 +363,7 @@ func (h *Handlers) NewRouter() chi.Router {
 		r.Get("/value", h.HandleGetMetricValueJSON)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		r.Post("/update", h.HandlePostMetricJSON)
-		r.Post("/updateViaUrl/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
+		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
 		r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)
 

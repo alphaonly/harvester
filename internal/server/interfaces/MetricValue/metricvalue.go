@@ -1,6 +1,4 @@
-package interfaces
-
-import "github.com/alphaonly/harvester/internal/server/interfaces"
+package MetricValue
 
 type Gauge float64
 type Counter int64
@@ -12,4 +10,3 @@ type MetricValue interface {
 	GetString() string
 	AddValue(MetricValue) MetricValue // increment  current and return incremented( for counter only)
 }
-

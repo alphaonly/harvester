@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	s "github.com/alphaonly/harvester/internal/server"
-	h "github.com/alphaonly/harvester/internal/server/handlers"
-	m "github.com/alphaonly/harvester/internal/server/storage/implementaions/MapStorage"
-	"github.com/alphaonly/harvester/internal/server/storage/interfaces"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	s "github.com/alphaonly/harvester/internal/server"
+	h "github.com/alphaonly/harvester/internal/server/handlers"
+	m "github.com/alphaonly/harvester/internal/server/storage/implementations/MapStorage"
+	"github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRun(t *testing.T) {

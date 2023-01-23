@@ -4,7 +4,7 @@ import (
 	"context"
 	s "github.com/alphaonly/harvester/internal/server"
 	h "github.com/alphaonly/harvester/internal/server/handlers"
-	m "github.com/alphaonly/harvester/internal/server/storage/implementaions/MapStorage"
+	m "github.com/alphaonly/harvester/internal/server/storage/implementions/MapStorage"
 	"github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"log"
 )

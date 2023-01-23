@@ -3,8 +3,9 @@ package MapStorage
 import (
 	"context"
 	"errors"
-	"github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
 	"sync"
+
+	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
 )
 
 type MapStorage struct {
@@ -23,9 +24,9 @@ func New() (sr MapStorage) {
 //Имплементация интерфейса storage
 
 // type Storage interface {
-// 	GetMetric(ctx context.Context, name string) (mv interfaces.MetricValue, err error)
-// 	SaveMetric(ctx context.Context, name string, mv interfaces.MetricValue) (err error)
-// 	GetAllMetrics(ctx context.Context) (mvList map[string]interfaces.MetricValue, err error)
+// 	GetMetric(ctx context.Context, name string) (mv *interfaces.MetricValue, err error)
+// 	SaveMetric(ctx context.Context, name string, mv *interfaces.MetricValue) (err error)
+// 	GetAllMetrics(ctx context.Context) (mvList *map[string]interfaces.MetricValue, err error)
 // }
 
 func (m MapStorage) GetMetric(ctx context.Context, name string) (mv *interfaces.MetricValue, err error) {

@@ -1,5 +1,4 @@
-package interfaces
-
+package GaugeValue
 import (
 	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
 	"strconv"
@@ -37,3 +36,8 @@ func (v GaugeValue) GetString() string {
 func (v GaugeValue) AddValue(v1 interfaces.MetricValue) interfaces.MetricValue {
 	return v //Mocked, as it's needed for counter only
 }
+
+
+
+//check
+var m interfaces.MetricValue = GaugeValue{}

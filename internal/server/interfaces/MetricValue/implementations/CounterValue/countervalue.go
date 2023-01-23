@@ -1,8 +1,9 @@
-package interfaces
+package CounterValue
 
 import (
-	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
 	"strconv"
+
+	interfaces "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue"
 )
 
 type CounterValue struct {
@@ -38,3 +39,6 @@ func (v CounterValue) AddValue(v1 interfaces.MetricValue) interfaces.MetricValue
 	sumVal := int64(v1.(CounterValue).value) + v.valueInt
 	return &CounterValue{value: interfaces.Counter(sumVal), valueInt: sumVal}
 }
+
+// check
+var m interfaces.MetricValue = CounterValue{}

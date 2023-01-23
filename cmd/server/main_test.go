@@ -45,6 +45,8 @@ func TestRun(t *testing.T) {
 				}
 			}()
 
+			time.Sleep(time.Second * 10)
+
 			if !assert.Equal(t, tt.want, err) {
 				t.Error("Server doesn't run")
 			}

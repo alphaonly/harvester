@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/alphaonly/harvester/internal/environment"
 	"github.com/alphaonly/harvester/internal/server/handlers"
 )
 
@@ -17,14 +18,14 @@ type Configuration struct {
 
 type Server struct {
 	handlers      *handlers.Handlers
-	configuration *Configuration
+	configuration *environment.Configuration
 }
 
 func NewConfiguration(serverPort string) *Configuration {
 	return &Configuration{serverPort: ":" + serverPort}
 }
 
-func New(handlers *handlers.Handlers, configuration *Configuration) (server Server) {
+func New(handlers *handlers.Handlers, configuration *environment.Configuration) (server Server) {
 	return Server{
 		handlers:      handlers,
 		configuration: configuration,

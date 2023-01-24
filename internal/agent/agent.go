@@ -14,6 +14,8 @@ import (
 
 	"math/rand"
 	"net/url"
+
+	"github.com/alphaonly/harvester/internal/environment"
 )
 
 type Configuration struct {
@@ -25,7 +27,7 @@ type Configuration struct {
 }
 
 type Gauge float64
-type Counter int64
+type counter int64
 
 type Metrics struct {
 	Alloc         Gauge
@@ -57,25 +59,26 @@ type Metrics struct {
 	TotalAlloc    Gauge
 	RandomValue   Gauge
 
-	PollCount Counter
+	PollCount counter
 }
 
 type Agent struct {
-	Configuration *Configuration
+	Configuration *environment.Configuration
 	baseURL       url.URL
 }
 
-func NewAgent(c *Configuration) Agent {
+func NewAgent(c *environment.Configuration) Agent {
+
 	return Agent{
 		Configuration: c,
 		baseURL: url.URL{
-			Scheme: "http",
-			Host:   c.ServerHost + ":" + c.ServerPort,
+			Scheme: (*c).Get("scheme"),
+			Host:   (*c).Get("host") + ":" + (*c).Get("port"),
 		},
 	}
 }
 
-func AddCounterData(urlPref *url.URL, val Counter, name string, data *map[sendData]bool) {
+func AddCounterData(urlPref *url.URL, val counter, name string, data *map[sendData]bool) {
 	URL := urlPref.
 		JoinPath("counter").
 		JoinPath(name).
@@ -126,7 +129,7 @@ func (data sendData) sendDataURL(client *http.Client) error {
 
 func (a Agent) Update(ctx context.Context, metrics *Metrics) {
 	var m runtime.MemStats
-	ticker := time.NewTicker(time.Duration(a.Configuration.PollInterval) * time.Second)
+	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("pollInterval")) * time.Second)
 	defer ticker.Stop()
 repeatAgain:
 	select {
@@ -175,12 +178,11 @@ repeatAgain:
 func (a Agent) prepareData(metrics *Metrics) map[sendData]bool {
 	m := make(map[sendData]bool)
 
-	switch a.Configuration.UseJSON {
+	switch (*a.Configuration).GetBool("useJSON") {
 	case true:
 		{
 			//Mocked up
-			//url := a.baseURL.
-			//	JoinPath("update")
+
 		}
 	default:
 		{
@@ -223,7 +225,7 @@ func (a Agent) prepareData(metrics *Metrics) map[sendData]bool {
 }
 func (a Agent) Send(ctx context.Context, client *http.Client, metrics *Metrics) {
 
-	ticker := time.NewTicker(time.Duration(a.Configuration.ReportInterval) * time.Second)
+	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("reportInterval")) * time.Second)
 	defer ticker.Stop()
 
 repeatAgain:

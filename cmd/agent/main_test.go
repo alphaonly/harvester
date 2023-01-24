@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alphaonly/harvester/internal/agent"
+	"github.com/alphaonly/harvester/internal/environment"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,15 +24,10 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	ac := agent.Configuration{
-		PollInterval:   2,
-		ReportInterval: 3, //10
-		ServerHost:     "127.0.0.1",
-		ServerPort:     "8080",
-		UseJSON:        false,
-	}
+	ac := environment.NewAgentConfiguration()
+	(*ac).Update()
 
-	a := agent.NewAgent(&ac)
+	a := agent.NewAgent(ac)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(tst *testing.T) {

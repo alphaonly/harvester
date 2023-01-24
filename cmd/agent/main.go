@@ -8,6 +8,7 @@ import (
 	"os/signal"
 
 	"github.com/alphaonly/harvester/internal/agent"
+	"github.com/alphaonly/harvester/internal/environment"
 )
 
 func main() {
@@ -15,15 +16,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ac := agent.Configuration{
-		PollInterval:   2,
-		ReportInterval: 3, //10
-		ServerHost:     "127.0.0.1",
-		ServerPort:     "8080",
-		UseJSON:        false,
-	}
+	ac := environment.NewAgentConfiguration()
 
-	agent.NewAgent(&ac).Run(ctx, &http.Client{})
+	(*ac).Update()
+
+	agent.NewAgent(ac).Run(ctx, &http.Client{})
 
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)

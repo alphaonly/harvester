@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	e "github.com/alphaonly/harvester/internal/environment"
 	s "github.com/alphaonly/harvester/internal/server"
 	h "github.com/alphaonly/harvester/internal/server/handlers"
 	m "github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
@@ -14,7 +15,7 @@ func main() {
 	var (
 		mapStorage          = m.New()
 		handlers            = h.New(&mapStorage)
-		serverConfiguration = s.NewConfiguration("8080")
+		serverConfiguration = (*e.NewServerConfiguration()).Update()
 		server              = s.New(handlers, serverConfiguration)
 	)
 

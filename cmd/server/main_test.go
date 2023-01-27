@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
-	e "github.com/alphaonly/harvester/internal/environment"
+	c "github.com/alphaonly/harvester/internal/configuration"
 	s "github.com/alphaonly/harvester/internal/server"
 	h "github.com/alphaonly/harvester/internal/server/handlers"
+	"github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
 	m "github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 
 	"github.com/stretchr/testify/assert"
@@ -35,10 +36,12 @@ func TestRun(t *testing.T) {
 			defer cancel()
 			go func() {
 				var (
-					mapStorage          = m.New()
-					handlers            = h.New(&mapStorage)
-					serverConfiguration = (*e.NewServerConfiguration()).Update()
-					server              = s.New(handlers, serverConfiguration)
+					configuration = (*c.NewServerConfiguration()).Update()
+					mapStorage    = m.New()
+					archive       = filestorage.New(configuration)
+					handlers      = h.New(mapStorage)
+
+					server = s.New(configuration, mapStorage, archive, handlers)
 				)
 				err := server.Run(ctx)
 				if err != nil {

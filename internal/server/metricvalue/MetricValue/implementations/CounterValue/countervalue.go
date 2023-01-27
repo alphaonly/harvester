@@ -1,10 +1,16 @@
 package countervalue
 
 import (
+	"encoding/json"
+	"errors"
 	"strconv"
 
-	interfaces "github.com/alphaonly/harvester/internal/server/interfaces"
+	interfaces "github.com/alphaonly/harvester/internal/server/metricvalue"
 )
+
+type CounterValueJSON struct {
+	Value string `json:"value"`
+}
 
 type CounterValue struct {
 	value    interfaces.Counter
@@ -46,6 +52,29 @@ func (v *CounterValue) AddValue(v1 interfaces.MetricValue) interfaces.MetricValu
 	return &CounterValue{value: interfaces.Counter(sumVal), valueInt: sumVal}
 }
 
+func (v *CounterValue) MarshalJSON() ([]byte, error) {
+	cj := CounterValueJSON{Value: v.GetString()}
+
+	return json.Marshal(cj)
+}
+
+func (v *CounterValue) UnmarshalJSON(data []byte) error {
+	var cj *CounterValueJSON = &CounterValueJSON{}
+
+	err := json.Unmarshal(data, cj)
+	if err != nil {
+		return errors.New("CounterValue unmarshal error")
+	}
+	v.valueInt, err = strconv.ParseInt(cj.Value, 10, 64)
+	if err != nil {
+		return errors.New("unmarshalled CounterValue parse error")
+	}
+	v.value = interfaces.Counter(v.valueInt)
+
+	return nil
+
+}
+
 // type MetricValue interface {
 // 	SetValue(MetricValue)
 // 	GetValue() MetricValue         //Gauge or Counter
@@ -55,4 +84,4 @@ func (v *CounterValue) AddValue(v1 interfaces.MetricValue) interfaces.MetricValu
 // }
 
 // check
-var m interfaces.MetricValue = &CounterValue{}
+// var m interfaces.MetricValue = &CounterValue{}

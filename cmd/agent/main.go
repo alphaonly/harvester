@@ -8,7 +8,7 @@ import (
 	"os/signal"
 
 	"github.com/alphaonly/harvester/internal/agent"
-	"github.com/alphaonly/harvester/internal/environment"
+	c "github.com/alphaonly/harvester/internal/configuration"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ac := environment.NewAgentConfiguration()
+	ac := c.NewAgentConfiguration()
 
 	(*ac).Update()
 

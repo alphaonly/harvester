@@ -1,10 +1,16 @@
 package gaugevalue
 
 import (
+	"encoding/json"
+	"errors"
 	"strconv"
 
-	interfaces "github.com/alphaonly/harvester/internal/server/interfaces"
+	interfaces "github.com/alphaonly/harvester/internal/server/metricvalue"
 )
+
+type GaugeValueJSON struct {
+	Value float64 `json:"value"`
+}
 
 type GaugeValue struct {
 	value      interfaces.Gauge
@@ -39,6 +45,26 @@ func (v *GaugeValue) GetString() string {
 func (v *GaugeValue) AddValue(v1 interfaces.MetricValue) interfaces.MetricValue {
 	return v //Mocked, as it's needed for counter only
 }
+func (v *GaugeValue) MarshalJSON() ([]byte, error) {
+	cj := GaugeValueJSON{Value: v.valueFloat}
+
+	return json.Marshal(cj)
+}
+
+func (v *GaugeValue) UnmarshalJSON(data []byte) error {
+	var cj *GaugeValueJSON = &GaugeValueJSON{}
+
+	err := json.Unmarshal(data, cj)
+	if err != nil {
+		return errors.New("CounterValue unmarshal error")
+	}
+	v.valueFloat = cj.Value
+
+	v.value = interfaces.Gauge(v.valueFloat)
+
+	return nil
+
+}
 
 // check
-var m interfaces.MetricValue = &GaugeValue{}
+// var m interfaces.MetricValue = &GaugeValue{}

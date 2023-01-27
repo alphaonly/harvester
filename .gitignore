@@ -29,3 +29,5 @@ vendor/
 .vscode
 
 #others
+cmd/tests/
+internal/server/storage/interfaces/archive.go

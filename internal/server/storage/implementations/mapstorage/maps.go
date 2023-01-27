@@ -5,21 +5,22 @@ import (
 	"errors"
 	"sync"
 
-	interfaces "github.com/alphaonly/harvester/internal/server/interfaces"
-	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	M "github.com/alphaonly/harvester/internal/server/metricvalue"
+	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 
 type MapStorage struct {
 	mutex      *sync.Mutex
-	metricsMap *map[string]interfaces.MetricValue
+	metricsMap *map[string]M.MetricValue
 }
 
-func New() (sr storage.Storage) {
-	map_ := make(map[string]interfaces.MetricValue)
-	return MapStorage{
+func New() (sr *S.Storage) {
+	map_ := make(map[string]M.MetricValue)
+	var mapStorage S.Storage = MapStorage{
 		mutex:      &sync.Mutex{},
 		metricsMap: &map_,
 	}
+	return &mapStorage
 }
 
 //Имплементация интерфейса storage
@@ -30,7 +31,7 @@ func New() (sr storage.Storage) {
 // 	GetAllMetrics(ctx context.Context) (mvList *map[string]interfaces.MetricValue, err error)
 // }
 
-func (m MapStorage) GetMetric(ctx context.Context, name string) (mv *interfaces.MetricValue, err error) {
+func (m MapStorage) GetMetric(ctx context.Context, name string) (mv *M.MetricValue, err error) {
 
 	if m.metricsMap == nil || len(*m.metricsMap) == 0 {
 		return nil, errors.New("404 - not found")
@@ -43,19 +44,25 @@ func (m MapStorage) GetMetric(ctx context.Context, name string) (mv *interfaces.
 	}
 
 }
-func (m MapStorage) SaveMetric(ctx context.Context, name string, mv *interfaces.MetricValue) (r error) {
+func (m MapStorage) SaveMetric(ctx context.Context, name string, mv *M.MetricValue) (r error) {
 
 	(*m.metricsMap)[name] = *mv
 
 	return nil
 }
 
-func (m MapStorage) GetAllMetrics(ctx context.Context) (mvList *map[string]interfaces.MetricValue, err error) {
+func (m MapStorage) GetAllMetrics(ctx context.Context) (mvList *map[string]M.MetricValue, err error) {
 
 	if m.metricsMap == nil {
-		return nil, errors.New("no list of metrics")
+		return nil, errors.New("map was not initialized")
 	}
 
 	return m.metricsMap, nil
 
+}
+
+func (m MapStorage) SaveAllMetrics(ctx context.Context, mvList *map[string]M.MetricValue) (err error) {
+	(*m.metricsMap) = *mvList
+
+	return nil
 }

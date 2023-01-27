@@ -7,20 +7,20 @@ import (
 	"net/http"
 	"strconv"
 
-	J "github.com/alphaonly/harvester/internal/server/JSON"
-	M "github.com/alphaonly/harvester/internal/server/interfaces"
-	C "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/CounterValue"
-	G "github.com/alphaonly/harvester/internal/server/interfaces/MetricValue/implementations/Gaugevalue"
+	J "github.com/alphaonly/harvester/internal/server/metricsJSON"
+	M "github.com/alphaonly/harvester/internal/server/metricvalue"
+	C "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/CounterValue"
+	G "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/Gaugevalue"
 	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/go-chi/chi/v5"
 )
 
 type Handlers struct {
-	Storage *S.Storage
+	MemKeeper *S.Storage
 }
 
 func New(storage *S.Storage) *Handlers {
-	return &Handlers{Storage: storage}
+	return &Handlers{MemKeeper: storage}
 }
 
 func (h *Handlers) HandleGetMetricFieldList(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +32,7 @@ func (h *Handlers) HandleGetMetricFieldList(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-	ms, err := (*h.Storage).GetAllMetrics(r.Context())
+	ms, err := (*h.MemKeeper).GetAllMetrics(r.Context())
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -68,13 +68,13 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 
 	}
 
-	if h.Storage == nil {
+	if h.MemKeeper == nil {
 		http.Error(w, "dataServer is not initialized", http.StatusInternalServerError)
 		return
 	}
 
 	ctx := r.Context()
-	metricsValue, err := (*h.Storage).GetMetric(ctx, metricName)
+	metricsValue, err := (*h.MemKeeper).GetMetric(ctx, metricName)
 	if err != nil {
 		http.Error(w, "404 - not found", http.StatusNotFound)
 		w.WriteHeader(http.StatusNotFound)
@@ -130,13 +130,13 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if h.Storage == nil {
+	if h.MemKeeper == nil {
 		http.Error(w, "dataServer is not initialized", http.StatusInternalServerError)
 		return
 	}
 
 	ctx := r.Context()
-	metricsValue, err := (*h.Storage).GetMetric(ctx, metricName)
+	metricsValue, err := (*h.MemKeeper).GetMetric(ctx, metricName)
 	if err != nil {
 		http.Error(w, "404 - not found", http.StatusNotFound)
 		w.WriteHeader(http.StatusNotFound)
@@ -190,7 +190,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
-	if h.Storage == nil {
+	if h.MemKeeper == nil {
 		http.Error(w, "data storage not initiated", http.StatusInternalServerError)
 		return
 	}
@@ -221,7 +221,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 					}
 					var m M.MetricValue = G.NewFloat(float64Value)
 
-					err = (*h.Storage).SaveMetric(r.Context(), metricName, &m)
+					err = (*h.MemKeeper).SaveMetric(r.Context(), metricName, &m)
 					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
@@ -236,7 +236,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					prevMetricValue, err := (*h.Storage).GetMetric(r.Context(), metricName)
+					prevMetricValue, err := (*h.MemKeeper).GetMetric(r.Context(), metricName)
 
 					if err != nil || prevMetricValue == nil {
 
@@ -245,7 +245,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 					}
 					sum := C.NewInt(intValue).AddValue(*prevMetricValue)
 
-					(*h.Storage).SaveMetric(r.Context(), metricName, &sum)
+					(*h.MemKeeper).SaveMetric(r.Context(), metricName, &sum)
 
 				}
 			default:
@@ -264,7 +264,7 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	dataServer := h.Storage
+	dataServer := h.MemKeeper
 
 	if dataServer == nil {
 		http.Error(w, "storage not initiated", http.StatusInternalServerError)
@@ -305,7 +305,7 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 			case "gauge":
 				{
 					var m M.MetricValue = G.NewFloat(*metricsJSON.Value)
-					err := (*h.Storage).SaveMetric(r.Context(), metricsJSON.ID, &m)
+					err := (*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &m)
 					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
@@ -315,7 +315,7 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 			case "counter":
 				{
 
-					prevMetricValue, err := (*h.Storage).GetMetric(r.Context(), metricsJSON.ID)
+					prevMetricValue, err := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
 
 					if err != nil || prevMetricValue == nil {
 
@@ -324,7 +324,7 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 					}
 					sum := C.NewInt(*metricsJSON.Delta).AddValue(*prevMetricValue)
 
-					(*h.Storage).SaveMetric(r.Context(), metricsJSON.ID, &sum)
+					(*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &sum)
 
 				}
 			default:

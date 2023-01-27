@@ -1,20 +1,11 @@
-package environment
+package configuration
 
 import (
-	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
 )
-
-type Configuration interface {
-	Update() *Configuration
-	Get(name string) (value string)
-	GetInt(name string) (value int64)
-	GetBool(name string) (value bool)
-	read() error
-	write()
-}
 
 type AgentConfiguration struct {
 	variables *map[string]string
@@ -27,12 +18,12 @@ func NewAgentConfiguration() *Configuration {
 		variables: &m,
 	}
 	//default bucket of parameters and their values
-	m["pollInterval"] = "2"
-	m["reportInterval"] = "3" //10
-	m["host"] = "127.0.0.1"
-	m["port"] = "8080"
-	m["scheme"] = "http"
-	m["useJSON"] = "false"
+	m["A_POLLINTERVAL"] = "2"
+	m["A_REPORTINTERVAL"] = "3" //10
+	m["A_HOST"] = "127.0.0.1"
+	m["A_PORT"] = "8080"
+	m["A_SCHEME"] = "http"
+	m["A_USEJSON"] = "false"
 
 	return &c
 }
@@ -76,9 +67,9 @@ func (ac *AgentConfiguration) read() error {
 		v := os.Getenv(k)
 		if v != "" {
 			(*(*ac).variables)[k] = v
+			log.Println("variable " + k + " presented in environment, value: " + (*(*ac).variables)[k])
 		} else {
-			log.Println("variable" + k + " not presented in environment")
-			return errors.New("one of variables absent, reading stopped")
+			log.Println("variable " + k + " not presented in environment, remains default: " + (*(*ac).variables)[k])
 		}
 	}
 	return nil
@@ -99,7 +90,8 @@ func (ac *AgentConfiguration) write() {
 func (ac *AgentConfiguration) Update() *Configuration {
 
 	err := (*ac).read()
-	if err == nil {
+	if err != nil {
+		fmt.Println((*ac).variables)
 		(*ac).write()
 	}
 	var c Configuration = ac
@@ -117,8 +109,10 @@ func NewServerConfiguration() *Configuration {
 		variables: &m,
 	}
 	//default bucket of parameters and their values
-	m["serverPort"] = "8080"
-
+	m["S_PORT"] = "8080"
+	m["STORE_INTERVAL"] = "15" //300
+	m["STORE_FILE"] = "/tmp/devops-metrics-db.json"
+	m["RESTORE"] = "true"
 	return &c
 }
 
@@ -136,9 +130,10 @@ func (sc *ServerConfiguration) read() error {
 		v := os.Getenv(k)
 		if v != "" {
 			(*(*sc).variables)[k] = v
+			log.Println("variable " + k + " presented in environment, value: " + (*(*sc).variables)[k])
 		} else {
-			log.Println("variable" + k + " not presented in environment")
-			return errors.New("one of variables absent, reading stopped")
+			log.Println("variable " + k + " not presented in environment, remains default: " + (*(*sc).variables)[k])
+
 		}
 	}
 	return nil
@@ -158,7 +153,7 @@ func (sc *ServerConfiguration) write() {
 }
 func (sc *ServerConfiguration) Update() *Configuration {
 	err := (*sc).read()
-	if err == nil {
+	if err != nil {
 		(*sc).write()
 	}
 	var c Configuration = sc

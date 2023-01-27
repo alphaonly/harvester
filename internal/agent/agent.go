@@ -15,19 +15,11 @@ import (
 	"math/rand"
 	"net/url"
 
-	"github.com/alphaonly/harvester/internal/environment"
+	C "github.com/alphaonly/harvester/internal/configuration"
 )
 
-type Configuration struct {
-	PollInterval   int
-	ReportInterval int
-	ServerHost     string
-	ServerPort     string
-	UseJSON        bool
-}
-
 type Gauge float64
-type counter int64
+type Counter int64
 
 type Metrics struct {
 	Alloc         Gauge
@@ -59,26 +51,26 @@ type Metrics struct {
 	TotalAlloc    Gauge
 	RandomValue   Gauge
 
-	PollCount counter
+	PollCount Counter
 }
 
 type Agent struct {
-	Configuration *environment.Configuration
+	Configuration *C.Configuration
 	baseURL       url.URL
 }
 
-func NewAgent(c *environment.Configuration) Agent {
+func NewAgent(c *C.Configuration) Agent {
 
 	return Agent{
 		Configuration: c,
 		baseURL: url.URL{
-			Scheme: (*c).Get("scheme"),
-			Host:   (*c).Get("host") + ":" + (*c).Get("port"),
+			Scheme: (*c).Get("A_SCHEME"),
+			Host:   (*c).Get("A_HOST") + ":" + (*c).Get("A_PORT"),
 		},
 	}
 }
 
-func AddCounterData(urlPref *url.URL, val counter, name string, data *map[sendData]bool) {
+func AddCounterData(urlPref *url.URL, val Counter, name string, data *map[sendData]bool) {
 	URL := urlPref.
 		JoinPath("counter").
 		JoinPath(name).
@@ -129,7 +121,7 @@ func (data sendData) sendDataURL(client *http.Client) error {
 
 func (a Agent) Update(ctx context.Context, metrics *Metrics) {
 	var m runtime.MemStats
-	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("pollInterval")) * time.Second)
+	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("A_POLLINTERVAL")) * time.Second)
 	defer ticker.Stop()
 repeatAgain:
 	select {
@@ -178,7 +170,7 @@ repeatAgain:
 func (a Agent) prepareData(metrics *Metrics) map[sendData]bool {
 	m := make(map[sendData]bool)
 
-	switch (*a.Configuration).GetBool("useJSON") {
+	switch (*a.Configuration).GetBool("A_USEJSON") {
 	case true:
 		{
 			//Mocked up
@@ -215,7 +207,7 @@ func (a Agent) prepareData(metrics *Metrics) map[sendData]bool {
 			AddGaugeData(URL, metrics.Sys, "Sys", &m)
 			AddGaugeData(URL, metrics.TotalAlloc, "TotalAlloc", &m)
 			AddGaugeData(URL, metrics.RandomValue, "RandomValue", &m)
-			AddCounterData(URL, metrics.PollCount, "", &m)
+			AddCounterData(URL, metrics.PollCount, "PollCount", &m)
 
 		}
 
@@ -225,7 +217,7 @@ func (a Agent) prepareData(metrics *Metrics) map[sendData]bool {
 }
 func (a Agent) Send(ctx context.Context, client *http.Client, metrics *Metrics) {
 
-	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("reportInterval")) * time.Second)
+	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("A_REPORTINTERVAL")) * time.Second)
 	defer ticker.Stop()
 
 repeatAgain:

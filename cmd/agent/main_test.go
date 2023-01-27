@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/alphaonly/harvester/internal/agent"
-	"github.com/alphaonly/harvester/internal/environment"
+	C "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,7 +24,7 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	ac := environment.NewAgentConfiguration()
+	ac := C.NewAgentConfiguration()
 	(*ac).Update()
 
 	a := agent.NewAgent(ac)

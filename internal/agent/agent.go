@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
+	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	"io"
 
 	"log"
@@ -64,8 +66,8 @@ func NewAgent(c *C.Configuration) Agent {
 	return Agent{
 		Configuration: c,
 		baseURL: url.URL{
-			Scheme: (*c).Get("A_SCHEME"),
-			Host:   (*c).Get("A_HOST") + ":" + (*c).Get("A_PORT"),
+			Scheme: (*c).Get("SCHEME"),
+			Host:   (*c).Get("HOST") + ":" + (*c).Get("PORT"),
 		},
 	}
 }
@@ -97,6 +99,45 @@ func AddGaugeData(urlPref *url.URL, val Gauge, name string, data *map[sendData]b
 
 }
 
+func AddGaugeDataJSON(urlPref *url.URL, val Gauge, name string, data *map[sendData]bool) {
+	v := float64(val)
+	mj := metricsjson.MetricsJSON{
+		ID:    name,
+		MType: "gauge",
+		Value: &v,
+	}
+	metricsBytes, err := json.Marshal(mj)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sd := sendData{
+		url:  *urlPref,
+		body: bytes.NewBuffer(metricsBytes),
+	}
+	(*data)[sd] = true
+
+}
+func AddCounterDataJSON(urlPref *url.URL, val Counter, name string, data *map[sendData]bool) {
+	v := int64(val)
+	mj := metricsjson.MetricsJSON{
+		ID:    name,
+		MType: "counter",
+		Delta: &v,
+	}
+	metricsBytes, err := json.Marshal(mj)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sd := sendData{
+		url:  *urlPref,
+		body: bytes.NewBuffer(metricsBytes),
+	}
+	(*data)[sd] = true
+
+}
+
 type sendData struct {
 	url  url.URL
 	body io.Reader
@@ -115,13 +156,13 @@ func (data sendData) sendDataURL(client *http.Client) error {
 		log.Fatal(err)
 	}
 	log.Println("response from server:" + response.Status)
-	response.Body.Close()
+	err = response.Body.Close()
 	return err
 }
 
 func (a Agent) Update(ctx context.Context, metrics *Metrics) {
 	var m runtime.MemStats
-	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("A_POLLINTERVAL")) * time.Second)
+	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("POLL_INTERVAL")) * time.Second)
 	defer ticker.Stop()
 repeatAgain:
 	select {
@@ -170,11 +211,39 @@ repeatAgain:
 func (a Agent) prepareData(metrics *Metrics) map[sendData]bool {
 	m := make(map[sendData]bool)
 
-	switch (*a.Configuration).GetBool("A_USEJSON") {
+	switch (*a.Configuration).GetBool("USE_JSON") {
 	case true:
 		{
 			//Mocked up
-
+			URL := a.baseURL.
+				JoinPath("update")
+			AddGaugeDataJSON(URL, metrics.Alloc, "Alloc", &m)
+			AddGaugeDataJSON(URL, metrics.Frees, "Frees", &m)
+			AddGaugeDataJSON(URL, metrics.GCCPUFraction, "GCCPUFraction", &m)
+			AddGaugeDataJSON(URL, metrics.GCSys, "GCSys", &m)
+			AddGaugeDataJSON(URL, metrics.HeapAlloc, "HeapAlloc", &m)
+			AddGaugeDataJSON(URL, metrics.HeapIdle, "HeapIdle", &m)
+			AddGaugeDataJSON(URL, metrics.HeapInuse, "HeapInuse", &m)
+			AddGaugeDataJSON(URL, metrics.HeapObjects, "HeapObjects", &m)
+			AddGaugeDataJSON(URL, metrics.HeapReleased, "HeapReleased", &m)
+			AddGaugeDataJSON(URL, metrics.HeapSys, "HeapSys", &m)
+			AddGaugeDataJSON(URL, metrics.LastGC, "LastGC", &m)
+			AddGaugeDataJSON(URL, metrics.Lookups, "Lookups", &m)
+			AddGaugeDataJSON(URL, metrics.MCacheSys, "MCacheSys", &m)
+			AddGaugeDataJSON(URL, metrics.MSpanInuse, "MSpanInuse", &m)
+			AddGaugeDataJSON(URL, metrics.MSpanSys, "MSpanSys", &m)
+			AddGaugeDataJSON(URL, metrics.Mallocs, "Mallocs", &m)
+			AddGaugeDataJSON(URL, metrics.NextGC, "NextGC", &m)
+			AddGaugeDataJSON(URL, metrics.NumForcedGC, "NumForcedGC", &m)
+			AddGaugeDataJSON(URL, metrics.NumGC, "NumGC", &m)
+			AddGaugeDataJSON(URL, metrics.OtherSys, "OtherSys", &m)
+			AddGaugeDataJSON(URL, metrics.PauseTotalNs, "PauseTotalNs", &m)
+			AddGaugeDataJSON(URL, metrics.StackInuse, "StackInuse", &m)
+			AddGaugeDataJSON(URL, metrics.StackSys, "StackSys", &m)
+			AddGaugeDataJSON(URL, metrics.Sys, "Sys", &m)
+			AddGaugeDataJSON(URL, metrics.TotalAlloc, "TotalAlloc", &m)
+			AddGaugeDataJSON(URL, metrics.RandomValue, "RandomValue", &m)
+			AddCounterDataJSON(URL, metrics.PollCount, "PollCount", &m)
 		}
 	default:
 		{
@@ -217,7 +286,7 @@ func (a Agent) prepareData(metrics *Metrics) map[sendData]bool {
 }
 func (a Agent) Send(ctx context.Context, client *http.Client, metrics *Metrics) {
 
-	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("A_REPORTINTERVAL")) * time.Second)
+	ticker := time.NewTicker(time.Duration((*a.Configuration).GetInt("REPORT_INTERVAL")) * time.Second)
 	defer ticker.Stop()
 
 repeatAgain:

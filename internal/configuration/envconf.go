@@ -18,13 +18,12 @@ func NewAgentConfiguration() *Configuration {
 		variables: &m,
 	}
 	//default bucket of parameters and their values
-	m["A_POLLINTERVAL"] = "2"
-	m["A_REPORTINTERVAL"] = "3" //10
-	m["A_HOST"] = "127.0.0.1"
-	m["A_PORT"] = "8080"
-	m["A_SCHEME"] = "http"
-	m["A_USEJSON"] = "false"
-
+	m["POLL_INTERVAL"] = "2"
+	m["REPORT_INTERVAL"] = "3" //10
+	m["HOST"] = "127.0.0.1"
+	m["SERVER_PORT"] = "8080"
+	m["SCHEME"] = "http"
+	m["USE_JSON"] = "false"
 	return &c
 }
 
@@ -109,9 +108,10 @@ func NewServerConfiguration() *Configuration {
 		variables: &m,
 	}
 	//default bucket of parameters and their values
-	m["S_PORT"] = "8080"
-	m["STORE_INTERVAL"] = "15" //300
+	m["PORT"] = "8080"
+	m["STORE_INTERVAL"] = "300" //300
 	m["STORE_FILE"] = "/tmp/devops-metrics-db.json"
+	//m["STORE_FILE"] = "devops-metrics-db.json"
 	m["RESTORE"] = "true"
 	return &c
 }

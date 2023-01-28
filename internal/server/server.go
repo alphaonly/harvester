@@ -49,7 +49,7 @@ func (s Server) Run(ctx context.Context) error {
 	// маршрутизация запросов обработчику
 
 	server := http.Server{
-		Addr: ":" + (*s.configuration).Get("S_PORT"),
+		Addr: ":" + (*s.configuration).Get("SERVER_PORT"),
 	}
 
 	s.restoreData(ctx, s.archive)

@@ -67,4 +67,4 @@ func (v *GaugeValue) UnmarshalJSON(data []byte) error {
 }
 
 // check
-// var m interfaces.MetricValue = &GaugeValue{}
+//var m interfaces.MetricValue = &GaugeValue{}

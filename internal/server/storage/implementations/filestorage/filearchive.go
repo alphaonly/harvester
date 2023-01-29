@@ -3,7 +3,6 @@ package filestorage
 import (
 	"context"
 	"errors"
-
 	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/files"
 	M "github.com/alphaonly/harvester/internal/server/metricvalue"
@@ -62,7 +61,7 @@ func (fa FileArchive) SaveAllMetrics(ctx context.Context, mvList *map[string]M.M
 	}
 	defer producer.Close()
 
-	producer.Write(mvList)
+	producer.Write(*mvList)
 
 	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	M "github.com/alphaonly/harvester/internal/server/metricvalue"
 	"log"
 	"os"
 
@@ -12,12 +11,12 @@ import (
 )
 
 type Producer interface {
-	Write(*map[string]M.MetricValue) error
+	Write(*metricsjson.MetricsMapType) error
 	Close() error
 }
 
 type Consumer interface {
-	Read() (*map[string]M.MetricValue, error)
+	Read() (*metricsjson.MetricsMapType, error)
 	Close() error
 }
 
@@ -40,9 +39,11 @@ func NewProducer(filename string) (*MetricsProducer, error) {
 	}, nil
 }
 
-func (mp *MetricsProducer) Write(metricsData *map[string]M.MetricValue) error {
+func (mp *MetricsProducer) Write(metricsData *metricsjson.MetricsMapType) error {
 
-	mapJSONBuf, err := json.Marshal(metricsData)
+	m := metricsjson.MetricsMapType(*metricsData)
+
+	mapJSONBuf, err := json.Marshal(&m)
 	if err != nil {
 		log.Println("error:cannot marshal data")
 		return err
@@ -85,7 +86,7 @@ func NewConsumer(filename string) (*metricsConsumer, error) {
 	}, nil
 }
 
-func (mp *metricsConsumer) Read() (metricsData *map[string]M.MetricValue, err error) {
+func (mp *metricsConsumer) Read() (metricsData *metricsjson.MetricsMapType, err error) {
 
 	scanner := bufio.NewScanner(mp.buf)
 	var mapJSON []byte
@@ -94,20 +95,22 @@ func (mp *metricsConsumer) Read() (metricsData *map[string]M.MetricValue, err er
 		mapJSON = scanner.Bytes()
 	}
 
-	*metricsData = make(metricsjson.MetricsMapType)
-	err = json.Unmarshal(mapJSON, metricsData)
+	m := make(metricsjson.MetricsMapType)
+
+	err = json.Unmarshal(mapJSON, &m)
 	if err != nil {
 		log.Println("error:cannot unmarshal data:" + err.Error())
 
 		return nil, err
+
 	}
 
-	return metricsData, nil
+	return &m, nil
 }
 func (mp *metricsConsumer) Close() error {
 
 	return mp.file.Close()
 }
 
-var producer Producer = &MetricsProducer{}
-var consumer Consumer = &metricsConsumer{}
+// var producer Producer = &MetricsProducer{}
+// var consumer Consumer = &metricsConsumer{}

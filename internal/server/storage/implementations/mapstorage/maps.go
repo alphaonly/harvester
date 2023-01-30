@@ -5,17 +5,18 @@ import (
 	"errors"
 	"sync"
 
+	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	M "github.com/alphaonly/harvester/internal/server/metricvalue"
 	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 
 type MapStorage struct {
 	mutex      *sync.Mutex
-	metricsMap *map[string]M.MetricValue
+	metricsMap *metricsjson.MetricsMapType
 }
 
 func New() (sr *S.Storage) {
-	map_ := make(map[string]M.MetricValue)
+	map_ := make(metricsjson.MetricsMapType)
 	var mapStorage S.Storage = MapStorage{
 		mutex:      &sync.Mutex{},
 		metricsMap: &map_,
@@ -51,7 +52,7 @@ func (m MapStorage) SaveMetric(ctx context.Context, name string, mv *M.MetricVal
 	return nil
 }
 
-func (m MapStorage) GetAllMetrics(ctx context.Context) (mvList *map[string]M.MetricValue, err error) {
+func (m MapStorage) GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error) {
 
 	if m.metricsMap == nil {
 		return nil, errors.New("map was not initialized")
@@ -61,7 +62,7 @@ func (m MapStorage) GetAllMetrics(ctx context.Context) (mvList *map[string]M.Met
 
 }
 
-func (m MapStorage) SaveAllMetrics(ctx context.Context, mvList *map[string]M.MetricValue) (err error) {
+func (m MapStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error) {
 	(*m.metricsMap) = *mvList
 
 	return nil

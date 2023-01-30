@@ -3,8 +3,10 @@ package filestorage
 import (
 	"context"
 	"errors"
+
 	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/files"
+	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	M "github.com/alphaonly/harvester/internal/server/metricvalue"
 	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
@@ -12,8 +14,8 @@ import (
 // type Storage interface {
 // 	GetMetric(ctx context.Context, name string) (mv *M.MetricValue, err error)
 // 	SaveMetric(ctx context.Context, name string, mv *M.MetricValue) (err error)
-// 	GetAllMetrics(ctx context.Context) (mvList *map[string]M.MetricValue, err error)
-// 	SaveAllMetrics(ctx context.Context, mvList *map[string]M.MetricValue) (err error)
+// 	GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error)
+// 	SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error)
 // }
 
 type FileArchive struct {
@@ -37,7 +39,7 @@ func (fa FileArchive) SaveMetric(ctx context.Context, name string, mv *M.MetricV
 }
 
 // Restore data from temp dir
-func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *map[string]M.MetricValue, err error) {
+func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error) {
 	consumer, err := files.NewConsumer((*fa.configuration).Get("STORE_FILE"))
 	if err != nil {
 		return nil, err
@@ -46,7 +48,7 @@ func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *map[string]M.M
 
 	mvList, err = consumer.Read()
 	if err != nil {
-		emptyMap := make(map[string]M.MetricValue)
+		emptyMap := make(metricsjson.MetricsMapType)
 
 		return &emptyMap, err
 	}
@@ -54,14 +56,14 @@ func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *map[string]M.M
 }
 
 // Park data to temp dir
-func (fa FileArchive) SaveAllMetrics(ctx context.Context, mvList *map[string]M.MetricValue) (err error) {
+func (fa FileArchive) SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error) {
 	producer, err := files.NewProducer((*fa.configuration).Get("STORE_FILE"))
 	if err != nil {
 		return err
 	}
 	defer producer.Close()
 
-	producer.Write(*mvList)
+	producer.Write(mvList)
 
 	return nil
 }

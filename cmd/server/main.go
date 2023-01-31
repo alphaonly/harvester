@@ -13,12 +13,14 @@ import (
 
 func main() {
 
+	var configuration = (*c.NewServerEnvConfiguration()).Update()
+	(*configuration).UpdateNotGiven(c.NewServerFlagConfiguration())
+
 	var (
-		configuration = (*c.NewServerConfiguration()).Update()
-		mapStorage    = m.New()
-		fileStorage   = f.New(configuration)
-		handlers      = h.New(mapStorage)
-		server        = s.New(configuration, mapStorage, fileStorage, handlers)
+		mapStorage  = m.New()
+		fileStorage = f.New(configuration)
+		handlers    = h.New(mapStorage)
+		server      = s.New(configuration, mapStorage, fileStorage, handlers)
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())

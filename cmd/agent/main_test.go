@@ -24,7 +24,7 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	ac := C.NewAgentConfiguration()
+	ac := C.NewAgentEnvConfiguration()
 	(*ac).Update()
 
 	a := agent.NewAgent(ac)

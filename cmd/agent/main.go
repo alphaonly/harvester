@@ -16,11 +16,14 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ac := c.NewAgentConfiguration()
+	//Configuration parameters from command line
+	afc := c.NewAgentFlagConfiguration()
+	//Configuration parameters from environment
+	aec := (*c.NewAgentEnvConfiguration()).Update()
 
-	(*ac).Update()
+	(*aec).UpdateNotGiven(afc)
 
-	agent.NewAgent(ac).Run(ctx, &http.Client{})
+	agent.NewAgent(aec).Run(ctx, &http.Client{})
 
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)

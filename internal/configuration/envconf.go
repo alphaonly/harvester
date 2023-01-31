@@ -7,27 +7,21 @@ import (
 	"strconv"
 )
 
-type AgentConfiguration struct {
+type AgentEnvConfiguration struct {
 	variables *map[string]string
 }
 
-func NewAgentConfiguration() *Configuration {
-	m := make(map[string]string)
+func NewAgentEnvConfiguration() *Configuration {
 
-	var c Configuration = &AgentConfiguration{
-		variables: &m,
+	v := copyMap(agentDefaults)
+
+	var c Configuration = &AgentEnvConfiguration{
+		variables: &v,
 	}
-	//default bucket of parameters and their values
-	m["POLL_INTERVAL"] = "2"
-	m["REPORT_INTERVAL"] = "3" //10
-	m["HOST"] = "127.0.0.1"
-	m["PORT"] = "8080"
-	m["SCHEME"] = "http"
-	m["USE_JSON"] = "false"
 	return &c
 }
 
-func (ac *AgentConfiguration) Get(name string) (value string) {
+func (ac *AgentEnvConfiguration) Get(name string) (value string) {
 	var v string = (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -36,7 +30,7 @@ func (ac *AgentConfiguration) Get(name string) (value string) {
 	return v
 }
 
-func (ac *AgentConfiguration) GetBool(name string) (value bool) {
+func (ac *AgentEnvConfiguration) GetBool(name string) (value bool) {
 	var v string = (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -47,7 +41,7 @@ func (ac *AgentConfiguration) GetBool(name string) (value bool) {
 	}
 	return b
 }
-func (ac *AgentConfiguration) GetInt(name string) (value int64) {
+func (ac *AgentEnvConfiguration) GetInt(name string) (value int64) {
 	var v string = (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -61,7 +55,7 @@ func (ac *AgentConfiguration) GetInt(name string) (value int64) {
 	return i
 }
 
-func (ac *AgentConfiguration) read() error {
+func (ac *AgentEnvConfiguration) read() error {
 	for k := range *(*ac).variables {
 		v := os.Getenv(k)
 		if v != "" {
@@ -74,7 +68,7 @@ func (ac *AgentConfiguration) read() error {
 	return nil
 }
 
-func (ac *AgentConfiguration) write() {
+func (ac *AgentEnvConfiguration) write() {
 	for k := range *(*ac).variables {
 		if v := (*(*ac).variables)[k]; v != "" {
 			err := os.Setenv(k, v)
@@ -86,7 +80,7 @@ func (ac *AgentConfiguration) write() {
 		}
 	}
 }
-func (ac *AgentConfiguration) Update() *Configuration {
+func (ac *AgentEnvConfiguration) Update() *Configuration {
 
 	err := (*ac).read()
 	if err != nil {
@@ -96,27 +90,51 @@ func (ac *AgentConfiguration) Update() *Configuration {
 	var c Configuration = ac
 	return &c
 }
+func (ac *AgentEnvConfiguration) UpdateNotGiven(fromConf *Configuration) {
+	//Type assertion
+	_fromConf := *fromConf
 
-type ServerEnvironmentConf struct {
+	switch fc := _fromConf.(type) {
+	case *AgentFlagConfiguration:
+		{
+			for k := range *ac.variables {
+				if (*ac.variables)[k] == agentDefaults[k] &&
+					((*(*fc).variables)[k] != agentDefaults[k]) {
+					(*ac.variables)[k] = (*(*fc).variables)[k]
+					log.Println("variable " + k + " updated from flags, value:" + (*ac.variables)[k])
+				}
+			}
+		}
+	case *AgentEnvConfiguration:
+		{
+			for k := range *ac.variables {
+				if (*ac.variables)[k] == agentDefaults[k] &&
+					((*(*fc).variables)[k] != agentDefaults[k]) {
+					(*ac.variables)[k] = (*(*fc).variables)[k]
+					log.Println("variable " + k + " updated from flags, value:" + (*ac.variables)[k])
+				}
+			}
+		}
+
+	default:
+		log.Fatal("UpdateNotGiven illegal type assertion")
+	}
+
+}
+
+type ServerEnvConfiguration struct {
 	variables *map[string]string
 }
 
-func NewServerConfiguration() *Configuration {
-	m := make(map[string]string)
-
-	var c Configuration = &AgentConfiguration{
-		variables: &m,
+func NewServerEnvConfiguration() *Configuration {
+	v := copyMap(serverDefaults)
+	var c Configuration = &ServerEnvConfiguration{
+		variables: &v,
 	}
-	//default bucket of parameters and their values
-	m["SERVER_PORT"] = "8080"
-	m["STORE_INTERVAL"] = "10" //300
-	m["STORE_FILE"] = "/tmp/devops-metrics-db.json"
-	// m["STORE_FILE"] = "devops-metrics-db.json"
-	m["RESTORE"] = "true"
 	return &c
 }
 
-func (sc *ServerEnvironmentConf) Get(name string) (value string) {
+func (sc *ServerEnvConfiguration) Get(name string) (value string) {
 	var v string = (*(*sc).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -125,7 +143,7 @@ func (sc *ServerEnvironmentConf) Get(name string) (value string) {
 	return v
 }
 
-func (sc *ServerEnvironmentConf) read() error {
+func (sc *ServerEnvConfiguration) read() error {
 	for k := range *(*sc).variables {
 		v := os.Getenv(k)
 		if v != "" {
@@ -139,7 +157,7 @@ func (sc *ServerEnvironmentConf) read() error {
 	return nil
 }
 
-func (sc *ServerEnvironmentConf) write() {
+func (sc *ServerEnvConfiguration) write() {
 	for k := range *(*sc).variables {
 		if v := (*(*sc).variables)[k]; v != "" {
 			err := os.Setenv(k, v)
@@ -151,7 +169,7 @@ func (sc *ServerEnvironmentConf) write() {
 		}
 	}
 }
-func (sc *ServerEnvironmentConf) Update() *Configuration {
+func (sc *ServerEnvConfiguration) Update() *Configuration {
 	err := (*sc).read()
 	if err != nil {
 		(*sc).write()
@@ -159,7 +177,41 @@ func (sc *ServerEnvironmentConf) Update() *Configuration {
 	var c Configuration = sc
 	return &c
 }
-func (sc *ServerEnvironmentConf) GetBool(name string) (value bool) {
+
+func (sc *ServerEnvConfiguration) UpdateNotGiven(fromConf *Configuration) {
+
+	//Type assertion
+	_fromConf := *fromConf
+
+	switch fc := _fromConf.(type) {
+	case *ServerFlagConfiguration:
+		{
+			for k := range *sc.variables {
+				if (*sc.variables)[k] == serverDefaults[k] &&
+					((*(*fc).variables)[k] != serverDefaults[k]) {
+					(*sc.variables)[k] = (*(*fc).variables)[k]
+					log.Println("variable " + k + " updated from flags, value:" + (*sc.variables)[k])
+				}
+			}
+		}
+	case *ServerEnvConfiguration:
+		{
+			for k := range *sc.variables {
+				if (*sc.variables)[k] == serverDefaults[k] &&
+					((*(*fc).variables)[k] != serverDefaults[k]) {
+					(*sc.variables)[k] = (*(*fc).variables)[k]
+					log.Println("variable " + k + " updated from flags, value:" + (*sc.variables)[k])
+				}
+			}
+		}
+
+	default:
+		log.Fatal("UpdateNotGiven illegal type assertion")
+	}
+
+}
+
+func (sc *ServerEnvConfiguration) GetBool(name string) (value bool) {
 	var v string = (*(*sc).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -170,7 +222,7 @@ func (sc *ServerEnvironmentConf) GetBool(name string) (value bool) {
 	}
 	return b
 }
-func (sc *ServerEnvironmentConf) GetInt(name string) (value int64) {
+func (sc *ServerEnvConfiguration) GetInt(name string) (value int64) {
 	var v string = (*(*sc).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -185,5 +237,5 @@ func (sc *ServerEnvironmentConf) GetInt(name string) (value int64) {
 }
 
 // // implementation check
-//var ac Configuration = &AgentConfiguration{}
-// var sc Configuration = &ServerEnvironmentConf{}
+// var ac Configuration = &AgentEnvConfiguration{}
+// var sc Configuration = &ServerEnvConfiguration{}

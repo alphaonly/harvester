@@ -24,12 +24,14 @@ func NewAgentFlagConfiguration() *Configuration {
 	a := flag.String("a", agentDefaults["HOST"], "Domain name")
 	p := flag.String("p", agentDefaults["POLL_INTERVAL"], "Poll interval")
 	r := flag.String("r", agentDefaults["REPORT_INTERVAL"], "Report interval")
+	j := flag.String("j", agentDefaults["USE_JSON"], "Use JSON true/false")
 
 	flag.Parse()
 
 	m["HOST"] = *a
 	m["POLL_INTERVAL"] = *p
 	m["REPORT_INTERVAL"] = *r
+	m["USE_JSON"] = *j
 
 	var c Configuration = &AgentFlagConfiguration{
 		variables: &m,
@@ -150,8 +152,6 @@ func NewServerFlagConfiguration() *Configuration {
 
 	return &c
 }
-
-
 
 func (sc *ServerFlagConfiguration) Get(name string) (value string) {
 	var v string = (*(*sc).variables)[name]

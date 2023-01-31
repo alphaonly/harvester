@@ -13,15 +13,15 @@ import (
 
 func main() {
 
-	// mj := agentjson.NewMetricJSON("PollCount", "counter", nil)
-
-	// baseURL := url.URL{
-	// 	Scheme: "http",
-	// 	Host:   "127.0.0.1:8080",
-	// }
-	// rj := mj.GetMetricJSON(&baseURL, "PollCount", "counter")
-	// fmt.Println(rj)
-	// return
+	//mj := agentjson.NewMetricJSON("PollCount", "counter", nil)
+	//
+	//baseURL := url.URL{
+	//	Scheme: "http",
+	//	Host:   "127.0.0.1:8080",
+	//}
+	//rj := mj.GetMetricJSON(&baseURL, "PollCount", "counter")
+	//fmt.Println(rj)
+	//return
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

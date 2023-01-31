@@ -147,15 +147,21 @@ type sendData struct {
 }
 
 func (data sendData) sendDataURL(client *http.Client) error {
-
+	retry := 3
 	request, err := http.NewRequest(http.MethodPost, data.url.String(), data.body)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	log.Printf("url from agent):%s", data.url.String())
+again:
 	response, err := client.Do(request)
 	if err != nil {
+		if retry != 0 {
+			time.Sleep(time.Microsecond * 100)
+			retry--
+			goto again
+		}
 		log.Fatal(err)
 	}
 	log.Println("response from server:" + response.Status)
@@ -217,7 +223,7 @@ func (a Agent) prepareData(metrics *Metrics) map[sendData]bool {
 	switch (*a.Configuration).GetBool("USE_JSON") {
 	case true:
 		{
-			//Mocked up
+
 			URL := a.baseURL.
 				JoinPath("update")
 			AddGaugeDataJSON(URL, metrics.Alloc, "Alloc", &m)

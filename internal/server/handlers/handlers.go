@@ -262,6 +262,8 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 }
 func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) {
 
+	defer r.Body.Close()
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	if h.MemKeeper == nil {
@@ -308,22 +310,17 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
 					}
-
 				}
 			case "counter":
 				{
+					var prevMetricValue M.MetricValue = &C.CounterValue{}
+					prevMetricValuePtr, err := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
 
-					prevMetricValue, err := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
-
-					if err != nil || prevMetricValue == nil {
-
-						*prevMetricValue = &C.CounterValue{}
-
+					if err != nil || prevMetricValuePtr == nil {
+						prevMetricValuePtr = &prevMetricValue
 					}
-					sum := C.NewInt(*metricsJSON.Delta).AddValue(*prevMetricValue)
-
+					sum := C.NewInt(*metricsJSON.Delta).AddValue(*prevMetricValuePtr)
 					(*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &sum)
-
 				}
 			default:
 				http.Error(w, metricsJSON.MType+" not recognized type", http.StatusNotImplemented)

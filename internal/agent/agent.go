@@ -3,8 +3,9 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	"io"
+
+	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 
 	"log"
 	"net/http"
@@ -106,6 +107,8 @@ func AddGaugeDataJSON(urlPref *url.URL, val Gauge, name string, data *map[sendDa
 		MType: "gauge",
 		Value: &v,
 	}
+
+	log.Println(mj)
 	metricsBytes, err := json.Marshal(mj)
 	if err != nil {
 		log.Fatal(err)

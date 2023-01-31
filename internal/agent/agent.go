@@ -160,6 +160,8 @@ again:
 		if retry != 0 {
 			time.Sleep(time.Microsecond * 100)
 			retry--
+			log.Println("request error, retry")
+
 			goto again
 		}
 		log.Fatal(err)

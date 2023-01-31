@@ -291,6 +291,7 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 
 			if metricsJSON.ID == "" {
 				http.Error(w, "not parsed, empty metric name!"+metricsJSON.ID, http.StatusNotFound)
+				log.Println("Error not parsed, empty metric name: 404")
 				return
 			}
 

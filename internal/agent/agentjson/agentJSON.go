@@ -43,7 +43,7 @@ func NewMetricJSON(name string, MType string, value interface{}) (ret MetricsJSO
 	}
 	return j
 }
-func (j *MetricsJSON) GetMetricJSON(baseUrl *url.URL, name string, MType string) (mj MetricsJSON) {
+func (j *MetricsJSON) GetMetricJSON(baseURL *url.URL, name string, MType string) (mj MetricsJSON) {
 
 	metricsJSONRequest := NewMetricJSON(name, MType, nil)
 	data, err := json.Marshal(metricsJSONRequest)
@@ -51,8 +51,8 @@ func (j *MetricsJSON) GetMetricJSON(baseUrl *url.URL, name string, MType string)
 		log.Fatal(err)
 	}
 
-	Url := (*baseUrl).JoinPath("value")
-	request, err := http.NewRequest(http.MethodGet, Url.String(), bytes.NewBuffer(data))
+	URL := (*baseURL).JoinPath("value")
+	request, err := http.NewRequest(http.MethodGet, URL.String(), bytes.NewBuffer(data))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -2,28 +2,25 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 
 	"github.com/alphaonly/harvester/internal/agent"
-	"github.com/alphaonly/harvester/internal/agent/agentjson"
 	c "github.com/alphaonly/harvester/internal/configuration"
 )
 
 func main() {
 
-	mj := agentjson.NewMetricJSON("PollCount", "counter", nil)
+	// mj := agentjson.NewMetricJSON("PollCount", "counter", nil)
 
-	baseUrl := url.URL{
-		Scheme: "http",
-		Host:   "127.0.0.1:8080",
-	}
-	rj := mj.GetMetricJSON(&baseUrl, "PollCount", "counter")
-	fmt.Println(rj)
+	// baseUrl := url.URL{
+	// 	Scheme: "http",
+	// 	Host:   "127.0.0.1:8080",
+	// }
+	// rj := mj.GetMetricJSON(&baseUrl, "PollCount", "counter")
+	// fmt.Println(rj)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

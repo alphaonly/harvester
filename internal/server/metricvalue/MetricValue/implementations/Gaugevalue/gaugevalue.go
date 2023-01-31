@@ -52,7 +52,7 @@ func (v *GaugeValue) MarshalJSON() ([]byte, error) {
 }
 
 func (v *GaugeValue) UnmarshalJSON(data []byte) error {
-	var cj *GaugeValueJSON = &GaugeValueJSON{}
+	var cj = &GaugeValueJSON{}
 
 	err := json.Unmarshal(data, cj)
 	if err != nil {

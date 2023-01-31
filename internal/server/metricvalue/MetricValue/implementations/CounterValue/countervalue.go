@@ -59,7 +59,7 @@ func (v *CounterValue) MarshalJSON() ([]byte, error) {
 }
 
 func (v *CounterValue) UnmarshalJSON(data []byte) error {
-	var cj *CounterValueJSON = &CounterValueJSON{}
+	var cj = &CounterValueJSON{}
 
 	err := json.Unmarshal(data, cj)
 	if err != nil {

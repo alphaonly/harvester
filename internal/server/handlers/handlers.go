@@ -146,12 +146,12 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 	var responseMetricsJSON = requestMetricsJSON
 
 	switch requestMetricsJSON.MType {
-	case "agent.gauge":
+	case "gauge":
 		{
 			v := (*metricsValue).GetInternalValue().(float64)
 			responseMetricsJSON.Value = &v
 		}
-	case "agent.counter":
+	case "counter":
 		{
 			v := (*metricsValue).GetInternalValue().(int64)
 			responseMetricsJSON.Delta = &v
@@ -264,9 +264,7 @@ func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	dataServer := h.MemKeeper
-
-	if dataServer == nil {
+	if h.MemKeeper == nil {
 		http.Error(w, "storage not initiated", http.StatusInternalServerError)
 		return
 	}

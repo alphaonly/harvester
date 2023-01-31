@@ -18,7 +18,6 @@ cmd/server/main
 cmd/server/server
 /internal/server/server
 /internal/agent/agent
-/internal/agent/JSON
 /cmd/httplib/
 
 # Dependency directories (remove the comment below to include it)

@@ -1,9 +1,9 @@
 package agent
 
 import (
+	"compress/flate"
 	"context"
 	"encoding/json"
-	"io"
 
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 
@@ -73,34 +73,36 @@ func NewAgent(c *C.Configuration) Agent {
 	}
 }
 
-func AddCounterData(urlPref *url.URL, val Counter, name string, data *map[sendData]bool) {
-	URL := urlPref.
+func AddCounterData(common sendData, val Counter, name string, data *map[*sendData]bool) {
+	URL := common.url.
 		JoinPath("counter").
 		JoinPath(name).
 		JoinPath(strconv.FormatUint(uint64(val), 10)) //value float
 	sd := sendData{
-		url:  *URL,
-		body: bytes.NewBufferString(url.Values{}.Encode()), //need to transer something
+		url:  URL,
+		keys: common.keys,
+		body: bytes.NewBufferString(url.Values{}.Encode()), //need to transfer something
 	}
-	(*data)[sd] = true
+	(*data)[&sd] = true
 
 }
-func AddGaugeData(urlPref *url.URL, val Gauge, name string, data *map[sendData]bool) {
+func AddGaugeData(common sendData, val Gauge, name string, data *map[*sendData]bool) {
 
-	URL := urlPref.
+	URL := common.url.
 		JoinPath("gauge").
 		JoinPath(name).
 		JoinPath(strconv.FormatFloat(float64(val), 'E', -1, 64)) //value float
 
 	sd := sendData{
-		url:  *URL,
+		url:  URL,
+		keys: common.keys,
 		body: bytes.NewBufferString(url.Values{}.Encode()), //need to transer something
 	}
-	(*data)[sd] = true
+	(*data)[&sd] = true
 
 }
 
-func AddGaugeDataJSON(urlPref *url.URL, val Gauge, name string, data *map[sendData]bool) {
+func AddGaugeDataJSON(common sendData, val Gauge, name string, data *map[*sendData]bool) {
 	v := float64(val)
 	mj := metricsjson.MetricsJSON{
 		ID:    name,
@@ -115,13 +117,14 @@ func AddGaugeDataJSON(urlPref *url.URL, val Gauge, name string, data *map[sendDa
 	}
 
 	sd := sendData{
-		url:  *urlPref,
+		url:  common.url,
+		keys: common.keys,
 		body: bytes.NewBuffer(metricsBytes),
 	}
-	(*data)[sd] = true
+	(*data)[&sd] = true
 
 }
-func AddCounterDataJSON(urlPref *url.URL, val Counter, name string, data *map[sendData]bool) {
+func AddCounterDataJSON(common sendData, val Counter, name string, data *map[*sendData]bool) {
 	v := int64(val)
 	mj := metricsjson.MetricsJSON{
 		ID:    name,
@@ -134,25 +137,32 @@ func AddCounterDataJSON(urlPref *url.URL, val Counter, name string, data *map[se
 	}
 
 	sd := sendData{
-		url:  *urlPref,
+		url:  common.url,
+		keys: common.keys,
 		body: bytes.NewBuffer(metricsBytes),
 	}
-	(*data)[sd] = true
+	(*data)[&sd] = true
 
 }
 
+type HeaderKeys map[string]string
 type sendData struct {
-	url  url.URL
-	body io.Reader
+	url  *url.URL
+	keys *HeaderKeys
+	body *bytes.Buffer
 }
 
-func (data sendData) sendDataURL(client *http.Client) error {
-	retry := 3
+func (data sendData) SendData(client *http.Client) error {
+	retry := 10
 	request, err := http.NewRequest(http.MethodPost, data.url.String(), data.body)
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	if data.keys != nil {
+		for k, v := range *data.keys {
+			request.Header.Set(k, v)
+		}
+	}
 	log.Printf("url from agent):%s", data.url.String())
 again:
 	response, err := client.Do(request)
@@ -219,78 +229,127 @@ repeatAgain:
 	}
 
 }
-func (a Agent) prepareData(metrics *Metrics) map[sendData]bool {
-	m := make(map[sendData]bool)
+
+func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
+
+	switch (*a.Configuration).Get("COMPRESS_TYPE") {
+	case "deflate":
+		{
+			for k := range data {
+
+				var b bytes.Buffer
+
+				w, err := flate.NewWriter(&b, flate.BestCompression)
+				if err != nil {
+					log.Fatalf("failed init compress writer: %v", err)
+				}
+				_, err = w.Write(k.body.Bytes())
+				if err != nil {
+					log.Fatalf("failed write data to compress temporary buffer: %v", err)
+				}
+
+				err = w.Close()
+				if err != nil {
+					log.Fatalf("failed compress data: %v", err)
+				}
+				k.body = &b
+			}
+		}
+	}
+
+	return data
+}
+func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
+	m := make(map[*sendData]bool)
+	keys := make(HeaderKeys)
+
+	switch (*a.Configuration).Get("COMPRESS_TYPE") {
+	case "deflate":
+		keys["Accept-Encoding"] = "deflate"
+		keys["Content-Encoding"] = "deflate"
+		// default:
+		// 	keys["Accept-Encoding"] = "gzip"
+	}
 
 	switch (*a.Configuration).GetBool("USE_JSON") {
 	case true:
 		{
 
-			URL := a.baseURL.
-				JoinPath("update")
-			AddGaugeDataJSON(URL, metrics.Alloc, "Alloc", &m)
-			AddGaugeDataJSON(URL, metrics.Frees, "Frees", &m)
-			AddGaugeDataJSON(URL, metrics.GCCPUFraction, "GCCPUFraction", &m)
-			AddGaugeDataJSON(URL, metrics.GCSys, "GCSys", &m)
-			AddGaugeDataJSON(URL, metrics.HeapAlloc, "HeapAlloc", &m)
-			AddGaugeDataJSON(URL, metrics.HeapIdle, "HeapIdle", &m)
-			AddGaugeDataJSON(URL, metrics.HeapInuse, "HeapInuse", &m)
-			AddGaugeDataJSON(URL, metrics.HeapObjects, "HeapObjects", &m)
-			AddGaugeDataJSON(URL, metrics.HeapReleased, "HeapReleased", &m)
-			AddGaugeDataJSON(URL, metrics.HeapSys, "HeapSys", &m)
-			AddGaugeDataJSON(URL, metrics.LastGC, "LastGC", &m)
-			AddGaugeDataJSON(URL, metrics.Lookups, "Lookups", &m)
-			AddGaugeDataJSON(URL, metrics.MCacheSys, "MCacheSys", &m)
-			AddGaugeDataJSON(URL, metrics.MSpanInuse, "MSpanInuse", &m)
-			AddGaugeDataJSON(URL, metrics.MSpanSys, "MSpanSys", &m)
-			AddGaugeDataJSON(URL, metrics.Mallocs, "Mallocs", &m)
-			AddGaugeDataJSON(URL, metrics.NextGC, "NextGC", &m)
-			AddGaugeDataJSON(URL, metrics.NumForcedGC, "NumForcedGC", &m)
-			AddGaugeDataJSON(URL, metrics.NumGC, "NumGC", &m)
-			AddGaugeDataJSON(URL, metrics.OtherSys, "OtherSys", &m)
-			AddGaugeDataJSON(URL, metrics.PauseTotalNs, "PauseTotalNs", &m)
-			AddGaugeDataJSON(URL, metrics.StackInuse, "StackInuse", &m)
-			AddGaugeDataJSON(URL, metrics.StackSys, "StackSys", &m)
-			AddGaugeDataJSON(URL, metrics.Sys, "Sys", &m)
-			AddGaugeDataJSON(URL, metrics.TotalAlloc, "TotalAlloc", &m)
-			AddGaugeDataJSON(URL, metrics.RandomValue, "RandomValue", &m)
-			AddCounterDataJSON(URL, metrics.PollCount, "PollCount", &m)
+			keys["Content-Type"] = "application/json; charset=utf-8"
+			keys["Accept"] = "application/json; charset=utf-8"
+
+			data := sendData{
+				url:  a.baseURL.JoinPath("update"),
+				keys: &keys,
+			}
+
+			AddGaugeDataJSON(data, metrics.Alloc, "Alloc", &m)
+			AddGaugeDataJSON(data, metrics.Frees, "Frees", &m)
+			AddGaugeDataJSON(data, metrics.GCCPUFraction, "GCCPUFraction", &m)
+			AddGaugeDataJSON(data, metrics.GCSys, "GCSys", &m)
+			AddGaugeDataJSON(data, metrics.HeapAlloc, "HeapAlloc", &m)
+			AddGaugeDataJSON(data, metrics.HeapIdle, "HeapIdle", &m)
+			AddGaugeDataJSON(data, metrics.HeapInuse, "HeapInuse", &m)
+			AddGaugeDataJSON(data, metrics.HeapObjects, "HeapObjects", &m)
+			AddGaugeDataJSON(data, metrics.HeapReleased, "HeapReleased", &m)
+			AddGaugeDataJSON(data, metrics.HeapSys, "HeapSys", &m)
+			AddGaugeDataJSON(data, metrics.LastGC, "LastGC", &m)
+			AddGaugeDataJSON(data, metrics.Lookups, "Lookups", &m)
+			AddGaugeDataJSON(data, metrics.MCacheSys, "MCacheSys", &m)
+			AddGaugeDataJSON(data, metrics.MSpanInuse, "MSpanInuse", &m)
+			AddGaugeDataJSON(data, metrics.MSpanSys, "MSpanSys", &m)
+			AddGaugeDataJSON(data, metrics.Mallocs, "Mallocs", &m)
+			AddGaugeDataJSON(data, metrics.NextGC, "NextGC", &m)
+			AddGaugeDataJSON(data, metrics.NumForcedGC, "NumForcedGC", &m)
+			AddGaugeDataJSON(data, metrics.NumGC, "NumGC", &m)
+			AddGaugeDataJSON(data, metrics.OtherSys, "OtherSys", &m)
+			AddGaugeDataJSON(data, metrics.PauseTotalNs, "PauseTotalNs", &m)
+			AddGaugeDataJSON(data, metrics.StackInuse, "StackInuse", &m)
+			AddGaugeDataJSON(data, metrics.StackSys, "StackSys", &m)
+			AddGaugeDataJSON(data, metrics.Sys, "Sys", &m)
+			AddGaugeDataJSON(data, metrics.TotalAlloc, "TotalAlloc", &m)
+			AddGaugeDataJSON(data, metrics.RandomValue, "RandomValue", &m)
+			AddCounterDataJSON(data, metrics.PollCount, "PollCount", &m)
 		}
 	default:
 		{
-			URL := a.baseURL.
-				JoinPath("update")
 
-			AddGaugeData(URL, metrics.Alloc, "Alloc", &m)
-			AddGaugeData(URL, metrics.Frees, "Frees", &m)
-			AddGaugeData(URL, metrics.GCCPUFraction, "GCCPUFraction", &m)
-			AddGaugeData(URL, metrics.GCSys, "GCSys", &m)
-			AddGaugeData(URL, metrics.HeapAlloc, "HeapAlloc", &m)
-			AddGaugeData(URL, metrics.HeapIdle, "HeapIdle", &m)
-			AddGaugeData(URL, metrics.HeapInuse, "HeapInuse", &m)
-			AddGaugeData(URL, metrics.HeapObjects, "HeapObjects", &m)
-			AddGaugeData(URL, metrics.HeapReleased, "HeapReleased", &m)
-			AddGaugeData(URL, metrics.HeapSys, "HeapSys", &m)
-			AddGaugeData(URL, metrics.LastGC, "LastGC", &m)
-			AddGaugeData(URL, metrics.Lookups, "Lookups", &m)
-			AddGaugeData(URL, metrics.MCacheSys, "MCacheSys", &m)
-			AddGaugeData(URL, metrics.MSpanInuse, "MSpanInuse", &m)
-			AddGaugeData(URL, metrics.MSpanSys, "MSpanSys", &m)
-			AddGaugeData(URL, metrics.Mallocs, "Mallocs", &m)
-			AddGaugeData(URL, metrics.NextGC, "NextGC", &m)
-			AddGaugeData(URL, metrics.NumForcedGC, "NumForcedGC", &m)
-			AddGaugeData(URL, metrics.NumGC, "NumGC", &m)
-			AddGaugeData(URL, metrics.OtherSys, "OtherSys", &m)
-			AddGaugeData(URL, metrics.PauseTotalNs, "PauseTotalNs", &m)
-			AddGaugeData(URL, metrics.StackInuse, "StackInuse", &m)
-			AddGaugeData(URL, metrics.StackSys, "StackSys", &m)
-			AddGaugeData(URL, metrics.Sys, "Sys", &m)
-			AddGaugeData(URL, metrics.TotalAlloc, "TotalAlloc", &m)
-			AddGaugeData(URL, metrics.RandomValue, "RandomValue", &m)
-			AddCounterData(URL, metrics.PollCount, "PollCount", &m)
+			keys["Content-Type"] = "application/json; charset=utf-8"
+			keys["Accept"] = "text/html; charset=utf-8"
 
+			data := sendData{
+				url:  a.baseURL.JoinPath("update"),
+				keys: &keys,
+			}
+
+			AddGaugeData(data, metrics.Alloc, "Alloc", &m)
+			AddGaugeData(data, metrics.Frees, "Frees", &m)
+			AddGaugeData(data, metrics.GCCPUFraction, "GCCPUFraction", &m)
+			AddGaugeData(data, metrics.GCSys, "GCSys", &m)
+			AddGaugeData(data, metrics.HeapAlloc, "HeapAlloc", &m)
+			AddGaugeData(data, metrics.HeapIdle, "HeapIdle", &m)
+			AddGaugeData(data, metrics.HeapInuse, "HeapInuse", &m)
+			AddGaugeData(data, metrics.HeapObjects, "HeapObjects", &m)
+			AddGaugeData(data, metrics.HeapReleased, "HeapReleased", &m)
+			AddGaugeData(data, metrics.HeapSys, "HeapSys", &m)
+			AddGaugeData(data, metrics.LastGC, "LastGC", &m)
+			AddGaugeData(data, metrics.Lookups, "Lookups", &m)
+			AddGaugeData(data, metrics.MCacheSys, "MCacheSys", &m)
+			AddGaugeData(data, metrics.MSpanInuse, "MSpanInuse", &m)
+			AddGaugeData(data, metrics.MSpanSys, "MSpanSys", &m)
+			AddGaugeData(data, metrics.Mallocs, "Mallocs", &m)
+			AddGaugeData(data, metrics.NextGC, "NextGC", &m)
+			AddGaugeData(data, metrics.NumForcedGC, "NumForcedGC", &m)
+			AddGaugeData(data, metrics.NumGC, "NumGC", &m)
+			AddGaugeData(data, metrics.OtherSys, "OtherSys", &m)
+			AddGaugeData(data, metrics.PauseTotalNs, "PauseTotalNs", &m)
+			AddGaugeData(data, metrics.StackInuse, "StackInuse", &m)
+			AddGaugeData(data, metrics.StackSys, "StackSys", &m)
+			AddGaugeData(data, metrics.Sys, "Sys", &m)
+			AddGaugeData(data, metrics.TotalAlloc, "TotalAlloc", &m)
+			AddGaugeData(data, metrics.RandomValue, "RandomValue", &m)
+			AddCounterData(data, metrics.PollCount, "PollCount", &m)
 		}
-
 	}
 
 	return m
@@ -306,10 +365,10 @@ repeatAgain:
 		{
 			metrics.PollCount++
 			metrics.RandomValue = Gauge(rand.Int63())
-			dataPackage := a.prepareData(metrics)
+			dataPackage := a.CompressData(a.prepareData(metrics))
 
 			for key := range dataPackage {
-				err := key.sendDataURL(client)
+				err := key.SendData(client)
 				if err != nil {
 					log.Println(err)
 					return

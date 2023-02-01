@@ -1,14 +1,11 @@
 package server
 
 import (
-	"compress/gzip"
 	"context"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	C "github.com/alphaonly/harvester/internal/configuration"
@@ -41,49 +38,10 @@ func New(configuration *C.Configuration, memKeeper *S.Storage, archive *S.Storag
 }
 
 func (s Server) ListenData(ctx context.Context) {
-	err := http.ListenAndServe(":"+(*s.configuration).Get("SERVER_PORT"), gzipHandle(s.handlers.NewRouter()))
+	err := http.ListenAndServe(":"+(*s.configuration).Get("SERVER_PORT"), s.handlers.NewRouter())
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-var compressAllowedContentList = []string{
-	"application/javascript",
-	"application/json",
-	"text/css",
-	"text/html",
-	"text/plain",
-	"text/xml"}
-
-type gzipWriter struct {
-	http.ResponseWriter
-	Writer io.Writer
-}
-
-func (w gzipWriter) Write(b []byte) (int, error) {
-	// w.Writer будет отвечать за gzip-сжатие, поэтому пишем в него
-	return w.Writer.Write(b)
-}
-
-func gzipHandle(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {		
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		
-		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
-		if err != nil {
-			io.WriteString(w, err.Error())
-			return
-		}
-		defer gz.Close()
-
-		w.Header().Set("Content-Encoding", "gzip")
-		
-		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
-	})
 }
 
 func (s Server) Run(ctx context.Context) error {

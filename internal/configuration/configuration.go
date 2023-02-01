@@ -24,4 +24,5 @@ var agentDefaults = map[string]string{
 	"PORT":            "8080",
 	"SCHEME":          "http",
 	"USE_JSON":        "false",
+	"COMPRESS_TYPE":   "gzip",
 }

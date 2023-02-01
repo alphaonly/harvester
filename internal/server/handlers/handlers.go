@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"compress/flate"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 
+	"github.com/alphaonly/harvester/internal/server/compression"
 	J "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	M "github.com/alphaonly/harvester/internal/server/metricvalue"
 	C "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/CounterValue"
@@ -260,86 +262,102 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-func (h *Handlers) HandlePostMetricJSON(w http.ResponseWriter, r *http.Request) {
 
-	defer r.Body.Close()
+func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		defer r.Body.Close()
 
-	if h.MemKeeper == nil {
-		http.Error(w, "storage not initiated", http.StatusInternalServerError)
-		return
-	}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	switch r.Method {
-	case http.MethodPost:
-		{
-
-			byteData, err := io.ReadAll(r.Body)
-			if err != nil {
-
-				http.Error(w, "unrecognized request body", http.StatusBadRequest)
-				return
-			}
-			var metricsJSON J.MetricsJSON
-			err = json.Unmarshal(byteData, &metricsJSON)
-
-			if err != nil {
-				http.Error(w, "Unrecognized json", http.StatusBadRequest)
-				return
-			}
-
-			if metricsJSON.ID == "" {
-				http.Error(w, "not parsed, empty metric name!"+metricsJSON.ID, http.StatusNotFound)
-				log.Println("Error not parsed, empty metric name: 404")
-				return
-			}
-
-			if metricsJSON.Delta == nil && metricsJSON.Value == nil {
-				http.Error(w, "not parsed, empty metric value", http.StatusBadRequest)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			//logic
-			switch metricsJSON.MType {
-			case "gauge":
-				{
-					var m M.MetricValue = G.NewFloat(*metricsJSON.Value)
-					err := (*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &m)
-					if err != nil {
-						http.Error(w, "internal value add error", http.StatusInternalServerError)
-						return
-					}
-				}
-			case "counter":
-				{
-					var prevMetricValue M.MetricValue = &C.CounterValue{}
-					prevMetricValuePtr, err := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
-
-					if err != nil || prevMetricValuePtr == nil {
-						prevMetricValuePtr = &prevMetricValue
-					}
-					sum := C.NewInt(*metricsJSON.Delta).AddValue(*prevMetricValuePtr)
-					(*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &sum)
-				}
-			default:
-				http.Error(w, metricsJSON.MType+" not recognized type", http.StatusNotImplemented)
-				return
-			}
-
-			byteData, err2 := json.Marshal(metricsJSON)
-			if err2 != nil || byteData == nil {
-				http.Error(w, " json response forming error", http.StatusInternalServerError)
-				return
-			}
-			w.Write(byteData)
+		if h.MemKeeper == nil {
+			http.Error(w, "storage not initiated", http.StatusInternalServerError)
+			return
 		}
-	default:
-		http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
-		return
-	}
 
+		switch r.Method {
+		case http.MethodPost:
+			{
+				byteData, err := io.ReadAll(r.Body)
+				if err != nil {
+
+					http.Error(w, "unrecognized request body", http.StatusBadRequest)
+					return
+				}
+				// d := CM.Deflator{
+				// 	Level:           flate.BestSpeed,
+				// 	ContentEncoding: r.Header.Get("Content-Encoding"),
+				// }
+
+				// byteData, err = d.Decompress(byteData)
+				// if err != nil {
+				// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+				// 	return
+				// }
+
+				var metricsJSON J.MetricsJSON
+				err = json.Unmarshal(byteData, &metricsJSON)
+
+				if err != nil {
+					http.Error(w, "Unrecognized json", http.StatusBadRequest)
+					return
+				}
+
+				if metricsJSON.ID == "" {
+					http.Error(w, "not parsed, empty metric name!"+metricsJSON.ID, http.StatusNotFound)
+					log.Println("Error not parsed, empty metric name: 404")
+					return
+				}
+
+				if metricsJSON.Delta == nil && metricsJSON.Value == nil {
+					http.Error(w, "not parsed, empty metric value", http.StatusBadRequest)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+
+				//logic
+				switch metricsJSON.MType {
+				case "gauge":
+					{
+						var m M.MetricValue = G.NewFloat(*metricsJSON.Value)
+						err := (*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &m)
+						if err != nil {
+							http.Error(w, "internal value add error", http.StatusInternalServerError)
+							return
+						}
+					}
+				case "counter":
+					{
+						var prevMetricValue M.MetricValue = &C.CounterValue{}
+						prevMetricValuePtr, err := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
+
+						if err != nil || prevMetricValuePtr == nil {
+							prevMetricValuePtr = &prevMetricValue
+						}
+						sum := C.NewInt(*metricsJSON.Delta).AddValue(*prevMetricValuePtr)
+						(*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &sum)
+					}
+				default:
+					http.Error(w, metricsJSON.MType+" not recognized type", http.StatusNotImplemented)
+					return
+				}
+
+				byteData, err2 := json.Marshal(metricsJSON)
+				if err2 != nil || byteData == nil {
+					http.Error(w, " json response forming error", http.StatusInternalServerError)
+					return
+				}
+				w.Write(byteData)
+			}
+		default:
+			http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		if next != nil {
+			next.ServeHTTP(w, r)
+		}
+	})
 }
 
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
@@ -354,13 +372,22 @@ func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.R
 
 func (h *Handlers) NewRouter() chi.Router {
 
+	d := compression.Deflator{
+		Level: flate.BestSpeed,
+		// ContentEncoding:r.Header.Get("Content-Encoding"),
+		ContentEncoding: "deflate",
+	}
+
+	var postJsonCompressedScenario http.HandlerFunc = 
+	d.DeCompressionHandler(h.HandlePostMetricJSON(nil))
+
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", h.HandleGetMetricFieldList)
 		r.Get("/value", h.HandleGetMetricValueJSON)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
-		r.Post("/update", h.HandlePostMetricJSON)
+		r.Post("/update", postJsonCompressedScenario)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
 		r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)

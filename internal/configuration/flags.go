@@ -25,13 +25,14 @@ func NewAgentFlagConfiguration() *Configuration {
 	p := flag.String("p", agentDefaults["POLL_INTERVAL"], "Poll interval")
 	r := flag.String("r", agentDefaults["REPORT_INTERVAL"], "Report interval")
 	j := flag.String("j", agentDefaults["USE_JSON"], "Use JSON true/false")
-
+	t := flag.String("t", agentDefaults["COMPRESS_TYPE"], "Compress type: \"deflate\" supported")
 	flag.Parse()
 
 	m["HOST"] = *a
 	m["POLL_INTERVAL"] = *p
 	m["REPORT_INTERVAL"] = *r
 	m["USE_JSON"] = *j
+	m["COMPRESS_TYPE"] = *t
 
 	var c Configuration = &AgentFlagConfiguration{
 		variables: &m,
@@ -68,7 +69,7 @@ func (ac *AgentFlagConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (ac *AgentFlagConfiguration) GetInt(name string) (value int64) {
-	var v  = (*(*ac).variables)[name]
+	var v = (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return

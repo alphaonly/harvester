@@ -176,8 +176,9 @@ again:
 		}
 		log.Fatal(err)
 	}
+	defer response.Body.Close()
 	log.Println("response from server:" + response.Status)
-	err = response.Body.Close()
+
 	return err
 }
 

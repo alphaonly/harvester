@@ -284,16 +284,6 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 					http.Error(w, "unrecognized request body", http.StatusBadRequest)
 					return
 				}
-				// d := CM.Deflator{
-				// 	Level:           flate.BestSpeed,
-				// 	ContentEncoding: r.Header.Get("Content-Encoding"),
-				// }
-
-				// byteData, err = d.Decompress(byteData)
-				// if err != nil {
-				// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-				// 	return
-				// }
 
 				var metricsJSON J.MetricsJSON
 				err = json.Unmarshal(byteData, &metricsJSON)
@@ -325,6 +315,13 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 							http.Error(w, "internal value add error", http.StatusInternalServerError)
 							return
 						}
+						//Читаем обратно для ответа
+						cv, err2 := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
+						if err2 != nil {
+							http.Error(w, err.Error(), http.StatusInternalServerError)
+							w.WriteHeader(http.StatusInternalServerError)
+						}
+						*metricsJSON.Value = (*cv).GetInternalValue().(float64)
 					}
 				case "counter":
 					{
@@ -335,7 +332,18 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 							prevMetricValuePtr = &prevMetricValue
 						}
 						sum := C.NewInt(*metricsJSON.Delta).AddValue(*prevMetricValuePtr)
-						(*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &sum)
+						err = (*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &sum)
+						if err != nil {
+							http.Error(w, err.Error(), http.StatusInternalServerError)
+							w.WriteHeader(http.StatusInternalServerError)
+						}
+						//Читаем обратно для ответа
+						cv, err2 := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
+						if err2 != nil {
+							http.Error(w, err.Error(), http.StatusInternalServerError)
+							w.WriteHeader(http.StatusInternalServerError)
+						}
+						*metricsJSON.Delta = (*cv).GetInternalValue().(int64)
 					}
 				default:
 					http.Error(w, metricsJSON.MType+" not recognized type", http.StatusNotImplemented)
@@ -348,6 +356,8 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 					return
 				}
 				w.Write(byteData)
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
 			}
 		default:
 			http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
@@ -374,12 +384,9 @@ func (h *Handlers) NewRouter() chi.Router {
 
 	d := compression.Deflator{
 		Level: flate.BestSpeed,
-		// ContentEncoding:r.Header.Get("Content-Encoding"),
-		ContentEncoding: "deflate",
 	}
 
-	var postJsonCompressedScenario http.HandlerFunc = 
-	d.DeCompressionHandler(h.HandlePostMetricJSON(nil))
+	var postJsonCompressedScenario = d.DeCompressionHandler(h.HandlePostMetricJSON(nil))
 
 	r := chi.NewRouter()
 	//

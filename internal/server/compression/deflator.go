@@ -17,7 +17,7 @@ type Deflator struct {
 
 func (d Deflator) CompressionHandler(next http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "deflate") {
+		if !strings.Contains(r.Header.Get("Content-Encoding"), "deflate") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -26,8 +26,9 @@ func (d Deflator) CompressionHandler(next http.Handler) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusNotImplemented)
 			return
 		}
+		d.ContentEncoding = r.Header.Get("Content-Encoding")
 		compressedByteData, err2 := d.Compress(byteData)
-		if err != nil {
+		if err2 != nil {
 			http.Error(w, err2.Error(), http.StatusNotImplemented)
 			return
 		}
@@ -39,13 +40,19 @@ func (d Deflator) CompressionHandler(next http.Handler) http.HandlerFunc {
 
 func (d Deflator) DeCompressionHandler(next http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		if !strings.Contains(r.Header.Get("Content-Encoding"), "deflate") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		byteData, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotImplemented)
 			return
 		}
+		d.ContentEncoding = r.Header.Get("Content-Encoding")
 		decompressedByteData, err2 := d.Decompress(byteData)
-		if err != nil {
+		if err2 != nil {
 			http.Error(w, err2.Error(), http.StatusNotImplemented)
 			return
 		}

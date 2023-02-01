@@ -84,4 +84,5 @@ func (v *CounterValue) UnmarshalJSON(data []byte) error {
 // }
 
 // check
-// var m interfaces.MetricValue = &CounterValue{}
+//var m interfaces.MetricValue = &CounterValue{}
+//

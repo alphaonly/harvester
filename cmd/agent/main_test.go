@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ func TestUpdate(t *testing.T) {
 		{
 			name:  "test#1 - Positive: are there values?",
 			value: agent.Metrics{},
-			want:  false,
+			want:  true,
 		},
 	}
 
@@ -32,12 +33,12 @@ func TestUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(tst *testing.T) {
 			ctx := context.Background()
-			ctxMetrics, cancel := context.WithTimeout(ctx, time.Second*3)
+			ctxMetrics, cancel := context.WithTimeout(ctx, time.Second*2)
 			defer cancel()
 			go a.Update(ctxMetrics, &tt.value)
 
-			time.Sleep(time.Second * 4)
-
+			time.Sleep(time.Second * 3)
+			fmt.Println(tt.value.PollCount)
 			if !assert.Equal(t, tt.want, tt.value.PollCount > 0) {
 				t.Error("UpdateMemStatsMetrics is not received form runtime values")
 			}

@@ -272,7 +272,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 	switch (*a.Configuration).Get("COMPRESS_TYPE") {
 	case "deflate":
 		keys["Accept-Encoding"] = "deflate"
-		keys["Content-Encoding"] = "deflate"	
+		keys["Content-Encoding"] = "deflate"
 	}
 
 	switch (*a.Configuration).GetBool("USE_JSON") {

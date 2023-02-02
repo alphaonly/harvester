@@ -383,7 +383,13 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		}
 
 		r.Body.Close()
-		w.Write(byteData)
+		_, err = w.Write(byteData)
+		if err != nil {
+			log.Println("response writing error")
+			http.Error(w, "response writing error", http.StatusInternalServerError)
+			return
+		}
+
 	})
 }
 

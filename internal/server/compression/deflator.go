@@ -5,6 +5,7 @@ import (
 	"compress/flate"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -43,6 +44,11 @@ func (d Deflator) CompressionHandler(next http.Handler) http.HandlerFunc {
 				}
 				//compressed response to requester
 				w.Write(compressedByteData)
+				if err != nil {
+					log.Println("compressed data writing error")
+					http.Error(w, "response writing error", http.StatusInternalServerError)
+					return
+				}
 			}
 		default: //uncompressed response
 			//uncompressed response to next handler
@@ -65,6 +71,11 @@ func (d Deflator) WriteRespondBodyHandler(next http.Handler) http.HandlerFunc {
 			return
 		}
 		w.Write(byteData)
+		if err != nil {
+			log.Println("byteData writing error")
+			http.Error(w, "byteData writing error", http.StatusInternalServerError)
+			return
+		}
 	})
 }
 func (d Deflator) DeCompressionHandler(next http.Handler) http.HandlerFunc {
@@ -96,6 +107,11 @@ func (d Deflator) DeCompressionHandler(next http.Handler) http.HandlerFunc {
 				}
 				//decompressed response to requester
 				w.Write(decompressedByteData)
+				if err != nil {
+					log.Println("decompressed writing error")
+					http.Error(w, "decompressed writing error", http.StatusInternalServerError)
+					return
+				}
 			}
 		default: //compressed response
 			//initial response to next handler

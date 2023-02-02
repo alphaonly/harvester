@@ -86,6 +86,7 @@ func (ac *AgentEnvConfiguration) Update() *Configuration {
 	if err != nil {
 		fmt.Println((*ac).variables)
 		(*ac).write()
+		
 	}
 	var c Configuration = ac
 	return &c

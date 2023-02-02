@@ -34,7 +34,7 @@ func (h *Handlers) HandleGetMetricFieldList(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html")
 
 	ms, err := (*h.MemKeeper).GetAllMetrics(r.Context())
 
@@ -93,7 +93,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "plain/text; charset=utf-8")
+	w.Header().Set("Content-Type", "plain/text")
 
 }
 
@@ -178,7 +178,7 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Type", "application/json")
 
 }
 
@@ -192,7 +192,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 		" metricName :" + metricName +
 		" metricValue :" + metricValue)
 
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Type", "text/plain")
 
 	if h.MemKeeper == nil {
 		http.Error(w, "data storage not initiated", http.StatusInternalServerError)
@@ -373,7 +373,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Content-Type", "application/json")
 
 		//response
 		if next != nil {

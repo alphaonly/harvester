@@ -36,7 +36,7 @@ func TestHandleMetric(t *testing.T) {
 
 	metricsRequestsParam := make(map[string]requestParams)
 
-	contentType := "text/plain; charset=utf-8"
+	contentType := "text/plain"
 
 	//Check Url Ok
 	urlStr = urlPrefix + "/update/gauge/Alloc/2.36912E+05"

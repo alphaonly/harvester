@@ -281,8 +281,8 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 	case true:
 		{
 
-			keys["Content-Type"] = "application/json; charset=utf-8"
-			keys["Accept"] = "application/json; charset=utf-8"
+			keys["Content-Type"] = "application/json"
+			keys["Accept"] = "application/json"
 
 			data := sendData{
 				url:  a.baseURL.JoinPath("update"),
@@ -320,8 +320,8 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 	default:
 		{
 
-			keys["Content-Type"] = "application/json; charset=utf-8"
-			keys["Accept"] = "text/html; charset=utf-8"
+			keys["Content-Type"] = "application/json"
+			keys["Accept"] = "text/html"
 
 			data := sendData{
 				url:  a.baseURL.JoinPath("update"),

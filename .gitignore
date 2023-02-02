@@ -13,9 +13,7 @@
 
 # Binaries
 cmd/agent/main
-cmd/agent/agent
 cmd/server/main
-cmd/server/server
 /internal/server/server
 /internal/agent/agent
 /cmd/httplib/

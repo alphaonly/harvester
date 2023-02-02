@@ -282,28 +282,28 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			return
 		}
 		log.Printf("Server:json received:" + string(byteData))
-		var metricsJSON J.MetricsJSON
-		err = json.Unmarshal(byteData, &metricsJSON)
+		var mj J.MetricsJSON
+		err = json.Unmarshal(byteData, &mj)
 
 		if err != nil {
 			http.Error(w, "Unrecognized json", http.StatusBadRequest)
 			return
 		}
 
-		if metricsJSON.ID == "" {
-			http.Error(w, "not parsed, empty metric name!"+metricsJSON.ID, http.StatusNotFound)
+		if mj.ID == "" {
+			http.Error(w, "not parsed, empty metric name!"+mj.ID, http.StatusNotFound)
 			log.Println("Error not parsed, empty metric name: 404")
 			return
 		}
 
 		//Обычный запрос пост в базу от агента
-		switch metricsJSON.MType {
+		switch mj.MType {
 		case "gauge":
 			{
-				if metricsJSON.Value != nil {
+				if mj.Value != nil {
 					//пишем если есть значение
-					var m M.MetricValue = G.NewFloat(*metricsJSON.Value)
-					err := (*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &m)
+					var m M.MetricValue = G.NewFloat(*mj.Value)
+					err := (*h.MemKeeper).SaveMetric(r.Context(), mj.ID, &m)
 					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
@@ -311,26 +311,26 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				}
 				//читаем  для ответа
 				var f float64 = 0
-				gv, err2 := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
+				gv, err2 := (*h.MemKeeper).GetMetric(r.Context(), mj.ID)
 				if err2 != nil {
 					log.Println("value not found")
 				} else {
 					f = (*gv).GetInternalValue().(float64)
 				}
-				metricsJSON.Value = &f
+				mj.Value = &f
 			}
 		case "counter":
 			{
-				if metricsJSON.Delta != nil {
+				if mj.Delta != nil {
 					//пишем если есть значение
 					var prevMetricValue M.MetricValue = &C.CounterValue{}
-					prevMetricValuePtr, err := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
+					prevMetricValuePtr, err := (*h.MemKeeper).GetMetric(r.Context(), mj.ID)
 
 					if err != nil || prevMetricValuePtr == nil {
 						prevMetricValuePtr = &prevMetricValue
 					}
-					sum := C.NewInt(*metricsJSON.Delta).AddValue(*prevMetricValuePtr)
-					err = (*h.MemKeeper).SaveMetric(r.Context(), metricsJSON.ID, &sum)
+					sum := C.NewInt(*mj.Delta).AddValue(*prevMetricValuePtr)
+					err = (*h.MemKeeper).SaveMetric(r.Context(), mj.ID, &sum)
 					if err != nil {
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						w.WriteHeader(http.StatusInternalServerError)
@@ -338,22 +338,22 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				}
 				//читаем для ответа
 				var i int64 = 0
-				cv, err2 := (*h.MemKeeper).GetMetric(r.Context(), metricsJSON.ID)
+				cv, err2 := (*h.MemKeeper).GetMetric(r.Context(), mj.ID)
 				if err2 != nil {
 					log.Println("value not found")
 				} else {
 					i = ((*cv).GetInternalValue().(int64))
 				}
-				metricsJSON.Delta = &i
+				mj.Delta = &i
 
 			}
 		default:
-			http.Error(w, metricsJSON.MType+" not recognized type", http.StatusNotImplemented)
+			http.Error(w, mj.MType+" not recognized type", http.StatusNotImplemented)
 			return
 		}
 
 		//перевод в json ответа
-		byteData, err = json.Marshal(metricsJSON)
+		byteData, err = json.Marshal(mj)
 		if err != nil || byteData == nil {
 			http.Error(w, " json response forming error", http.StatusInternalServerError)
 			return

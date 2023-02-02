@@ -38,7 +38,7 @@ func New(configuration *C.Configuration, memKeeper *S.Storage, archive *S.Storag
 }
 
 func (s Server) ListenData(ctx context.Context) {
-	err := http.ListenAndServe(":"+(*s.configuration).Get("SERVER_PORT"), s.handlers.NewRouter())
+	err := http.ListenAndServe((*s.configuration).Get("ADDRESS"), s.handlers.NewRouter())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func (s Server) Run(ctx context.Context) error {
 	// маршрутизация запросов обработчику
 
 	server := http.Server{
-		Addr: ":" + (*s.configuration).Get("SERVER_PORT"),
+		Addr: (*s.configuration).Get("ADDRESS"),
 	}
 
 	s.restoreData(ctx, s.archive)

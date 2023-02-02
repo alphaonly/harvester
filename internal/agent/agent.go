@@ -69,7 +69,7 @@ func NewAgent(c *C.Configuration) Agent {
 		Configuration: c,
 		baseURL: url.URL{
 			Scheme: (*c).Get("SCHEME"),
-			Host:   (*c).Get("HOST") + ":" + (*c).Get("PORT"),
+			Host:   (*c).Get("ADDRESS"),
 		},
 	}
 }

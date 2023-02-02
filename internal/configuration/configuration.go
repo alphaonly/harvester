@@ -11,7 +11,7 @@ type Configuration interface {
 }
 
 var serverDefaults = map[string]string{
-	"SERVER_PORT":    "8080",
+	"ADDRESS":        "localhost:8080",
 	"STORE_INTERVAL": "300",
 	"STORE_FILE":     "/tmp/devops-metrics-db.json",
 	"RESTORE":        "true",
@@ -20,9 +20,9 @@ var serverDefaults = map[string]string{
 var agentDefaults = map[string]string{
 	"POLL_INTERVAL":   "2",
 	"REPORT_INTERVAL": "10",
-	"HOST":            "localhost",
-	"PORT":            "8080",
-	"SCHEME":          "http",
-	"USE_JSON":        "false",
-	"COMPRESS_TYPE":   "gzip",
+	"ADDRESS":         "localhost:8080",
+
+	"SCHEME":        "http",
+	"USE_JSON":      "false",
+	"COMPRESS_TYPE": "",
 }

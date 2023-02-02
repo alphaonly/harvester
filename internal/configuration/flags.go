@@ -21,14 +21,14 @@ func NewAgentFlagConfiguration() *Configuration {
 
 	//default bucket of parameters and their values
 
-	a := flag.String("a", agentDefaults["HOST"], "Domain name")
+	a := flag.String("a", agentDefaults["ADDRESS"], "Domain name and :port")
 	p := flag.String("p", agentDefaults["POLL_INTERVAL"], "Poll interval")
 	r := flag.String("r", agentDefaults["REPORT_INTERVAL"], "Report interval")
 	j := flag.String("j", agentDefaults["USE_JSON"], "Use JSON true/false")
 	t := flag.String("t", agentDefaults["COMPRESS_TYPE"], "Compress type: \"deflate\" supported")
 	flag.Parse()
 
-	m["HOST"] = *a
+	m["ADDRESS"] = *a
 	m["POLL_INTERVAL"] = *p
 	m["REPORT_INTERVAL"] = *r
 	m["USE_JSON"] = *j
@@ -135,14 +135,14 @@ func NewServerFlagConfiguration() *Configuration {
 	m := copyMap(serverDefaults)
 
 	//default bucket of parameters and their values
-	a := flag.String("a", serverDefaults["SERVER_PORT"], "Address")
+	a := flag.String("a", serverDefaults["ADDRESS"], "Address")
 	i := flag.String("i", serverDefaults["STORE_INTERVAL"], "Store interval")
 	f := flag.String("f", serverDefaults["STORE_FILE"], "Store interval")
 	r := flag.String("r", serverDefaults["RESTORE"], "Restore from external storage:true/false")
 
 	flag.Parse()
 
-	m["SERVER_PORT"] = *a
+	m["ADDRESS"] = *a
 	m["STORE_INTERVAL"] = *i
 	m["STORE_FILE"] = *f
 	m["RESTORE"] = *r

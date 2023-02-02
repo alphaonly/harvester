@@ -4,6 +4,7 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/json"
+	"io"
 
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 
@@ -177,7 +178,10 @@ again:
 		log.Fatal(err)
 	}
 	defer response.Body.Close()
-	log.Println("response from server:" + response.Status)
+	log.Println("agent:response from server:" + response.Status)
+	bytes, _ := io.ReadAll(response.Body)
+
+	log.Println("agent:body from server:" + string(bytes))
 
 	return err
 }

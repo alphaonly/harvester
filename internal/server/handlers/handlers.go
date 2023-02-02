@@ -11,6 +11,7 @@ import (
 
 	"github.com/alphaonly/harvester/internal/server/compression"
 	J "github.com/alphaonly/harvester/internal/server/metricsJSON"
+	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	M "github.com/alphaonly/harvester/internal/server/metricvalue"
 	C "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/CounterValue"
 	G "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/Gaugevalue"
@@ -212,6 +213,9 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
+			//response struct for json
+			mj := metricsjson.MetricsJSON{ID: metricName,
+				MType: metricType}
 
 			switch metricType {
 			case "gauge":
@@ -229,6 +233,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
 					}
+					mj.Value = &float64Value
 
 				}
 			case "counter":
@@ -242,19 +247,27 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 					prevMetricValue, err := (*h.MemKeeper).GetMetric(r.Context(), metricName)
 
 					if err != nil || prevMetricValue == nil {
-
 						prevMetricValue = C.NewCounterValue()
 
 					}
 					sum := C.NewInt(intValue).AddValue(*prevMetricValue)
-
 					(*h.MemKeeper).SaveMetric(r.Context(), metricName, &sum)
-
+					delta := (sum.GetInternalValue().(int64))
+					mj.Delta = &delta
 				}
 			default:
 				http.Error(w, metricType+" not recognized type", http.StatusNotImplemented)
 				return
 			}
+			//json response
+			jb, err2 := json.Marshal(mj)
+
+			if err2 != nil || jb == nil {
+				http.Error(w, " json response forming error", http.StatusInternalServerError)
+				return
+			}
+
+			w.Write(jb)
 			w.WriteHeader(http.StatusOK)
 		}
 	default:

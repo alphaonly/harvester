@@ -223,7 +223,8 @@ repeatAgain:
 			metrics.StackSys = Gauge(m.StackSys)
 			metrics.Sys = Gauge(m.Sys)
 			metrics.TotalAlloc = Gauge(m.TotalAlloc)
-
+			metrics.RandomValue = Gauge(rand.Int63())
+			metrics.PollCount++
 			goto repeatAgain
 		}
 	case <-ctx.Done():
@@ -368,8 +369,7 @@ repeatAgain:
 	select {
 	case <-ticker.C:
 		{
-			metrics.PollCount++
-			metrics.RandomValue = Gauge(rand.Int63())
+			log.Printf("test changed value of metrics.HeapAlloc:%v", metrics.HeapAlloc)
 			dataPackage := a.CompressData(a.prepareData(metrics))
 
 			for key := range dataPackage {

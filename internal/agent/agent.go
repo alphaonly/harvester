@@ -130,7 +130,7 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data *map[*se
 	mj := metricsjson.MetricsJSON{
 		ID:    name,
 		MType: "counter",
-		Delta: &v,
+		Delta: &v, //for test
 	}
 	metricsBytes, err := json.Marshal(mj)
 	if err != nil {

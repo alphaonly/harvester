@@ -56,6 +56,17 @@ func (d Deflator) CompressionHandler(next http.Handler) http.HandlerFunc {
 	})
 }
 
+func (d Deflator) WriteRespondBodyHandler(next http.Handler) http.HandlerFunc {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		byteData, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotImplemented)
+			return
+		}
+		w.Write(byteData)
+	})
+}
 func (d Deflator) DeCompressionHandler(next http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 

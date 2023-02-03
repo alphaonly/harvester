@@ -19,7 +19,7 @@ import (
 	"math/rand"
 	"net/url"
 
-	C "github.com/alphaonly/harvester/internal/configuration"
+	conf "github.com/alphaonly/harvester/internal/configuration"
 )
 
 type Gauge float64
@@ -59,11 +59,12 @@ type Metrics struct {
 }
 
 type Agent struct {
-	Configuration *C.Configuration
+	Configuration *conf.Configuration
 	baseURL       url.URL
+	Client        AgentClient
 }
 
-func NewAgent(c *C.Configuration) Agent {
+func NewAgent(c *conf.Configuration) Agent {
 
 	return Agent{
 		Configuration: c,

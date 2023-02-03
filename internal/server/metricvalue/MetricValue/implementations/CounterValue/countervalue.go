@@ -18,7 +18,7 @@ type CounterValue struct {
 }
 
 func NewCounterValue() *interfaces.MetricValue {
-	var m interfaces.MetricValue = &CounterValue{}
+	m := interfaces.MetricValue(&CounterValue{})
 	return &m
 }
 
@@ -59,7 +59,7 @@ func (v *CounterValue) MarshalJSON() ([]byte, error) {
 }
 
 func (v *CounterValue) UnmarshalJSON(data []byte) error {
-	var cj = &CounterValueJSON{}
+	cj := &CounterValueJSON{}
 
 	err := json.Unmarshal(data, cj)
 	if err != nil {

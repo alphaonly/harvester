@@ -3,6 +3,7 @@ package metricsjson
 import (
 	"encoding/json"
 	"errors"
+
 	"github.com/alphaonly/harvester/internal/server/metricvalue"
 	countervalue "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/CounterValue"
 	gaugevalue "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/Gaugevalue"
@@ -18,8 +19,8 @@ type MetricsJSON struct {
 type MetricsMapType map[string]metricvalue.MetricValue
 
 func (m MetricsMapType) MarshalJSON() ([]byte, error) {
-	var mjArray = make([]MetricsJSON, len(m))
-	var i = 0
+	mjArray := make([]MetricsJSON, len(m))
+	i := 0
 	for k, v := range m {
 		switch value := v.(type) {
 		case *gaugevalue.GaugeValue:

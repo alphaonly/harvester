@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"time"
 
-	C "github.com/alphaonly/harvester/internal/configuration"
+	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/handlers"
-	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 
 type Configuration struct {
@@ -18,9 +18,9 @@ type Configuration struct {
 }
 
 type Server struct {
-	configuration *C.Configuration
-	memKeeper     *S.Storage
-	archive       *S.Storage
+	configuration *conf.Configuration
+	memKeeper     *stor.Storage
+	archive       *stor.Storage
 	handlers      *handlers.Handlers
 }
 
@@ -28,7 +28,7 @@ func NewConfiguration(serverPort string) *Configuration {
 	return &Configuration{serverPort: ":" + serverPort}
 }
 
-func New(configuration *C.Configuration, memKeeper *S.Storage, archive *S.Storage, handlers *handlers.Handlers) (server Server) {
+func New(configuration *conf.Configuration, memKeeper *stor.Storage, archive *stor.Storage, handlers *handlers.Handlers) (server Server) {
 	return Server{
 		configuration: configuration,
 		memKeeper:     memKeeper,
@@ -61,24 +61,25 @@ func (s Server) Run(ctx context.Context) error {
 	channelInt := make(chan os.Signal, 1)
 	signal.Notify(channelInt, os.Interrupt)
 
-	ctx2, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	select {
 	case <-channelInt:
 		{
-			cancel()
+			goto shutdown
 		}
 	case <-ctx.Done():
 		{
-			cancel()
+			goto shutdown
 		}
 	}
 
-	err := server.Shutdown(ctx2)
+shutdown:
+	time.Sleep(time.Second * 2)
+	err := server.Shutdown(ctx)
 	log.Println("Server shutdown")
 	return err
 }
 
-func (s Server) restoreData(ctx context.Context, storageFrom *S.Storage) {
+func (s Server) restoreData(ctx context.Context, storageFrom *stor.Storage) {
 
 	if (*s.configuration).GetBool("RESTORE") {
 		mvList, err := (*storageFrom).GetAllMetrics(ctx)
@@ -100,7 +101,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom *S.Storage) {
 
 }
 
-func (s Server) ParkData(ctx context.Context, storageTo *S.Storage) {
+func (s Server) ParkData(ctx context.Context, storageTo *stor.Storage) {
 
 	if s.handlers.MemKeeper == storageTo {
 		log.Fatal("a try to save to it is own")

@@ -10,19 +10,19 @@ import (
 	"strconv"
 
 	"github.com/alphaonly/harvester/internal/server/compression"
-	J "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	M "github.com/alphaonly/harvester/internal/server/metricvalue"
-	C "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/CounterValue"
-	G "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/Gaugevalue"
-	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	metricsJSON "github.com/alphaonly/harvester/internal/server/metricsJSON"
+	"github.com/alphaonly/harvester/internal/server/metricvalue"
+	"github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/CounterValue"
+	"github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/Gaugevalue"
+	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/go-chi/chi/v5"
 )
 
 type Handlers struct {
-	MemKeeper *S.Storage
+	MemKeeper *stor.Storage
 }
 
-func New(storage *S.Storage) *Handlers {
+func New(storage *stor.Storage) *Handlers {
 	return &Handlers{MemKeeper: storage}
 }
 
@@ -109,7 +109,7 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var requestMetricsJSON J.MetricsJSON
+	var requestMetricsJSON metricsJSON.MetricsJSON
 
 	err = json.Unmarshal(requestByteData, &requestMetricsJSON)
 	if err != nil {
@@ -121,15 +121,13 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	metricType := requestMetricsJSON.MType
-	metricName := requestMetricsJSON.ID
 
-	if metricName == "" {
+	if requestMetricsJSON.ID == "" {
 		http.Error(w, "is not parsed, empty metric name ", http.StatusNotFound)
 		return
 	}
-	if metricType == "" {
-		http.Error(w, metricType+"is not recognized type", http.StatusNotImplemented)
+	if requestMetricsJSON.MType == "" {
+		http.Error(w, requestMetricsJSON.MType+"is not recognized type", http.StatusNotImplemented)
 		return
 	}
 
@@ -139,7 +137,7 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 	}
 
 	ctx := r.Context()
-	metricsValue, err := (*h.MemKeeper).GetMetric(ctx, metricName)
+	metricsValue, err := (*h.MemKeeper).GetMetric(ctx, requestMetricsJSON.ID)
 	if err != nil {
 		http.Error(w, "404 - not found", http.StatusNotFound)
 		w.WriteHeader(http.StatusNotFound)
@@ -222,7 +220,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusBadRequest)
 						return
 					}
-					var m M.MetricValue = G.NewFloat(float64Value)
+					var m metricvalue.MetricValue = gaugevalue.NewFloat(float64Value)
 
 					err = (*h.MemKeeper).SaveMetric(r.Context(), metricName, &m)
 					if err != nil {
@@ -242,10 +240,10 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 					prevMetricValue, err := (*h.MemKeeper).GetMetric(r.Context(), metricName)
 
 					if err != nil || prevMetricValue == nil {
-						prevMetricValue = C.NewCounterValue()
+						prevMetricValue = countervalue.NewCounterValue()
 
 					}
-					sum := C.NewInt(intValue).AddValue(*prevMetricValue)
+					sum := countervalue.NewInt(intValue).AddValue(*prevMetricValue)
 					(*h.MemKeeper).SaveMetric(r.Context(), metricName, &sum)
 
 				}
@@ -282,7 +280,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			return
 		}
 		log.Printf("Server:json received:" + string(byteData))
-		var mj J.MetricsJSON
+		var mj metricsJSON.MetricsJSON
 		err = json.Unmarshal(byteData, &mj)
 
 		if err != nil {
@@ -302,7 +300,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			{
 				if mj.Value != nil {
 					//пишем если есть значение
-					var m M.MetricValue = G.NewFloat(*mj.Value)
+					var m metricvalue.MetricValue = gaugevalue.NewFloat(*mj.Value)
 					err := (*h.MemKeeper).SaveMetric(r.Context(), mj.ID, &m)
 					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
@@ -323,13 +321,13 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			{
 				if mj.Delta != nil {
 					//пишем если есть значение
-					var prevMetricValue M.MetricValue = &C.CounterValue{}
+					prevMetricValue:= metricvalue.MetricValue(&countervalue.CounterValue{})
 					prevMetricValuePtr, err := (*h.MemKeeper).GetMetric(r.Context(), mj.ID)
 
 					if err != nil || prevMetricValuePtr == nil {
 						prevMetricValuePtr = &prevMetricValue
 					}
-					sum := C.NewInt(*mj.Delta).AddValue(*prevMetricValuePtr)
+					sum := countervalue.NewInt(*mj.Delta).AddValue(*prevMetricValuePtr)
 					err = (*h.MemKeeper).SaveMetric(r.Context(), mj.ID, &sum)
 					if err != nil {
 						http.Error(w, err.Error(), http.StatusInternalServerError)

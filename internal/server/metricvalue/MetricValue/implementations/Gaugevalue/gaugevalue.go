@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strconv"
 
-	interfaces "github.com/alphaonly/harvester/internal/server/metricvalue"
+	"github.com/alphaonly/harvester/internal/server/metricvalue"
 )
 
 type GaugeValueJSON struct {
@@ -13,26 +13,26 @@ type GaugeValueJSON struct {
 }
 
 type GaugeValue struct {
-	value      interfaces.Gauge
+	value      metricvalue.Gauge
 	valueFloat float64
 }
 
-func (v *GaugeValue) New(g interfaces.Gauge) *GaugeValue {
+func (v *GaugeValue) New(g metricvalue.Gauge) *GaugeValue {
 	v.value = g
 	v.valueFloat = float64(g)
 	return v
 }
 func NewFloat(g float64) *GaugeValue {
 	return &GaugeValue{
-		value:      interfaces.Gauge(g),
+		value:      metricvalue.Gauge(g),
 		valueFloat: g,
 	}
 }
-func (v *GaugeValue) SetValue(gauge interfaces.MetricValue) {
-	v.value = interfaces.Gauge(gauge.(*GaugeValue).value)
+func (v *GaugeValue) SetValue(gauge metricvalue.MetricValue) {
+	v.value = metricvalue.Gauge(gauge.(*GaugeValue).value)
 	v.valueFloat = float64(v.value)
 }
-func (v *GaugeValue) GetValue() interfaces.MetricValue {
+func (v *GaugeValue) GetValue() metricvalue.MetricValue {
 	return v
 }
 func (v *GaugeValue) GetInternalValue() interface{} {
@@ -42,7 +42,7 @@ func (v *GaugeValue) GetString() string {
 	return strconv.FormatFloat(float64(v.value), 'f', -1, 64)
 }
 
-func (v *GaugeValue) AddValue(v1 interfaces.MetricValue) interfaces.MetricValue {
+func (v *GaugeValue) AddValue(v1 metricvalue.MetricValue) metricvalue.MetricValue {
 	return v //Mocked, as it's needed for counter only
 }
 func (v *GaugeValue) MarshalJSON() ([]byte, error) {
@@ -52,7 +52,7 @@ func (v *GaugeValue) MarshalJSON() ([]byte, error) {
 }
 
 func (v *GaugeValue) UnmarshalJSON(data []byte) error {
-	var cj = &GaugeValueJSON{}
+	cj := &GaugeValueJSON{}
 
 	err := json.Unmarshal(data, cj)
 	if err != nil {
@@ -60,7 +60,7 @@ func (v *GaugeValue) UnmarshalJSON(data []byte) error {
 	}
 	v.valueFloat = cj.Value
 
-	v.value = interfaces.Gauge(v.valueFloat)
+	v.value = metricvalue.Gauge(v.valueFloat)
 
 	return nil
 

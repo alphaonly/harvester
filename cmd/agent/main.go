@@ -8,8 +8,10 @@ import (
 	"os/signal"
 
 	"github.com/alphaonly/harvester/internal/agent"
-	c "github.com/alphaonly/harvester/internal/configuration"
+	conf "github.com/alphaonly/harvester/internal/configuration"
 )
+
+
 
 func main() {
 
@@ -17,11 +19,12 @@ func main() {
 	defer cancel()
 
 	//Configuration parameters from command line
-	afc := c.NewAgentFlagConfiguration()
+	afc := conf.NewAgentFlagConfiguration()
 	//Configuration parameters from environment
-	aec := (*c.NewAgentEnvConfiguration()).Update()
+	aec := (*conf.NewAgentEnvConfiguration()).Update()
 
 	(*aec).UpdateNotGiven(afc)
+	// client := AgentClient{client: &http.Client{}, retries: 10}
 
 	agent.NewAgent(aec).Run(ctx, &http.Client{})
 

@@ -34,22 +34,22 @@ func NewAgentFlagConfiguration() *Configuration {
 	m["USE_JSON"] = *j
 	m["COMPRESS_TYPE"] = *t
 
-	var c Configuration = &AgentFlagConfiguration{
+	c := Configuration(&AgentFlagConfiguration{
 		variables: &m,
-	}
+	})
 	return &c
 }
 
 func (ac *AgentFlagConfiguration) DefaultConf() *Configuration {
 
-	var c Configuration = &ServerEnvConfiguration{
+	c := Configuration(&ServerEnvConfiguration{
 		variables: &agentDefaults,
-	}
+	})
 	return &c
 }
 
 func (ac *AgentFlagConfiguration) Get(name string) (value string) {
-	var v = (*(*ac).variables)[name]
+	v := (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -58,7 +58,7 @@ func (ac *AgentFlagConfiguration) Get(name string) (value string) {
 }
 
 func (ac *AgentFlagConfiguration) GetBool(name string) (value bool) {
-	var v = (*(*ac).variables)[name]
+	v := (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -69,7 +69,7 @@ func (ac *AgentFlagConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (ac *AgentFlagConfiguration) GetInt(name string) (value int64) {
-	var v = (*(*ac).variables)[name]
+	v := (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return
@@ -147,15 +147,15 @@ func NewServerFlagConfiguration() *Configuration {
 	m["STORE_FILE"] = *f
 	m["RESTORE"] = *r
 
-	var c Configuration = &ServerFlagConfiguration{
+	c := Configuration(&ServerFlagConfiguration{
 		variables: &m,
-	}
+	})
 
 	return &c
 }
 
 func (sc *ServerFlagConfiguration) Get(name string) (value string) {
-	var v = (*(*sc).variables)[name]
+	v := (*(*sc).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -186,7 +186,7 @@ func (sc *ServerFlagConfiguration) Update() *Configuration {
 	if err != nil {
 		(*sc).write()
 	}
-	var c Configuration = sc
+	c := Configuration(sc)
 	return &c
 }
 func (sc *ServerFlagConfiguration) UpdateNotGiven(fromConf *Configuration) {
@@ -221,7 +221,7 @@ func (sc *ServerFlagConfiguration) UpdateNotGiven(fromConf *Configuration) {
 }
 
 func (sc *ServerFlagConfiguration) GetBool(name string) (value bool) {
-	var v = (*(*sc).variables)[name]
+	v:= (*(*sc).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -232,7 +232,7 @@ func (sc *ServerFlagConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (sc *ServerFlagConfiguration) GetInt(name string) (value int64) {
-	var v = (*(*sc).variables)[name]
+	v := (*(*sc).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return
@@ -253,6 +253,6 @@ func copyMap[K, V comparable](m map[K]V) map[K]V {
 	return result
 }
 
-// // implementation check
+ // implementation check
 // var ac Configuration = &AgentFlagConfiguration{}
 // var sc Configuration = &ServerFlagConfiguration{}

@@ -1,0 +1,19 @@
+package agent
+
+type AgentClient struct {
+	client  *http.Client
+	retries int
+}
+
+func (c AgentClient) DoWithRetry(r *http.Request) (*http.Response, error) {
+	var err error
+	if c.retries > 0 {
+		for tries := 0; tries < c.retries; tries++ {
+			response, err := c.client.Do(r)
+			if err == nil {
+				return response, nil
+			}
+		}
+	}
+	return nil, err
+}

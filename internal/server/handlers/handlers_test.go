@@ -30,8 +30,6 @@ func TestHandleMetric(t *testing.T) {
 		want   want
 	}
 
-	var urlStr string
-
 	data := url.Values{}
 
 	metricsRequestsParam := make(map[string]requestParams)
@@ -39,7 +37,7 @@ func TestHandleMetric(t *testing.T) {
 	contentType := "text/plain"
 
 	//Check Url Ok
-	urlStr = urlPrefix + "/update/gauge/Alloc/2.36912E+05"
+	urlStr := urlPrefix + "/update/gauge/Alloc/2.36912E+05"
 	r1 := requestParams{method: http.MethodPost, url: urlStr,
 		want: want{code: http.StatusOK, response: `{"status":"ok"}`, contentType: contentType}}
 

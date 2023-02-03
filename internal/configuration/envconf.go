@@ -15,14 +15,14 @@ func NewAgentEnvConfiguration() *Configuration {
 
 	v := copyMap(agentDefaults)
 
-	var c Configuration = &AgentEnvConfiguration{
+	c := Configuration(&AgentEnvConfiguration{
 		variables: &v,
-	}
+	})
 	return &c
 }
 
 func (ac *AgentEnvConfiguration) Get(name string) (value string) {
-	var v = (*(*ac).variables)[name]
+	v := (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -31,7 +31,7 @@ func (ac *AgentEnvConfiguration) Get(name string) (value string) {
 }
 
 func (ac *AgentEnvConfiguration) GetBool(name string) (value bool) {
-	var v = (*(*ac).variables)[name]
+	v := (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -42,7 +42,7 @@ func (ac *AgentEnvConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (ac *AgentEnvConfiguration) GetInt(name string) (value int64) {
-	var v = (*(*ac).variables)[name]
+	v := (*(*ac).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return
@@ -86,9 +86,10 @@ func (ac *AgentEnvConfiguration) Update() *Configuration {
 	if err != nil {
 		fmt.Println((*ac).variables)
 		(*ac).write()
-		
+
 	}
-	var c Configuration = ac
+	c := Configuration(ac)
+
 	return &c
 }
 func (ac *AgentEnvConfiguration) UpdateNotGiven(fromConf *Configuration) {
@@ -129,14 +130,14 @@ type ServerEnvConfiguration struct {
 
 func NewServerEnvConfiguration() *Configuration {
 	v := copyMap(serverDefaults)
-	var c Configuration = &ServerEnvConfiguration{
+	c := Configuration(&ServerEnvConfiguration{
 		variables: &v,
-	}
+	})
 	return &c
 }
 
 func (sc *ServerEnvConfiguration) Get(name string) (value string) {
-	var v = (*(*sc).variables)[name]
+	v := (*(*sc).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -175,7 +176,7 @@ func (sc *ServerEnvConfiguration) Update() *Configuration {
 	if err != nil {
 		(*sc).write()
 	}
-	var c Configuration = sc
+	c := Configuration(sc)
 	return &c
 }
 
@@ -213,7 +214,7 @@ func (sc *ServerEnvConfiguration) UpdateNotGiven(fromConf *Configuration) {
 }
 
 func (sc *ServerEnvConfiguration) GetBool(name string) (value bool) {
-	var v = (*(*sc).variables)[name]
+	v:= (*(*sc).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -224,7 +225,7 @@ func (sc *ServerEnvConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (sc *ServerEnvConfiguration) GetInt(name string) (value int64) {
-	var v = (*(*sc).variables)[name]
+	v:= (*(*sc).variables)[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return

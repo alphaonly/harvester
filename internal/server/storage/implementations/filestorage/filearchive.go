@@ -7,8 +7,8 @@ import (
 	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/files"
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	M "github.com/alphaonly/harvester/internal/server/metricvalue"
-	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	"github.com/alphaonly/harvester/internal/server/metricvalue"
+	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 
 // type Storage interface {
@@ -22,18 +22,18 @@ type FileArchive struct {
 	configuration *configuration.Configuration
 }
 
-func New(c *configuration.Configuration) *S.Storage {
-	var s S.Storage = FileArchive{
+func New(c *configuration.Configuration) *stor.Storage {
+	s := stor.Storage(FileArchive{
 		configuration: c,
-	}
+	})
 	return &s
 }
 
-func (fa FileArchive) GetMetric(ctx context.Context, name string) (mv *M.MetricValue, err error) {
+func (fa FileArchive) GetMetric(ctx context.Context, name string) (mv *metricvalue.MetricValue, err error) {
 	//Not supported by the implementation
 	return nil, errors.New("not supported")
 }
-func (fa FileArchive) SaveMetric(ctx context.Context, name string, mv *M.MetricValue) (err error) {
+func (fa FileArchive) SaveMetric(ctx context.Context, name string, mv *metricvalue.MetricValue) (err error) {
 	//Not supported by the implementation
 	return errors.New("not supported")
 }

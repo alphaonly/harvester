@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	M "github.com/alphaonly/harvester/internal/server/metricvalue"
-	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	"github.com/alphaonly/harvester/internal/server/metricvalue"
+	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 
 type MapStorage struct {
@@ -15,12 +15,12 @@ type MapStorage struct {
 	metricsMap *metricsjson.MetricsMapType
 }
 
-func New() (sr *S.Storage) {
+func New() (sr *stor.Storage) {
 	map_ := make(metricsjson.MetricsMapType)
-	var mapStorage S.Storage = MapStorage{
+	mapStorage := stor.Storage(MapStorage{
 		mutex:      &sync.Mutex{},
 		metricsMap: &map_,
-	}
+	})
 	return &mapStorage
 }
 
@@ -32,7 +32,7 @@ func New() (sr *S.Storage) {
 // 	GetAllMetrics(ctx context.Context) (mvList *map[string]interfaces.MetricValue, err error)
 // }
 
-func (m MapStorage) GetMetric(ctx context.Context, name string) (mv *M.MetricValue, err error) {
+func (m MapStorage) GetMetric(ctx context.Context, name string) (mv *metricvalue.MetricValue, err error) {
 
 	if m.metricsMap == nil || len(*m.metricsMap) == 0 {
 		return nil, errors.New("404 - not found")
@@ -45,7 +45,7 @@ func (m MapStorage) GetMetric(ctx context.Context, name string) (mv *M.MetricVal
 	}
 
 }
-func (m MapStorage) SaveMetric(ctx context.Context, name string, mv *M.MetricValue) (r error) {
+func (m MapStorage) SaveMetric(ctx context.Context, name string, mv *metricvalue.MetricValue) (r error) {
 
 	(*m.metricsMap)[name] = *mv
 

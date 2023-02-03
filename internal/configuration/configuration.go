@@ -23,6 +23,6 @@ var agentDefaults = map[string]string{
 	"ADDRESS":         "localhost:8080",
 
 	"SCHEME":        "http",
-	"USE_JSON":      "false",
+	"USE_JSON":      "true",
 	"COMPRESS_TYPE": "",
 }

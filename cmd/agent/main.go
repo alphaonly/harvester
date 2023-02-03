@@ -27,7 +27,7 @@ func main() {
 	//http.Client cover
 	client := &agent.AgentClient{Client: &http.Client{}, Retries: 10, RetryPause: time.Second * 2}
 
-	agent.NewAgent(aec, client).Run(ctx, &http.Client{})
+	agent.NewAgent(aec, client).Run(ctx)
 
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)

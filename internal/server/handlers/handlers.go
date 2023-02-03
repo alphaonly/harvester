@@ -263,7 +263,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 
 		//validation
 		if h.MemKeeper == nil {
@@ -376,7 +376,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			return
 		}
 
-	})
+	}
 }
 
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
@@ -395,14 +395,15 @@ func (h *Handlers) NewRouter() chi.Router {
 		Level: flate.BestSpeed,
 	}
 
-	var postJsonCompressedScenario = d.DeCompressionHandler(h.HandlePostMetricJSON(d.CompressionHandler(d.WriteRespondBodyHandler(nil))))
+	var postJsonCompressedScenario = d.DeCompressionHandler(h.HandlePostMetricJSON(d.CompressionHandler(d.WriteResponseBodyHandler(nil))))
+	var postJsonAndGetDataScenario = h.HandlePostMetricJSON(d.WriteResponseBodyHandler(nil))
 
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", h.HandleGetMetricFieldList)
-		r.Get("/value", h.HandleGetMetricValueJSON)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
+		r.Post("/value", postJsonAndGetDataScenario)
 		r.Post("/update", postJsonCompressedScenario)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)

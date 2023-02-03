@@ -129,10 +129,19 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 }
 func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sendData]bool) {
 	v := int64(val)
-	mj := schema.MetricsJSON{
-		ID:    name,
-		MType: "counter",
-		Delta: &v, //for test
+	var mj schema.MetricsJSON
+	if v > 0 {
+		mj = schema.MetricsJSON{
+			ID:    name,
+			MType: "counter",
+			Delta: &v, //for test
+		}
+	} else {
+		//если счетчик меньше нуля - проверка API на возврат значения
+		mj = schema.MetricsJSON{
+			ID:    name,
+			MType: "counter",
+		}
 	}
 	metricsBytes, err := json.Marshal(mj)
 	if err != nil {
@@ -309,6 +318,10 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddGaugeDataJSON(data, metrics.TotalAlloc, "TotalAlloc", m)
 			AddGaugeDataJSON(data, metrics.RandomValue, "RandomValue", m)
 			AddCounterDataJSON(data, metrics.PollCount, "PollCount", m)
+
+			//check api
+			//AddCounterDataJSON(data, -1, "PollCount", m)
+
 		}
 	default:
 		{
@@ -382,7 +395,7 @@ repeatAgain:
 	}
 
 }
-func (a Agent) Run(ctx context.Context, client *http.Client) {
+func (a Agent) Run(ctx context.Context) {
 
 	metrics := Metrics{}
 

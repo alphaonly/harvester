@@ -1,15 +1,5 @@
 package configuration
 
-type Configuration interface {
-	Update() *Configuration
-	UpdateNotGiven(fromConf *Configuration)
-	Get(name string) (value string)
-	GetInt(name string) (value int64)
-	GetBool(name string) (value bool)
-	read() error
-	write()
-}
-
 var serverDefaults = map[string]string{
 	"ADDRESS":        "localhost:8080",
 	"STORE_INTERVAL": "300",

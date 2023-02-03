@@ -36,7 +36,7 @@ func TestRun(t *testing.T) {
 			defer cancel()
 			go func() {
 
-				configuration := (*conf.NewServerEnvConfiguration()).Update()
+				configuration := conf.NewServerEnvConfiguration()
 				mapStorage := mapStor.New()
 				archive := filestorage.New(configuration)
 				handlers := handlers.New(mapStorage)

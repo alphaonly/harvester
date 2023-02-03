@@ -19,38 +19,36 @@ type Deflator struct {
 func (d Deflator) CompressionHandler(next http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		//validation for compression
-		switch true {
-		case strings.Contains(r.Header.Get("Content-Encoding"), "deflate"):
+		if strings.Contains(r.Header.Get("Content-Encoding"), "deflate") {
 			//deflate compressed response
-			{
-				//read body
-				byteData, err := io.ReadAll(r.Body)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusNotImplemented)
-					return
-				}
-				//Compression logic
-				d.ContentEncoding = r.Header.Get("Content-Encoding")
-				compressedByteData, err2 := d.Compress(byteData)
-				if err2 != nil {
-					http.Error(w, err2.Error(), http.StatusNotImplemented)
-					return
-				}
-				//compressed response to next handler
-				if next != nil {
-					r.Body = io.NopCloser(bytes.NewReader(compressedByteData))
-					next.ServeHTTP(w, r)
-					return
-				}
-				//compressed response to requester
-				w.Write(compressedByteData)
-				if err != nil {
-					log.Println("compressed data writing error")
-					http.Error(w, "response writing error", http.StatusInternalServerError)
-					return
-				}
+
+			//read body
+			byteData, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotImplemented)
+				return
 			}
-		default: //uncompressed response
+			//Compression logic
+			d.ContentEncoding = r.Header.Get("Content-Encoding")
+			compressedByteData, err := d.Compress(byteData)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotImplemented)
+				return
+			}
+			//compressed response to next handler
+			if next != nil {
+				r.Body = io.NopCloser(bytes.NewReader(compressedByteData))
+				next.ServeHTTP(w, r)
+				return
+			}
+			//compressed response to requester
+			w.Write(compressedByteData)
+			if err != nil {
+				log.Println("compressed data writing error")
+				http.Error(w, "response writing error", http.StatusInternalServerError)
+				return
+			}
+		} else {
 			//uncompressed response to next handler
 			if next != nil {
 				// r.Body = io.NopCloser(bytes.NewReader(byteData))
@@ -58,6 +56,7 @@ func (d Deflator) CompressionHandler(next http.Handler) http.HandlerFunc {
 				return
 			}
 		}
+		//uncompressed response
 
 	})
 }
@@ -82,38 +81,37 @@ func (d Deflator) DeCompressionHandler(next http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		//validation for decompression
-		switch true {
-		case strings.Contains(r.Header.Get("Content-Encoding"), "deflate"):
-			//deflate decompressed response
-			{
-				//always read body
-				byteData, err := io.ReadAll(r.Body)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusNotImplemented)
-					return
-				}
-				//Decompression logic
-				d.ContentEncoding = r.Header.Get("Content-Encoding")
-				decompressedByteData, err2 := d.Decompress(byteData)
-				if err2 != nil {
-					http.Error(w, err2.Error(), http.StatusNotImplemented)
-					return
-				}
-				//decompressed response to next handler
-				if next != nil {
-					r.Body = io.NopCloser(bytes.NewReader(decompressedByteData))
-					next.ServeHTTP(w, r)
-					return
-				}
-				//decompressed response to requester
-				w.Write(decompressedByteData)
-				if err != nil {
-					log.Println("decompressed writing error")
-					http.Error(w, "decompressed writing error", http.StatusInternalServerError)
-					return
-				}
+		if strings.Contains(r.Header.Get("Content-Encoding"), "deflate") {
+
+			//always read body
+			byteData, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotImplemented)
+				return
 			}
-		default: //compressed response
+			//Decompression logic
+			d.ContentEncoding = r.Header.Get("Content-Encoding")
+			decompressedByteData, err := d.Decompress(byteData)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotImplemented)
+				return
+			}
+			//decompressed response to next handler
+			if next != nil {
+				r.Body = io.NopCloser(bytes.NewReader(decompressedByteData))
+				next.ServeHTTP(w, r)
+				return
+			}
+			//decompressed response to requester
+			w.Write(decompressedByteData)
+			if err != nil {
+				log.Println("decompressed writing error")
+				http.Error(w, "decompressed writing error", http.StatusInternalServerError)
+				return
+			}
+		} else {
+
+			//compressed response
 			//initial response to next handler
 			if next != nil {
 
@@ -122,6 +120,7 @@ func (d Deflator) DeCompressionHandler(next http.Handler) http.HandlerFunc {
 				return
 			}
 		}
+
 	})
 }
 

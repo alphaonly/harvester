@@ -13,8 +13,8 @@ import (
 
 func main() {
 
-	configuration := (*conf.NewServerEnvConfiguration()).Update()
-	(*configuration).UpdateNotGiven(conf.NewServerFlagConfiguration())
+	configuration := conf.NewServerEnvConfiguration()
+	configuration.UpdateNotGiven(conf.NewServerFlagConfiguration())
 
 	mapStorage := mapStor.New()
 	fileStorage := fileStor.New(configuration)

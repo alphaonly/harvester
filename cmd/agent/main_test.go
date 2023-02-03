@@ -3,6 +3,7 @@ package main_test
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -25,10 +26,10 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	ac := C.NewAgentEnvConfiguration()
-	(*ac).Update()
-
-	a := agent.NewAgent(ac)
+	agentConf := C.NewAgentEnvConfiguration()
+	
+	client := &agent.AgentClient{Client: &http.Client{}, Retries: 1, RetryPause: time.Millisecond}
+	a := agent.NewAgent(agentConf, client)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(tst *testing.T) {

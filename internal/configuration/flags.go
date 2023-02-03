@@ -8,7 +8,7 @@ import (
 )
 
 type AgentFlagConfiguration struct {
-	variables *map[string]string
+	variables map[string]string
 }
 
 // Аргументы агента:
@@ -16,7 +16,7 @@ type AgentFlagConfiguration struct {
 // REPORT_INTERVAL через флаг r=<ЗНАЧЕНИЕ>,
 // POLL_INTERVAL через флаг p=<ЗНАЧЕНИЕ>.
 
-func NewAgentFlagConfiguration() *Configuration {
+func NewAgentFlagConfiguration() *AgentFlagConfiguration {
 	m := copyMap(agentDefaults)
 
 	//default bucket of parameters and their values
@@ -34,22 +34,13 @@ func NewAgentFlagConfiguration() *Configuration {
 	m["USE_JSON"] = *j
 	m["COMPRESS_TYPE"] = *t
 
-	c := Configuration(&AgentFlagConfiguration{
-		variables: &m,
-	})
-	return &c
-}
-
-func (ac *AgentFlagConfiguration) DefaultConf() *Configuration {
-
-	c := Configuration(&ServerEnvConfiguration{
-		variables: &agentDefaults,
-	})
-	return &c
+	return &AgentFlagConfiguration{
+		variables: m,
+	}
 }
 
 func (ac *AgentFlagConfiguration) Get(name string) (value string) {
-	v := (*(*ac).variables)[name]
+	v := ac.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -58,7 +49,7 @@ func (ac *AgentFlagConfiguration) Get(name string) (value string) {
 }
 
 func (ac *AgentFlagConfiguration) GetBool(name string) (value bool) {
-	v := (*(*ac).variables)[name]
+	v := ac.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -69,7 +60,7 @@ func (ac *AgentFlagConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (ac *AgentFlagConfiguration) GetInt(name string) (value int64) {
-	v := (*(*ac).variables)[name]
+	v := ac.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return
@@ -91,46 +82,16 @@ func (ac *AgentFlagConfiguration) write() {
 	// is not supported by implementation
 	log.Fatal("method AgentFlagConfiguration.write is not supported by implementation")
 }
-func (ac *AgentFlagConfiguration) Update() *Configuration {
+func (ac *AgentFlagConfiguration) Update() *AgentFlagConfiguration {
 	log.Fatal("method AgentFlagConfiguration.Update is not supported by implementation")
 	return nil
 }
 
-func (ac *AgentFlagConfiguration) UpdateNotGiven(fromConf *Configuration) {
-	//Type assertion
-	_fromConf := *fromConf
-
-	switch fc := _fromConf.(type) {
-	case *AgentFlagConfiguration:
-		{
-			for k := range *ac.variables {
-				if (*ac.variables)[k] == agentDefaults[k] &&
-					((*(*fc).variables)[k] != agentDefaults[k]) {
-					(*ac.variables)[k] = (*(*fc).variables)[k]
-				}
-			}
-		}
-	case *AgentEnvConfiguration:
-		{
-			for k := range *ac.variables {
-				if (*ac.variables)[k] == agentDefaults[k] &&
-					((*(*fc).variables)[k] != agentDefaults[k]) {
-					(*ac.variables)[k] = (*(*fc).variables)[k]
-				}
-			}
-		}
-
-	default:
-		log.Fatal("UpdateNotGiven illegal type assertion")
-	}
-
-}
-
 type ServerFlagConfiguration struct {
-	variables *map[string]string
+	variables map[string]string
 }
 
-func NewServerFlagConfiguration() *Configuration {
+func NewServerFlagConfiguration() *ServerFlagConfiguration {
 
 	m := copyMap(serverDefaults)
 
@@ -147,15 +108,13 @@ func NewServerFlagConfiguration() *Configuration {
 	m["STORE_FILE"] = *f
 	m["RESTORE"] = *r
 
-	c := Configuration(&ServerFlagConfiguration{
-		variables: &m,
-	})
-
-	return &c
+	return &ServerFlagConfiguration{
+		variables: m,
+	}
 }
 
 func (sc *ServerFlagConfiguration) Get(name string) (value string) {
-	v := (*(*sc).variables)[name]
+	v := sc.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -164,13 +123,13 @@ func (sc *ServerFlagConfiguration) Get(name string) (value string) {
 }
 
 func (sc *ServerFlagConfiguration) read() error {
-	for k := range *(*sc).variables {
+	for k := range sc.variables {
 		v := os.Getenv(k)
 		if v != "" {
-			(*(*sc).variables)[k] = v
-			log.Println("variable " + k + " presented in environment, value: " + (*(*sc).variables)[k])
+			sc.variables[k] = v
+			log.Println("variable " + k + " presented in environment, value: " + sc.variables[k])
 		} else {
-			log.Println("variable " + k + " not presented in environment, remains default: " + (*(*sc).variables)[k])
+			log.Println("variable " + k + " not presented in environment, remains default: " + sc.variables[k])
 
 		}
 	}
@@ -181,47 +140,17 @@ func (sc *ServerFlagConfiguration) write() {
 	// is not supported by implementation
 	log.Fatal("method ServerFlagConfiguration.write is not supported by implementation")
 }
-func (sc *ServerFlagConfiguration) Update() *Configuration {
-	err := (*sc).read()
+func (sc *ServerFlagConfiguration) Update() *ServerFlagConfiguration {
+	err := sc.read()
 	if err != nil {
-		(*sc).write()
-	}
-	c := Configuration(sc)
-	return &c
-}
-func (sc *ServerFlagConfiguration) UpdateNotGiven(fromConf *Configuration) {
-
-	//Type assertion
-	_fromConf := *fromConf
-
-	switch fc := _fromConf.(type) {
-	case *AgentFlagConfiguration:
-		{
-			for k := range *sc.variables {
-				if (*sc.variables)[k] == serverDefaults[k] &&
-					((*(*fc).variables)[k] != serverDefaults[k]) {
-					(*sc.variables)[k] = (*(*fc).variables)[k]
-				}
-			}
-		}
-	case *AgentEnvConfiguration:
-		{
-			for k := range *sc.variables {
-				if (*sc.variables)[k] == serverDefaults[k] &&
-					((*(*fc).variables)[k] != serverDefaults[k]) {
-					(*sc.variables)[k] = (*(*fc).variables)[k]
-				}
-			}
-		}
-
-	default:
-		log.Fatal("UpdateNotGiven illegal type assertion")
+		sc.write()
 	}
 
+	return sc
 }
 
 func (sc *ServerFlagConfiguration) GetBool(name string) (value bool) {
-	v:= (*(*sc).variables)[name]
+	v := sc.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -232,7 +161,7 @@ func (sc *ServerFlagConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (sc *ServerFlagConfiguration) GetInt(name string) (value int64) {
-	v := (*(*sc).variables)[name]
+	v := sc.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return
@@ -252,7 +181,3 @@ func copyMap[K, V comparable](m map[K]V) map[K]V {
 	}
 	return result
 }
-
- // implementation check
-// var ac Configuration = &AgentFlagConfiguration{}
-// var sc Configuration = &ServerFlagConfiguration{}

@@ -8,21 +8,21 @@ import (
 )
 
 type AgentEnvConfiguration struct {
-	variables *map[string]string
+	variables map[string]string
 }
 
-func NewAgentEnvConfiguration() *Configuration {
+func NewAgentEnvConfiguration() *AgentEnvConfiguration {
 
 	v := copyMap(agentDefaults)
+	ac := &AgentEnvConfiguration{
+		variables: v,
+	}
+	return ac.update()
 
-	c := Configuration(&AgentEnvConfiguration{
-		variables: &v,
-	})
-	return &c
 }
 
 func (ac *AgentEnvConfiguration) Get(name string) (value string) {
-	v := (*(*ac).variables)[name]
+	v := ac.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -31,7 +31,7 @@ func (ac *AgentEnvConfiguration) Get(name string) (value string) {
 }
 
 func (ac *AgentEnvConfiguration) GetBool(name string) (value bool) {
-	v := (*(*ac).variables)[name]
+	v := ac.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -42,7 +42,7 @@ func (ac *AgentEnvConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (ac *AgentEnvConfiguration) GetInt(name string) (value int64) {
-	v := (*(*ac).variables)[name]
+	v := ac.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return
@@ -56,21 +56,21 @@ func (ac *AgentEnvConfiguration) GetInt(name string) (value int64) {
 }
 
 func (ac *AgentEnvConfiguration) read() error {
-	for k := range *(*ac).variables {
+	for k := range ac.variables {
 		v := os.Getenv(k)
 		if v != "" {
-			(*(*ac).variables)[k] = v
-			log.Println("variable " + k + " presented in environment, value: " + (*(*ac).variables)[k])
+			ac.variables[k] = v
+			log.Println("variable " + k + " presented in environment, value: " + ac.variables[k])
 		} else {
-			log.Println("variable " + k + " not presented in environment, remains default: " + (*(*ac).variables)[k])
+			log.Println("variable " + k + " not presented in environment, remains default: " + ac.variables[k])
 		}
 	}
 	return nil
 }
 
 func (ac *AgentEnvConfiguration) write() {
-	for k := range *(*ac).variables {
-		if v := (*(*ac).variables)[k]; v != "" {
+	for k := range ac.variables {
+		if v := ac.variables[k]; v != "" {
 			err := os.Setenv(k, v)
 			if err != nil {
 				log.Fatal(err)
@@ -80,64 +80,45 @@ func (ac *AgentEnvConfiguration) write() {
 		}
 	}
 }
-func (ac *AgentEnvConfiguration) Update() *Configuration {
-
-	err := (*ac).read()
+func (ac *AgentEnvConfiguration) update() *AgentEnvConfiguration {
+	acv := *ac
+	err := acv.read()
 	if err != nil {
-		fmt.Println((*ac).variables)
-		(*ac).write()
+		fmt.Println(acv.variables)
+		acv.write()
 
 	}
-	c := Configuration(ac)
-
-	return &c
+	return ac
 }
-func (ac *AgentEnvConfiguration) UpdateNotGiven(fromConf *Configuration) {
-	//Type assertion
-	_fromConf := *fromConf
-
-	switch fc := _fromConf.(type) {
-	case *AgentFlagConfiguration:
-		{
-			for k := range *ac.variables {
-				if (*ac.variables)[k] == agentDefaults[k] &&
-					((*(*fc).variables)[k] != agentDefaults[k]) {
-					(*ac.variables)[k] = (*(*fc).variables)[k]
-					log.Println("variable " + k + " updated from flags, value:" + (*ac.variables)[k])
-				}
-			}
+func (ac *AgentEnvConfiguration) UpdateNotGiven(fromConf *AgentFlagConfiguration) {
+	acv := *ac
+	fc := *fromConf
+	for k := range ac.variables {
+		if ac.variables[k] == agentDefaults[k] &&
+			(fc.variables[k] != agentDefaults[k]) {
+			ac.variables[k] = fc.variables[k]
+			log.Println("variable " + k + " updated from flags, value:" + acv.variables[k])
 		}
-	case *AgentEnvConfiguration:
-		{
-			for k := range *ac.variables {
-				if (*ac.variables)[k] == agentDefaults[k] &&
-					((*(*fc).variables)[k] != agentDefaults[k]) {
-					(*ac.variables)[k] = (*(*fc).variables)[k]
-					log.Println("variable " + k + " updated from flags, value:" + (*ac.variables)[k])
-				}
-			}
-		}
-
-	default:
-		log.Fatal("UpdateNotGiven illegal type assertion")
 	}
 
 }
 
 type ServerEnvConfiguration struct {
-	variables *map[string]string
+	variables map[string]string
 }
 
-func NewServerEnvConfiguration() *Configuration {
+func NewServerEnvConfiguration() *ServerEnvConfiguration {
 	v := copyMap(serverDefaults)
-	c := Configuration(&ServerEnvConfiguration{
-		variables: &v,
-	})
-	return &c
+	sc := ServerEnvConfiguration{
+		variables: v,
+	}
+	sc.update()
+	return &sc
+
 }
 
 func (sc *ServerEnvConfiguration) Get(name string) (value string) {
-	v := (*(*sc).variables)[name]
+	v := sc.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -146,13 +127,13 @@ func (sc *ServerEnvConfiguration) Get(name string) (value string) {
 }
 
 func (sc *ServerEnvConfiguration) read() error {
-	for k := range *(*sc).variables {
+	for k := range sc.variables {
 		v := os.Getenv(k)
 		if v != "" {
-			(*(*sc).variables)[k] = v
-			log.Println("variable " + k + " presented in environment, value: " + (*(*sc).variables)[k])
+			sc.variables[k] = v
+			log.Println("variable " + k + " presented in environment, value: " + sc.variables[k])
 		} else {
-			log.Println("variable " + k + " not presented in environment, remains default: " + (*(*sc).variables)[k])
+			log.Println("variable " + k + " not presented in environment, remains default: " + sc.variables[k])
 
 		}
 	}
@@ -160,8 +141,8 @@ func (sc *ServerEnvConfiguration) read() error {
 }
 
 func (sc *ServerEnvConfiguration) write() {
-	for k := range *(*sc).variables {
-		if v := (*(*sc).variables)[k]; v != "" {
+	for k := range sc.variables {
+		if v := sc.variables[k]; v != "" {
 			err := os.Setenv(k, v)
 			if err != nil {
 				log.Fatal(err)
@@ -171,50 +152,28 @@ func (sc *ServerEnvConfiguration) write() {
 		}
 	}
 }
-func (sc *ServerEnvConfiguration) Update() *Configuration {
-	err := (*sc).read()
+func (sc *ServerEnvConfiguration) update() *ServerEnvConfiguration {
+	err := sc.read()
 	if err != nil {
-		(*sc).write()
+		sc.write()
 	}
-	c := Configuration(sc)
-	return &c
+	return sc
 }
 
-func (sc *ServerEnvConfiguration) UpdateNotGiven(fromConf *Configuration) {
-
-	//Type assertion
-	_fromConf := *fromConf
-
-	switch fc := _fromConf.(type) {
-	case *ServerFlagConfiguration:
-		{
-			for k := range *sc.variables {
-				if (*sc.variables)[k] == serverDefaults[k] &&
-					((*(*fc).variables)[k] != serverDefaults[k]) {
-					(*sc.variables)[k] = (*(*fc).variables)[k]
-					log.Println("variable " + k + " updated from flags, value:" + (*sc.variables)[k])
-				}
-			}
+func (sc *ServerEnvConfiguration) UpdateNotGiven(fromConf *ServerFlagConfiguration) {
+	fc := *fromConf
+	for k := range sc.variables {
+		if sc.variables[k] == serverDefaults[k] &&
+			fc.variables[k] != serverDefaults[k] {
+			sc.variables[k] = fc.variables[k]
+			log.Println("variable " + k + " updated from flags, value:" + sc.variables[k])
 		}
-	case *ServerEnvConfiguration:
-		{
-			for k := range *sc.variables {
-				if (*sc.variables)[k] == serverDefaults[k] &&
-					((*(*fc).variables)[k] != serverDefaults[k]) {
-					(*sc.variables)[k] = (*(*fc).variables)[k]
-					log.Println("variable " + k + " updated from flags, value:" + (*sc.variables)[k])
-				}
-			}
-		}
-
-	default:
-		log.Fatal("UpdateNotGiven illegal type assertion")
 	}
-
 }
 
 func (sc *ServerEnvConfiguration) GetBool(name string) (value bool) {
-	v:= (*(*sc).variables)[name]
+
+	v := sc.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -225,7 +184,7 @@ func (sc *ServerEnvConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (sc *ServerEnvConfiguration) GetInt(name string) (value int64) {
-	v:= (*(*sc).variables)[name]
+	v := sc.variables[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return

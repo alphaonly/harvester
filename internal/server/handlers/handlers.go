@@ -12,8 +12,6 @@ import (
 	"github.com/alphaonly/harvester/internal/server/compression"
 	metricsJSON "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	"github.com/alphaonly/harvester/internal/server/metricvalue"
-	"github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/CounterValue"
-	"github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/Gaugevalue"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/go-chi/chi/v5"
 )
@@ -121,7 +119,6 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-
 	if requestMetricsJSON.ID == "" {
 		http.Error(w, "is not parsed, empty metric name ", http.StatusNotFound)
 		return
@@ -220,7 +217,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusBadRequest)
 						return
 					}
-					var m metricvalue.MetricValue = gaugevalue.NewFloat(float64Value)
+					var m metricvalue.MetricValue = metricvalue.NewFloat(float64Value)
 
 					err = (*h.MemKeeper).SaveMetric(r.Context(), metricName, &m)
 					if err != nil {
@@ -294,14 +291,15 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			return
 		}
 
-		//Обычный запрос пост в базу от агента
+		mk := *h.MemKeeper
+		//запрос пост в базу от агента
 		switch mj.MType {
 		case "gauge":
 			{
 				if mj.Value != nil {
 					//пишем если есть значение
-					var m metricvalue.MetricValue = gaugevalue.NewFloat(*mj.Value)
-					err := (*h.MemKeeper).SaveMetric(r.Context(), mj.ID, &m)
+					mv := metricvalue.MetricValue(gaugevalue.NewFloat(*mj.Value))
+					err := mk.SaveMetric(r.Context(), mj.ID, &mv)
 					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
@@ -309,8 +307,8 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				}
 				//читаем  для ответа
 				var f float64 = 0
-				gv, err2 := (*h.MemKeeper).GetMetric(r.Context(), mj.ID)
-				if err2 != nil {
+				gv, err := mk.GetMetric(r.Context(), mj.ID)
+				if err != nil {
 					log.Println("value not found")
 				} else {
 					f = (*gv).GetInternalValue().(float64)
@@ -321,14 +319,14 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			{
 				if mj.Delta != nil {
 					//пишем если есть значение
-					prevMetricValue:= metricvalue.MetricValue(&countervalue.CounterValue{})
-					prevMetricValuePtr, err := (*h.MemKeeper).GetMetric(r.Context(), mj.ID)
+					prevMetricValue := metricvalue.MetricValue(&countervalue.CounterValue{})
+					prevMetricValuePtr, err := mk.GetMetric(r.Context(), mj.ID)
 
 					if err != nil || prevMetricValuePtr == nil {
 						prevMetricValuePtr = &prevMetricValue
 					}
 					sum := countervalue.NewInt(*mj.Delta).AddValue(*prevMetricValuePtr)
-					err = (*h.MemKeeper).SaveMetric(r.Context(), mj.ID, &sum)
+					err = mk.SaveMetric(r.Context(), mj.ID, &sum)
 					if err != nil {
 						http.Error(w, err.Error(), http.StatusInternalServerError)
 						w.WriteHeader(http.StatusInternalServerError)
@@ -336,8 +334,8 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				}
 				//читаем для ответа
 				var i int64 = 0
-				cv, err2 := (*h.MemKeeper).GetMetric(r.Context(), mj.ID)
-				if err2 != nil {
+				cv, err := mk.GetMetric(r.Context(), mj.ID)
+				if err != nil {
 					log.Println("value not found")
 				} else {
 					i = ((*cv).GetInternalValue().(int64))

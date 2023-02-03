@@ -18,7 +18,7 @@ type Configuration struct {
 }
 
 type Server struct {
-	configuration *conf.Configuration
+	configuration *conf.ServerEnvConfiguration
 	memKeeper     *stor.Storage
 	archive       *stor.Storage
 	handlers      *handlers.Handlers
@@ -28,7 +28,7 @@ func NewConfiguration(serverPort string) *Configuration {
 	return &Configuration{serverPort: ":" + serverPort}
 }
 
-func New(configuration *conf.Configuration, memKeeper *stor.Storage, archive *stor.Storage, handlers *handlers.Handlers) (server Server) {
+func New(configuration *conf.ServerEnvConfiguration, memKeeper *stor.Storage, archive *stor.Storage, handlers *handlers.Handlers) (server Server) {
 	return Server{
 		configuration: configuration,
 		memKeeper:     memKeeper,
@@ -38,7 +38,7 @@ func New(configuration *conf.Configuration, memKeeper *stor.Storage, archive *st
 }
 
 func (s Server) ListenData(ctx context.Context) {
-	err := http.ListenAndServe((*s.configuration).Get("ADDRESS"), s.handlers.NewRouter())
+	err := http.ListenAndServe(s.configuration.Get("ADDRESS"), s.handlers.NewRouter())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func (s Server) Run(ctx context.Context) error {
 	// маршрутизация запросов обработчику
 
 	server := http.Server{
-		Addr: (*s.configuration).Get("ADDRESS"),
+		Addr: s.configuration.Get("ADDRESS"),
 	}
 
 	s.restoreData(ctx, s.archive)
@@ -81,7 +81,7 @@ shutdown:
 
 func (s Server) restoreData(ctx context.Context, storageFrom *stor.Storage) {
 
-	if (*s.configuration).GetBool("RESTORE") {
+	if s.configuration.GetBool("RESTORE") {
 		mvList, err := (*storageFrom).GetAllMetrics(ctx)
 		if err != nil {
 			log.Println("cannot initially read metrics from file storage")
@@ -108,7 +108,7 @@ func (s Server) ParkData(ctx context.Context, storageTo *stor.Storage) {
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration((*s.configuration).GetInt("STORE_INTERVAL")) * (time.Second))
+	ticker := time.NewTicker(time.Duration(s.configuration.GetInt("STORE_INTERVAL")) * (time.Second))
 	defer ticker.Stop()
 
 DoitAgain:

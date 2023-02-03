@@ -39,11 +39,10 @@ func (m MapStorage) GetMetric(ctx context.Context, name string) (mv *metricvalue
 	}
 
 	if value := (*m.metricsMap)[name]; value == nil {
-		return nil, errors.New("404 - not found")
-	} else {
-		return &value, nil
-	}
 
+		return &value, errors.New("404 - not found")
+	}
+	return
 }
 func (m MapStorage) SaveMetric(ctx context.Context, name string, mv *metricvalue.MetricValue) (r error) {
 

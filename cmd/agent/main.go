@@ -6,12 +6,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/alphaonly/harvester/internal/agent"
 	conf "github.com/alphaonly/harvester/internal/configuration"
 )
-
-
 
 func main() {
 
@@ -21,12 +20,14 @@ func main() {
 	//Configuration parameters from command line
 	afc := conf.NewAgentFlagConfiguration()
 	//Configuration parameters from environment
-	aec := (*conf.NewAgentEnvConfiguration()).Update()
+	aec := conf.NewAgentEnvConfiguration()
 
-	(*aec).UpdateNotGiven(afc)
-	// client := AgentClient{client: &http.Client{}, retries: 10}
+	aec.UpdateNotGiven(afc)
 
-	agent.NewAgent(aec).Run(ctx, &http.Client{})
+	//http.Client cover
+	client := &agent.AgentClient{Client: &http.Client{}, Retries: 10, RetryPause: time.Second * 2}
+
+	agent.NewAgent(aec, client).Run(ctx, &http.Client{})
 
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)

@@ -19,10 +19,10 @@ import (
 // }
 
 type FileArchive struct {
-	configuration *configuration.Configuration
+	configuration *configuration.ServerEnvConfiguration
 }
 
-func New(c *configuration.Configuration) *stor.Storage {
+func New(c *configuration.ServerEnvConfiguration) *stor.Storage {
 	s := stor.Storage(FileArchive{
 		configuration: c,
 	})

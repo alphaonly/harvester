@@ -83,9 +83,8 @@ type CounterValue struct {
 	valueInt int64
 }
 
-func NewCounterValue() *MetricValue {
-	m := MetricValue(&CounterValue{})
-	return &m
+func NewCounterValue() MetricValue {
+	return MetricValue(&CounterValue{})
 }
 
 func (v *CounterValue) New(c Counter) *CounterValue {

@@ -29,7 +29,7 @@ func New(c *configuration.ServerEnvConfiguration) *stor.Storage {
 	return &s
 }
 
-func (fa FileArchive) GetMetric(ctx context.Context, name string) (mv *mVal.MetricValue, err error) {
+func (fa FileArchive) GetMetric(ctx context.Context, name string) (mv mVal.MetricValue, err error) {
 	//Not supported by the implementation
 	return nil, errors.New("not supported")
 }

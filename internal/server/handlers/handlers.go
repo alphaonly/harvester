@@ -82,7 +82,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	metricValue := (*metricsValue).GetString()
+	metricValue := metricsValue.GetString()
 
 	_, err = w.Write([]byte(metricValue))
 	if err != nil {
@@ -146,12 +146,12 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 	switch requestMetricsJSON.MType {
 	case "gauge":
 		{
-			v := (*metricsValue).GetInternalValue().(float64)
+			v := metricsValue.GetInternalValue().(float64)
 			responseMetricsJSON.Value = &v
 		}
 	case "counter":
 		{
-			v := (*metricsValue).GetInternalValue().(int64)
+			v := metricsValue.GetInternalValue().(int64)
 			responseMetricsJSON.Delta = &v
 		}
 	default:
@@ -229,20 +229,23 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 				}
 			case "counter":
 				{
+					mk := *h.MemKeeper
 					intValue, err := strconv.ParseInt(metricValue, 10, 64)
 					if err != nil {
 						http.Error(w, "value: "+metricValue+" not parsed", http.StatusBadRequest)
 						return
 					}
-
-					prevMetricValue, err := (*h.MemKeeper).GetMetric(r.Context(), metricName)
-
+					prevMetricValue, err := mk.GetMetric(r.Context(), metricName)
 					if err != nil || prevMetricValue == nil {
 						prevMetricValue = mVal.NewCounterValue()
+					}
+					sum := mVal.NewInt(intValue).AddValue(prevMetricValue)
+					err = mk.SaveMetric(r.Context(), metricName, &sum)
+					if err != nil {
+						http.Error(w, "value: "+metricValue+" not saved in memStorage", http.StatusInternalServerError)
+						return
 
 					}
-					sum := mVal.NewInt(intValue).AddValue(*prevMetricValue)
-					(*h.MemKeeper).SaveMetric(r.Context(), metricName, &sum)
 
 				}
 			default:
@@ -298,8 +301,9 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		case "gauge":
 			{
 				if mj.Value != nil {
+					mjVal := *mj.Value
 					//пишем если есть значение
-					mv := mVal.MetricValue(mVal.NewFloat(*mj.Value))
+					mv := mVal.MetricValue(mVal.NewFloat(mjVal))
 					err := mk.SaveMetric(r.Context(), mj.ID, &mv)
 					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
@@ -312,21 +316,20 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				if err != nil {
 					log.Println("value not found")
 				} else {
-					f = (*gv).GetInternalValue().(float64)
+					f = gv.GetInternalValue().(float64)
 				}
 				mj.Value = &f
 			}
 		case "counter":
 			{
 				if mj.Delta != nil {
+					mjVal := *mj.Delta
 					//пишем если есть значение
-					prevMetricValue := mVal.MetricValue(&mVal.CounterValue{})
-					prevMetricValuePtr, err := mk.GetMetric(r.Context(), mj.ID)
-
-					if err != nil || prevMetricValuePtr == nil {
-						prevMetricValuePtr = &prevMetricValue
+					prevMetricValue, err := mk.GetMetric(r.Context(), mj.ID)
+					if err != nil {
+						prevMetricValue = mVal.NewCounterValue()
 					}
-					sum := mVal.NewInt(*mj.Delta).AddValue(*prevMetricValuePtr)
+					sum := mVal.NewInt(mjVal).AddValue(prevMetricValue)
 					err = mk.SaveMetric(r.Context(), mj.ID, &sum)
 					if err != nil {
 						http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -339,7 +342,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				if err != nil {
 					log.Println("value not found")
 				} else {
-					i = ((*cv).GetInternalValue().(int64))
+					i = cv.GetInternalValue().(int64)
 				}
 				mj.Delta = &i
 

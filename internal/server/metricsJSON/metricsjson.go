@@ -52,11 +52,13 @@ func (m MetricsMapType) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	for _, v := range mjArray {
+		gauge := *v.Value
+		counter := *v.Delta
 		switch v.MType {
 		case "gauge":
-			m[v.ID] = mVal.NewFloat(*v.Value)
+			m[v.ID] = mVal.NewFloat(gauge)
 		case "counter":
-			m[v.ID] = mVal.NewInt(*v.Delta)
+			m[v.ID] = mVal.NewInt(counter)
 		default:
 			return errors.New("unknown type in decoding metricsJSONArray")
 		}

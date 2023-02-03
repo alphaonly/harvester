@@ -32,17 +32,15 @@ func New() (sr *stor.Storage) {
 // 	GetAllMetrics(ctx context.Context) (mvList *map[string]interfaces.MetricValue, err error)
 // }
 
-func (m MapStorage) GetMetric(ctx context.Context, name string) (mv *metricvalueI.MetricValue, err error) {
-
-	if m.metricsMap == nil || len(*m.metricsMap) == 0 {
+func (m MapStorage) GetMetric(ctx context.Context, name string) (mv metricvalueI.MetricValue, err error) {
+	_map := *m.metricsMap
+	if m.metricsMap == nil || len(_map) == 0 {
 		return nil, errors.New("404 - not found")
 	}
-
-	value := (*m.metricsMap)[name]
-	if value == nil {
-		return &value, errors.New("404 - not found")
+	if _map[name] == nil {
+		return nil, errors.New("404 - not found")
 	}
-	return &value, nil
+	return _map[name], nil
 }
 func (m MapStorage) SaveMetric(ctx context.Context, name string, mv *metricvalueI.MetricValue) (r error) {
 

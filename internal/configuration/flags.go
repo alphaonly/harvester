@@ -8,7 +8,8 @@ import (
 )
 
 type AgentFlagConfiguration struct {
-	variables map[string]string
+	variablesMap map[string]string
+	Cfg          AgentCfg
 }
 
 // Аргументы агента:
@@ -19,6 +20,7 @@ type AgentFlagConfiguration struct {
 func NewAgentFlagConfiguration() *AgentFlagConfiguration {
 	m := copyMap(agentDefaults)
 
+	cfg := UnMarshalAgentDefaults(AgentDefaultJSON)
 	//default bucket of parameters and their values
 
 	a := flag.String("a", agentDefaults["ADDRESS"], "Domain name and :port")
@@ -34,13 +36,20 @@ func NewAgentFlagConfiguration() *AgentFlagConfiguration {
 	m["USE_JSON"] = *j
 	m["COMPRESS_TYPE"] = *t
 
+	cfg.ADDRESS = *a
+	cfg.POLL_INTERVAL, _ = strconv.ParseInt(*p, 10, 64)
+	cfg.REPORT_INTERVAL, _ = strconv.ParseInt(*r, 10, 64)
+	cfg.USE_JSON, _ = strconv.ParseBool(*j)
+	cfg.COMPRESS_TYPE = *t
+
 	return &AgentFlagConfiguration{
-		variables: m,
+		variablesMap: m,
+		Cfg:          cfg,
 	}
 }
 
 func (ac *AgentFlagConfiguration) Get(name string) (value string) {
-	v := ac.variables[name]
+	v := ac.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -49,7 +58,7 @@ func (ac *AgentFlagConfiguration) Get(name string) (value string) {
 }
 
 func (ac *AgentFlagConfiguration) GetBool(name string) (value bool) {
-	v := ac.variables[name]
+	v := ac.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -60,7 +69,7 @@ func (ac *AgentFlagConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (ac *AgentFlagConfiguration) GetInt(name string) (value int64) {
-	v := ac.variables[name]
+	v := ac.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return
@@ -88,12 +97,15 @@ func (ac *AgentFlagConfiguration) Update() *AgentFlagConfiguration {
 }
 
 type ServerFlagConfiguration struct {
-	variables map[string]string
+	variablesMap map[string]string
+	Cfg          ServerCfg
 }
 
 func NewServerFlagConfiguration() *ServerFlagConfiguration {
 
 	m := copyMap(serverDefaults)
+
+	cfg := UnMarshalServerDefaults(ServerDefaultJSON)
 
 	//default bucket of parameters and their values
 	a := flag.String("a", serverDefaults["ADDRESS"], "Address")
@@ -108,13 +120,19 @@ func NewServerFlagConfiguration() *ServerFlagConfiguration {
 	m["STORE_FILE"] = *f
 	m["RESTORE"] = *r
 
+	cfg.ADDRESS = *a
+	cfg.STORE_INTERVAL, _ = strconv.ParseInt(*i, 10, 64)
+	cfg.STORE_FILE = *f
+	cfg.RESTORE, _ = strconv.ParseBool(*r)
+
 	return &ServerFlagConfiguration{
-		variables: m,
+		variablesMap: m,
+		Cfg:          cfg,
 	}
 }
 
 func (sc *ServerFlagConfiguration) Get(name string) (value string) {
-	v := sc.variables[name]
+	v := sc.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -123,13 +141,13 @@ func (sc *ServerFlagConfiguration) Get(name string) (value string) {
 }
 
 func (sc *ServerFlagConfiguration) read() error {
-	for k := range sc.variables {
+	for k := range sc.variablesMap {
 		v := os.Getenv(k)
 		if v != "" {
-			sc.variables[k] = v
-			log.Println("variable " + k + " presented in environment, value: " + sc.variables[k])
+			sc.variablesMap[k] = v
+			log.Println("variable " + k + " presented in environment, value: " + sc.variablesMap[k])
 		} else {
-			log.Println("variable " + k + " not presented in environment, remains default: " + sc.variables[k])
+			log.Println("variable " + k + " not presented in environment, remains default: " + sc.variablesMap[k])
 
 		}
 	}
@@ -150,7 +168,7 @@ func (sc *ServerFlagConfiguration) Update() *ServerFlagConfiguration {
 }
 
 func (sc *ServerFlagConfiguration) GetBool(name string) (value bool) {
-	v := sc.variables[name]
+	v := sc.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 	}
@@ -161,7 +179,7 @@ func (sc *ServerFlagConfiguration) GetBool(name string) (value bool) {
 	return b
 }
 func (sc *ServerFlagConfiguration) GetInt(name string) (value int64) {
-	v := sc.variables[name]
+	v := sc.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
 		return

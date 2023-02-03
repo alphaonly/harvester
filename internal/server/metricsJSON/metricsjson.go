@@ -4,38 +4,30 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/alphaonly/harvester/internal/server/metricvalue"
-	countervalue "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/CounterValue"
-	gaugevalue "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/Gaugevalue"
+	"github.com/alphaonly/harvester/internal/schema"
+	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 )
 
-type MetricsJSON struct {
-	ID    string   `json:"id"`              // имя метрики
-	MType string   `json:"type"`            // параметр, пID    string   `json:"id"`              // имя метрикиринимающий значение gauge или counter
-	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
-	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
-}
-
-type MetricsMapType map[string]metricvalue.MetricValue
+type MetricsMapType map[string]mVal.MetricValue
 
 func (m MetricsMapType) MarshalJSON() ([]byte, error) {
-	mjArray := make([]MetricsJSON, len(m))
+	mjArray := make([]schema.MetricsJSON, len(m))
 	i := 0
 	for k, v := range m {
 		switch value := v.(type) {
-		case *gaugevalue.GaugeValue:
+		case *mVal.GaugeValue:
 			{
 				v := value.GetInternalValue().(float64)
-				mjArray[i] = MetricsJSON{
+				mjArray[i] = schema.MetricsJSON{
 					ID:    k,
 					MType: "gauge",
 					Value: &v,
 				}
 			}
-		case *countervalue.CounterValue:
+		case *mVal.CounterValue:
 			{
 				v := value.GetInternalValue().(int64)
-				mjArray[i] = MetricsJSON{
+				mjArray[i] = schema.MetricsJSON{
 					ID:    k,
 					MType: "counter",
 					Delta: &v,
@@ -55,16 +47,16 @@ func (m MetricsMapType) MarshalJSON() ([]byte, error) {
 }
 
 func (m MetricsMapType) UnmarshalJSON(b []byte) error {
-	var mjArray []MetricsJSON
+	var mjArray []schema.MetricsJSON
 	if err := json.Unmarshal(b, &mjArray); err != nil {
 		return err
 	}
 	for _, v := range mjArray {
 		switch v.MType {
 		case "gauge":
-			m[v.ID] = gaugevalue.NewFloat(*v.Value)
+			m[v.ID] = mVal.NewFloat(*v.Value)
 		case "counter":
-			m[v.ID] = countervalue.NewInt(*v.Delta)
+			m[v.ID] = mVal.NewInt(*v.Delta)
 		default:
 			return errors.New("unknown type in decoding metricsJSONArray")
 		}

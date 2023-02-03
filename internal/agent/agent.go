@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"io"
 
-	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
+	"github.com/alphaonly/harvester/internal/schema"
 
 	"log"
 	"net/http"
@@ -69,8 +69,8 @@ func NewAgent(c *conf.AgentEnvConfiguration, client *AgentClient) Agent {
 	return Agent{
 		Configuration: c,
 		baseURL: url.URL{
-			Scheme: (*c).Get("SCHEME"),
-			Host:   (*c).Get("ADDRESS"),
+			Scheme: c.Cfg.SCHEME,
+			Host:   c.Cfg.ADDRESS,
 		},
 		Client: client,
 	}
@@ -107,7 +107,7 @@ func AddGaugeData(common sendData, val Gauge, name string, data map[*sendData]bo
 
 func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendData]bool) {
 	v := float64(val)
-	mj := metricsjson.MetricsJSON{
+	mj := schema.MetricsJSON{
 		ID:    name,
 		MType: "gauge",
 		Value: &v,
@@ -129,7 +129,7 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 }
 func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sendData]bool) {
 	v := int64(val)
-	mj := metricsjson.MetricsJSON{
+	mj := schema.MetricsJSON{
 		ID:    name,
 		MType: "counter",
 		Delta: &v, //for test
@@ -233,7 +233,7 @@ repeatAgain:
 
 func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 
-	switch a.Configuration.Get("COMPRESS_TYPE") {
+	switch a.Configuration.Cfg.COMPRESS_TYPE {
 	case "deflate":
 		{
 			for k := range data {
@@ -264,7 +264,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 	m := make(map[*sendData]bool)
 	keys := make(HeaderKeys)
 
-	switch a.Configuration.Get("COMPRESS_TYPE") {
+	switch a.Configuration.Cfg.COMPRESS_TYPE {
 	case "deflate":
 		keys["Accept-Encoding"] = "deflate"
 		keys["Content-Encoding"] = "deflate"

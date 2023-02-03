@@ -7,7 +7,7 @@ import (
 	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/files"
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	"github.com/alphaonly/harvester/internal/server/metricvalue"
+	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 
@@ -29,18 +29,18 @@ func New(c *configuration.ServerEnvConfiguration) *stor.Storage {
 	return &s
 }
 
-func (fa FileArchive) GetMetric(ctx context.Context, name string) (mv *metricvalue.MetricValue, err error) {
+func (fa FileArchive) GetMetric(ctx context.Context, name string) (mv *mVal.MetricValue, err error) {
 	//Not supported by the implementation
 	return nil, errors.New("not supported")
 }
-func (fa FileArchive) SaveMetric(ctx context.Context, name string, mv *metricvalue.MetricValue) (err error) {
+func (fa FileArchive) SaveMetric(ctx context.Context, name string, mv *mVal.MetricValue) (err error) {
 	//Not supported by the implementation
 	return errors.New("not supported")
 }
 
 // Restore data from temp dir
 func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error) {
-	consumer, err := files.NewConsumer((*fa.configuration).Get("STORE_FILE"))
+	consumer, err := files.NewConsumer((*fa.configuration).Cfg.STORE_FILE)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.Me
 
 // Park data to temp dir
 func (fa FileArchive) SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error) {
-	producer, err := files.NewProducer((*fa.configuration).Get("STORE_FILE"))
+	producer, err := files.NewProducer((*fa.configuration).Cfg.STORE_FILE)
 	if err != nil {
 		return err
 	}

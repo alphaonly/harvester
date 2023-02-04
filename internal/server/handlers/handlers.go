@@ -270,6 +270,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			http.Error(w, "storage not initiated", http.StatusInternalServerError)
 			return
 		}
+
 		if r.Method != http.MethodPost {
 			http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
 			return
@@ -277,7 +278,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 
 		byteData, err := io.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, "unrecognized request body", http.StatusBadRequest)
+			http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
 			return
 		}
 		log.Printf("Server:json received:" + string(byteData))
@@ -285,7 +286,8 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		err = json.Unmarshal(byteData, &mj)
 
 		if err != nil {
-			http.Error(w, "Unrecognized json", http.StatusBadRequest)
+			http.Error(w, "unmarshal error:", http.StatusBadRequest)
+			log.Println("unmarshal error:" + err.Error())
 			return
 		}
 

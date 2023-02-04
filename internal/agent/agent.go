@@ -192,7 +192,7 @@ func (data sendData) SendData(client *AgentClient) error {
 
 func (a Agent) Update(ctx context.Context, metrics *Metrics) {
 	var m runtime.MemStats
-	ticker := time.NewTicker(time.Duration(a.Configuration.GetInt("POLL_INTERVAL")) * time.Second)
+	ticker := time.NewTicker(time.Duration(a.Configuration.Cfg.POLL_INTERVAL) * time.Second)
 	defer ticker.Stop()
 repeatAgain:
 	select {
@@ -279,7 +279,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 		keys["Content-Encoding"] = "deflate"
 	}
 
-	switch a.Configuration.GetBool("USE_JSON") {
+	switch a.Configuration.Cfg.USE_JSON {
 	case true:
 		{
 
@@ -319,9 +319,13 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddGaugeDataJSON(data, metrics.RandomValue, "RandomValue", m)
 			AddCounterDataJSON(data, metrics.PollCount, "PollCount", m)
 
-			//check api
-			//AddCounterDataJSON(data, -1, "PollCount", m)
-
+			////check api no value POST with expected response
+			//baseURL := url.URL{Scheme: a.Configuration.Cfg.SCHEME, Host: a.Configuration.Cfg.ADDRESS}
+			//dataAPI := sendData{
+			//	url:  baseURL.JoinPath("value"),
+			//	keys: keys,
+			//}
+			//AddCounterDataJSON(dataAPI, -1, "PollCount", m)
 		}
 	default:
 		{
@@ -368,7 +372,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 }
 func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 
-	ticker := time.NewTicker(time.Duration(a.Configuration.GetInt("REPORT_INTERVAL")) * time.Second)
+	ticker := time.NewTicker(time.Duration(a.Configuration.Cfg.REPORT_INTERVAL) * time.Second)
 	defer ticker.Stop()
 
 repeatAgain:

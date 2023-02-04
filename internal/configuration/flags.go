@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type AgentFlagConfiguration struct {
@@ -120,10 +121,14 @@ func NewServerFlagConfiguration() *ServerFlagConfiguration {
 	m["STORE_FILE"] = *f
 	m["RESTORE"] = *r
 
+	m["PORT"] = ":" + strings.Split(m["ADDRESS"], ":")[1]
+
 	cfg.ADDRESS = *a
 	cfg.STORE_INTERVAL, _ = strconv.ParseInt(*i, 10, 64)
 	cfg.STORE_FILE = *f
 	cfg.RESTORE, _ = strconv.ParseBool(*r)
+
+	cfg.PORT = m["PORT"]
 
 	return &ServerFlagConfiguration{
 		variablesMap: m,

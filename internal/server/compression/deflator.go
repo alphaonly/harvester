@@ -177,7 +177,7 @@ func (d Deflator) Decompress(data []byte) ([]byte, error) {
 
 // func gzipandle(next http.Handler) http.Handler {
 // 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+// 		if !strings.Contains(r.Header.get("Accept-Encoding"), "gzip") {
 // 			next.ServeHTTP(w, r)
 // 			return
 // 		}

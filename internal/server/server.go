@@ -38,7 +38,7 @@ func New(configuration *conf.ServerEnvConfiguration, memKeeper *stor.Storage, ar
 }
 
 func (s Server) ListenData(ctx context.Context) {
-	err := http.ListenAndServe(s.configuration.Cfg.ADDRESS, s.handlers.NewRouter())
+	err := http.ListenAndServe(s.configuration.Cfg.PORT, s.handlers.NewRouter())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,7 +81,7 @@ shutdown:
 
 func (s Server) restoreData(ctx context.Context, storageFrom *stor.Storage) {
 
-	if s.configuration.GetBool("RESTORE") {
+	if s.configuration.Cfg.RESTORE {
 		mvList, err := (*storageFrom).GetAllMetrics(ctx)
 		if err != nil {
 			log.Println("cannot initially read metrics from file storage")
@@ -108,7 +108,7 @@ func (s Server) ParkData(ctx context.Context, storageTo *stor.Storage) {
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(s.configuration.GetInt("STORE_INTERVAL")) * (time.Second))
+	ticker := time.NewTicker(time.Duration(s.configuration.Cfg.STORE_INTERVAL) * (time.Second))
 	defer ticker.Stop()
 
 DoitAgain:
@@ -128,7 +128,7 @@ DoitAgain:
 			} else {
 				err = (*storageTo).SaveAllMetrics(ctx, mvList)
 				if err != nil {
-					log.Fatal("cannot write metrics to file storage")
+					log.Fatal("cannot write metrics to file storage:" + err.Error())
 				}
 				log.Println("saved to file")
 			}

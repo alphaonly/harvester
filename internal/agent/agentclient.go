@@ -25,6 +25,8 @@ func (c AgentClient) DoWithRetry(r *http.Request) (*http.Response, error) {
 				time.Sleep(c.RetryPause)
 			}
 		}
+		log.Fatalf("agent gave up after %v attempts,exit", c.Retries)
 	}
+
 	return nil, errors.New("retries int was not noticed")
 }

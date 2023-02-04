@@ -29,6 +29,7 @@ type ServerCfg struct {
 	STORE_INTERVAL int64  `json:"STORE_INTERVAL,omitempty"`
 	STORE_FILE     string `json:"STORE_FILE,omitempty"`
 	RESTORE        bool   `json:"RESTORE,omitempty"`
+	PORT           string `json:"PORT,omitempty"` //additionally for listen and serve func
 }
 type AgentCfg struct {
 	POLL_INTERVAL   int64  `json:"POLL_INTERVAL,omitempty"`

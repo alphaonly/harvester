@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type AgentEnvConfiguration struct {
@@ -25,7 +26,7 @@ func NewAgentEnvConfiguration() *AgentEnvConfiguration {
 
 }
 
-func (ac *AgentEnvConfiguration) Get(name string) (value string) {
+func (ac *AgentEnvConfiguration) get(name string) (value string) {
 	v := ac.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -34,7 +35,7 @@ func (ac *AgentEnvConfiguration) Get(name string) (value string) {
 	return v
 }
 
-func (ac *AgentEnvConfiguration) GetBool(name string) (value bool) {
+func (ac *AgentEnvConfiguration) getBool(name string) (value bool) {
 	v := ac.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -45,7 +46,7 @@ func (ac *AgentEnvConfiguration) GetBool(name string) (value bool) {
 	}
 	return b
 }
-func (ac *AgentEnvConfiguration) GetInt(name string) (value int64) {
+func (ac *AgentEnvConfiguration) getInt(name string) (value int64) {
 	v := ac.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -104,6 +105,11 @@ func (ac *AgentEnvConfiguration) UpdateNotGiven(fromConf *AgentFlagConfiguration
 			log.Println("variable " + k + " updated from flags, value:" + acv.variablesMap[k])
 		}
 	}
+	ac.Cfg.ADDRESS = ac.get("ADDRESS")
+	ac.Cfg.SCHEME = ac.get("SCHEME")
+	ac.Cfg.COMPRESS_TYPE = ac.get("COMPRESS_TYPE")
+	ac.Cfg.POLL_INTERVAL = ac.getInt("POLL_INTERVAL")
+	ac.Cfg.USE_JSON = ac.getBool("USE_JSON")
 
 }
 
@@ -114,8 +120,10 @@ type ServerEnvConfiguration struct {
 
 func NewServerEnvConfiguration() *ServerEnvConfiguration {
 	v := copyMap(serverDefaults)
+	v["PORT"] = ":" + (strings.Split(v["ADDRESS"], ":"))[1]
 
 	cfg := UnMarshalServerDefaults(ServerDefaultJSON)
+	cfg.PORT = ":" + (strings.Split(cfg.ADDRESS, ":"))[1]
 
 	sc := ServerEnvConfiguration{
 		variablesMap: v,
@@ -126,7 +134,7 @@ func NewServerEnvConfiguration() *ServerEnvConfiguration {
 
 }
 
-func (sc *ServerEnvConfiguration) Get(name string) (value string) {
+func (sc *ServerEnvConfiguration) get(name string) (value string) {
 	v := sc.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)
@@ -143,7 +151,6 @@ func (sc *ServerEnvConfiguration) read() error {
 			log.Println("variable " + k + " presented in environment, value: " + sc.variablesMap[k])
 		} else {
 			log.Println("variable " + k + " not presented in environment, remains default: " + sc.variablesMap[k])
-
 		}
 	}
 	return nil
@@ -164,7 +171,7 @@ func (sc *ServerEnvConfiguration) write() {
 func (sc *ServerEnvConfiguration) update() *ServerEnvConfiguration {
 	err := sc.read()
 	if err != nil {
-		sc.write()
+		sc.write() //write defaults to environment
 	}
 	return sc
 }
@@ -176,11 +183,29 @@ func (sc *ServerEnvConfiguration) UpdateNotGiven(fromConf *ServerFlagConfigurati
 			fc.variablesMap[k] != serverDefaults[k] {
 			sc.variablesMap[k] = fc.variablesMap[k]
 			log.Println("variable " + k + " updated from flags, value:" + sc.variablesMap[k])
+
+			//Парсим порт из адреса
+
+		}
+		if k == "ADDRESS" {
+			sc.variablesMap["PORT"] = ":" + strings.Split(sc.variablesMap[k], ":")[1]
+			sc.Cfg.PORT = sc.variablesMap["PORT"]
+			log.Println("variable PORT updated from ADDRESS flags, value:" + sc.Cfg.PORT)
 		}
 	}
+	sc.Cfg.STORE_FILE = sc.get("STORE_FILE")
+	sc.Cfg.RESTORE = sc.getBool("RESTORE")
+	sc.Cfg.STORE_INTERVAL = sc.getInt("STORE_INTERVAL")
+	sc.Cfg.ADDRESS = sc.get("ADDRESS")
+
+	if sc.get("PORT") != serverDefaults["PORT"] {
+		sc.Cfg.PORT = sc.get("PORT")
+		log.Println("variable PORT updated from ADDRESS flags, value:" + sc.Cfg.PORT)
+	}
+
 }
 
-func (sc *ServerEnvConfiguration) GetBool(name string) (value bool) {
+func (sc *ServerEnvConfiguration) getBool(name string) (value bool) {
 
 	v := sc.variablesMap[name]
 	if v == "" {
@@ -192,7 +217,7 @@ func (sc *ServerEnvConfiguration) GetBool(name string) (value bool) {
 	}
 	return b
 }
-func (sc *ServerEnvConfiguration) GetInt(name string) (value int64) {
+func (sc *ServerEnvConfiguration) getInt(name string) (value int64) {
 	v := sc.variablesMap[name]
 	if v == "" {
 		log.Println("no variable:" + name)

@@ -287,7 +287,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			keys["Accept"] = "application/json"
 
 			data := sendData{
-				url:  a.baseURL.JoinPath("update"),
+				url:  a.baseURL.JoinPath("update/"),
 				keys: keys,
 			}
 

@@ -407,6 +407,7 @@ func (h *Handlers) NewRouter() chi.Router {
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		r.Post("/value", postJsonAndGetDataScenario)
 		r.Post("/update", postJsonCompressedScenario)
+		r.Post("/update/", postJsonCompressedScenario)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
 		r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)

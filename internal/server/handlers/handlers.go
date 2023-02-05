@@ -382,12 +382,16 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 }
 
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Unknown request", http.StatusNotFound)
+	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
+	log.Println("Chi rounting error, unknown route to get handler")
+	log.Println("HandlePostErrorPattern invoked")
 	r.Body.Close()
 }
 func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.Request) {
 
-	http.Error(w, "Unknown request", http.StatusNotFound)
+	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
+	log.Println("Chi rounting error, unknown route to get handler")
+	log.Println("HandlePostErrorPatternNoName invoked")
 	r.Body.Close()
 }
 
@@ -410,8 +414,8 @@ func (h *Handlers) NewRouter() chi.Router {
 		r.Post("/update", postJsonCompressedScenario)
 		r.Post("/update/", postJsonCompressedScenario)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
-		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
-		r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)
+		//r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
+		//r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)
 
 	})
 

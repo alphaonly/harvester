@@ -398,14 +398,15 @@ func (h *Handlers) NewRouter() chi.Router {
 	}
 
 	var postJsonCompressedScenario = d.DeCompressionHandler(h.HandlePostMetricJSON(d.CompressionHandler(d.WriteResponseBodyHandler(nil))))
-	var postJsonAndGetDataScenario = h.HandlePostMetricJSON(d.WriteResponseBodyHandler(nil))
+	var postJsonAndGetDataIncrement4Scenario = h.HandlePostMetricJSON(d.WriteResponseBodyHandler(nil))
 
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", h.HandleGetMetricFieldList)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
-		r.Post("/value", postJsonAndGetDataScenario)
+		r.Post("/value", postJsonAndGetDataIncrement4Scenario)
+		r.Post("/value/", postJsonAndGetDataIncrement4Scenario)
 		r.Post("/update", postJsonCompressedScenario)
 		r.Post("/update/", postJsonCompressedScenario)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)

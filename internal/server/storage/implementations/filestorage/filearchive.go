@@ -19,14 +19,14 @@ import (
 // }
 
 type FileArchive struct {
-	configuration *configuration.ServerEnvConfiguration
+	configuration *configuration.FileArchiveConfiguration
 }
 
-func New(c *configuration.ServerEnvConfiguration) *stor.Storage {
+func New(c *configuration.FileArchiveConfiguration) stor.Storage {
 	s := stor.Storage(FileArchive{
 		configuration: c,
 	})
-	return &s
+	return s
 }
 
 func (fa FileArchive) GetMetric(ctx context.Context, name string) (mv mVal.MetricValue, err error) {
@@ -40,7 +40,9 @@ func (fa FileArchive) SaveMetric(ctx context.Context, name string, mv *mVal.Metr
 
 // Restore data from temp dir
 func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error) {
-	consumer, err := files.NewConsumer((*fa.configuration).Cfg.STORE_FILE)
+	conf := *fa.configuration
+
+	consumer, err := files.NewConsumer(conf.StoreFile)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +59,9 @@ func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.Me
 
 // Park data to temp dir
 func (fa FileArchive) SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error) {
-	producer, err := files.NewProducer((*fa.configuration).Cfg.STORE_FILE)
+	conf := *fa.configuration
+
+	producer, err := files.NewProducer(conf.StoreFile)
 	if err != nil {
 		return err
 	}
@@ -67,5 +71,3 @@ func (fa FileArchive) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Me
 
 	return nil
 }
-
-// var s S.Storage = FileArchive{}

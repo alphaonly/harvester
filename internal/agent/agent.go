@@ -59,18 +59,18 @@ type Metrics struct {
 }
 
 type Agent struct {
-	Configuration *conf.AgentEnvConfiguration
+	Configuration *conf.AgentConfiguration
 	baseURL       url.URL
 	Client        *AgentClient
 }
 
-func NewAgent(c *conf.AgentEnvConfiguration, client *AgentClient) Agent {
+func NewAgent(c *conf.AgentConfiguration, client *AgentClient) Agent {
 
 	return Agent{
 		Configuration: c,
 		baseURL: url.URL{
-			Scheme: c.Cfg.SCHEME,
-			Host:   c.Cfg.ADDRESS,
+			Scheme: c.Scheme,
+			Host:   c.Address,
 		},
 		Client: client,
 	}
@@ -192,7 +192,7 @@ func (data sendData) SendData(client *AgentClient) error {
 
 func (a Agent) Update(ctx context.Context, metrics *Metrics) {
 	var m runtime.MemStats
-	ticker := time.NewTicker(time.Duration(a.Configuration.Cfg.POLL_INTERVAL) * time.Second)
+	ticker := time.NewTicker(time.Duration(a.Configuration.PollInterval) * time.Second)
 	defer ticker.Stop()
 repeatAgain:
 	select {
@@ -242,7 +242,7 @@ repeatAgain:
 
 func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 
-	switch a.Configuration.Cfg.COMPRESS_TYPE {
+	switch a.Configuration.CompressType {
 	case "deflate":
 		{
 			for k := range data {
@@ -273,13 +273,13 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 	m := make(map[*sendData]bool)
 	keys := make(HeaderKeys)
 
-	switch a.Configuration.Cfg.COMPRESS_TYPE {
+	switch a.Configuration.CompressType {
 	case "deflate":
 		keys["Accept-Encoding"] = "deflate"
 		keys["Content-Encoding"] = "deflate"
 	}
 
-	switch a.Configuration.Cfg.USE_JSON {
+	switch a.Configuration.UseJSON {
 	case true:
 		{
 
@@ -372,7 +372,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 }
 func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 
-	ticker := time.NewTicker(time.Duration(a.Configuration.Cfg.REPORT_INTERVAL) * time.Second)
+	ticker := time.NewTicker(time.Duration(a.Configuration.ReportInterval) * time.Second)
 	defer ticker.Stop()
 
 repeatAgain:

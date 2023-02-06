@@ -43,7 +43,7 @@ func NewMetricJSON(name string, MType string, value interface{}) (ret MetricsJSO
 	}
 	return j
 }
-func (j *MetricsJSON) GetMetricJSONWithPOST(baseURL *url.URL, name string, MType string) (mj MetricsJSON) {
+func GetMetricJSONWithPOST(baseURL *url.URL, name string, MType string) (mj MetricsJSON) {
 
 	metricsJSONRequest := NewMetricJSON(name, MType, nil)
 	data, err := json.Marshal(metricsJSONRequest)

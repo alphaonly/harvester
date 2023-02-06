@@ -13,11 +13,16 @@ import (
 
 func main() {
 
-	configuration := conf.NewServerEnvConfiguration()
-	configuration.UpdateNotGiven(conf.NewServerFlagConfiguration())
-
+	configuration := conf.NewServerConfiguration()
+	configuration.UpdateFromEnvironment()
+	configuration.UpdateFromFlags()
+	
+	fac := &conf.FileArchiveConfiguration{
+			StoreFile: configuration.StoreFile,
+	}
+	
 	mapStorage := mapStor.New()
-	fileStorage := fileStor.New(configuration)
+	fileStorage := fileStor.New(fac)
 	handlers := handlers.New(mapStorage)
 	server := server.New(configuration, mapStorage, fileStorage, handlers)
 

@@ -26,8 +26,10 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	agentConf := C.NewAgentEnvConfiguration()
-	
+	agentConf := C.NewAgentConfiguration()
+	agentConf.UpdateFromEnvironment()
+	agentConf.UpdateFromFlags()
+
 	client := &agent.AgentClient{Client: &http.Client{}, Retries: 1, RetryPause: time.Millisecond}
 	a := agent.NewAgent(agentConf, client)
 

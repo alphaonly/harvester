@@ -36,11 +36,14 @@ func TestRun(t *testing.T) {
 			defer cancel()
 			go func() {
 
-				configuration := conf.NewServerEnvConfiguration()
+				sc := conf.NewServerConfiguration()
+				sc.UpdateFromEnvironment()
+				sc.UpdateFromFlags()
+				
 				mapStorage := mapStor.New()
-				archive := filestorage.New(configuration)
+				archive := filestorage.New(&conf.FileArchiveConfiguration{StoreFile: sc.StoreFile})
 				handlers := handlers.New(mapStorage)
-				server := server.New(configuration, mapStorage, archive, handlers)
+				server := server.New(sc, mapStorage, archive, handlers)
 
 				err := server.Run(ctx)
 				if err != nil {

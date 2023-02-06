@@ -177,7 +177,7 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
-
+	log.Panicln("HandlePostMetric invoked")
 	metricType := chi.URLParam(r, "TYPE")
 	metricName := chi.URLParam(r, "NAME")
 	metricValue := chi.URLParam(r, "VALUE")
@@ -229,7 +229,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 				}
 			case "counter":
 				{
-					
+
 					intValue, err := strconv.ParseInt(metricValue, 10, 64)
 					if err != nil {
 						http.Error(w, "value: "+metricValue+" not parsed", http.StatusBadRequest)
@@ -406,13 +406,14 @@ func (h *Handlers) NewRouter() chi.Router {
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {
-		r.Get("/", h.HandleGetMetricFieldList)
-		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
+		// r.Get("/", h.HandleGetMetricFieldList)
+		// r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		r.Post("/value", postJsonAndGetDataIncrement4Scenario)
 		r.Post("/value/", postJsonAndGetDataIncrement4Scenario)
 		r.Post("/update", postJsonCompressedScenario)
 		r.Post("/update/", postJsonCompressedScenario)
-		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
+		// r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
+
 		//r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
 		//r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)
 

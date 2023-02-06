@@ -61,7 +61,7 @@ func (d Deflator) CompressionHandler(next http.Handler) http.HandlerFunc {
 	})
 }
 
-func (d Deflator) WriteResponseBodyHandler(next http.Handler) http.HandlerFunc {
+func (d Deflator) WriteResponseBodyHandler() http.HandlerFunc {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		byteData, err := io.ReadAll(r.Body)
@@ -75,6 +75,8 @@ func (d Deflator) WriteResponseBodyHandler(next http.Handler) http.HandlerFunc {
 			http.Error(w, "byteData writing error", http.StatusInternalServerError)
 			return
 		}
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
 	})
 }
 func (d Deflator) DeCompressionHandler(next http.Handler) http.HandlerFunc {

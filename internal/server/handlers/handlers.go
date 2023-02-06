@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"compress/flate"
 	"encoding/json"
 	"io"
 	"log"
@@ -10,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/alphaonly/harvester/internal/schema"
-	"github.com/alphaonly/harvester/internal/server/compression"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/go-chi/chi/v5"
@@ -359,17 +357,14 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			http.Error(w, " json response forming error", http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-
 		//response
 		if next != nil {
 			r.Body = io.NopCloser(bytes.NewReader(byteData))
 			next.ServeHTTP(w, r)
 			return
 		}
-
-		r.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(byteData)
 		if err != nil {
 			log.Println("response writing error")
@@ -396,26 +391,26 @@ func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.R
 
 func (h *Handlers) NewRouter() chi.Router {
 
-	d := compression.Deflator{
-		Level: flate.BestSpeed,
-	}
+	// d := compression.Deflator{
+	// 	Level: flate.BestSpeed,
+	// }
 
-	var postJsonCompressedScenario = d.DeCompressionHandler(h.HandlePostMetricJSON(d.CompressionHandler(d.WriteResponseBodyHandler(nil))))
-	var postJsonAndGetDataIncrement4Scenario = h.HandlePostMetricJSON(d.WriteResponseBodyHandler(nil))
+	// var postJsonCompressedScenario = d.DeCompressionHandler(h.HandlePostMetricJSON(d.CompressionHandler(d.WriteResponseBodyHandler(nil))))
+	var postJsonAndGetDataIncrement4Scenario = h.HandlePostMetricJSON(nil)
 
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {
-		// r.Get("/", h.HandleGetMetricFieldList)
-		// r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
+		r.Get("/", h.HandleGetMetricFieldList)
+		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		r.Post("/value", postJsonAndGetDataIncrement4Scenario)
 		r.Post("/value/", postJsonAndGetDataIncrement4Scenario)
-		r.Post("/update", postJsonCompressedScenario)
-		r.Post("/update/", postJsonCompressedScenario)
-		// r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
+		r.Post("/update", postJsonAndGetDataIncrement4Scenario)
+		r.Post("/update/", postJsonAndGetDataIncrement4Scenario)
+		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 
-		//r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
-		//r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)
+		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
+		r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)
 
 	})
 

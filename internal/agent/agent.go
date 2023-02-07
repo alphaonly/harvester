@@ -3,9 +3,9 @@ package agent
 import (
 	"compress/flate"
 	"context"
-	"encoding/json"
 
 	"github.com/alphaonly/harvester/internal/schema"
+	"github.com/go-resty/resty/v2"
 
 	"log"
 	"net/http"
@@ -80,10 +80,12 @@ func AddCounterData(common sendData, val Counter, name string, data map[*sendDat
 		JoinPath("counter").
 		JoinPath(name).
 		JoinPath(strconv.FormatUint(uint64(val), 10)) //value float
+
+	empty := []byte("empty")
 	sd := sendData{
-		url:  URL,
-		keys: common.keys,
-		body: bytes.NewBufferString(url.Values{}.Encode()), //need to transfer something
+		url:     URL,
+		keys:    common.keys,
+		bodyURL: &empty, //need to transfer something
 	}
 	data[&sd] = true
 
@@ -95,10 +97,11 @@ func AddGaugeData(common sendData, val Gauge, name string, data map[*sendData]bo
 		JoinPath(name).
 		JoinPath(strconv.FormatFloat(float64(val), 'E', -1, 64)) //value float
 
+	empty := []byte("empty")
 	sd := sendData{
-		url:  URL,
-		keys: common.keys,
-		body: bytes.NewBufferString(url.Values{}.Encode()), //need to transer something
+		url:     URL,
+		keys:    common.keys,
+		bodyURL: &empty, //need to transer something
 	}
 	data[&sd] = true
 
@@ -112,16 +115,10 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 		Value: &v,
 	}
 
-	log.Println(mj)
-	metricsBytes, err := json.Marshal(mj)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	sd := sendData{
-		url:  common.url,
-		keys: common.keys,
-		body: bytes.NewBuffer(metricsBytes),
+		url:      common.url,
+		keys:     common.keys,
+		bodyJSON: &mj,
 	}
 	data[&sd] = true
 
@@ -129,28 +126,17 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sendData]bool) {
 	v := int64(val)
 	var mj schema.MetricsJSON
-	if v > 0 {
-		mj = schema.MetricsJSON{
-			ID:    name,
-			MType: "counter",
-			Delta: &v, //for test
-		}
-	} else {
-		//если счетчик меньше нуля - проверка API на возврат значения
-		mj = schema.MetricsJSON{
-			ID:    name,
-			MType: "counter",
-		}
-	}
-	metricsBytes, err := json.Marshal(mj)
-	if err != nil {
-		log.Fatal(err)
+
+	mj = schema.MetricsJSON{
+		ID:    name,
+		MType: "counter",
+		Delta: &v,
 	}
 
 	sd := sendData{
-		url:  common.url,
-		keys: common.keys,
-		body: bytes.NewBuffer(metricsBytes),
+		url:      common.url,
+		keys:     common.keys,
+		bodyJSON: &mj,
 	}
 	data[&sd] = true
 
@@ -158,14 +144,60 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sen
 
 type HeaderKeys map[string]string
 type sendData struct {
-	url  *url.URL
-	keys HeaderKeys
-	body *bytes.Buffer
+	url      *url.URL
+	keys     HeaderKeys
+	bodyURL  *[]byte
+	bodyJSON *schema.MetricsJSON
 }
 
-func (data sendData) SendData(client *AgentClient) error {
+func (sd sendData) Body() interface{} {
+	if sd.bodyJSON != nil {
+		return *sd.bodyJSON
+	} else if sd.bodyURL != nil {
+		return *sd.bodyURL
+	} else {
+		log.Fatal("Error sendData get body, all nil")
+		return nil
+	}
+}
 
-	request, err := http.NewRequest(http.MethodPost, data.url.String(), data.body)
+func (data sendData) SendDataResty(client *AgentClient) error {
+	//a resty attempt
+
+	cl := resty.New().SetRetryCount(10)
+
+	resp, err := cl.R().
+		SetHeaders(data.keys).
+		SetBody(data.Body()).
+		Post(data.url.String())
+	if err != nil {
+		log.Fatalf("new request error:%v", err)
+	}
+	log.Println("agent:response status from server:" + resp.Status())
+	log.Printf("agent:response body from server:%v", string(resp.Body()))
+
+	// request, err := http.NewRequest(http.MethodPost, data.url.String(), data.body)
+	// if err != nil {
+	// 	log.Fatalf("new request error:%v", err)
+	// }
+	// if data.keys != nil {
+	// 	for k, v := range data.keys {
+	// 		request.Header.Set(k, v)
+	// 	}
+	// }
+	// log.Printf("url from agent):%s", data.url.String())
+	// request.Close = true
+	// readBytes, err := client.DoWithRetry(request)
+	// if err != nil {
+	// 	log.Fatal("an unfortunate request to server after a few retries")
+	// }
+	// log.Printf("received body from server: %v", string(readBytes))
+	return err
+}
+
+func (data sendData) SendDataClassic(client *AgentClient) error {
+
+	request, err := http.NewRequest(http.MethodPost, data.url.String(), bytes.NewBuffer(*data.bodyURL))
 	if err != nil {
 		log.Fatalf("new request error:%v", err)
 	}
@@ -247,7 +279,7 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 				if err != nil {
 					log.Fatalf("failed init compress writer: %v", err)
 				}
-				_, err = w.Write(k.body.Bytes())
+				_, err = w.Write(*k.bodyURL)
 				if err != nil {
 					log.Fatalf("failed write data to compress temporary buffer: %v", err)
 				}
@@ -256,7 +288,8 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 				if err != nil {
 					log.Fatalf("failed compress data: %v", err)
 				}
-				k.body = &b
+				bytes := b.Bytes()
+				k.bodyURL = &bytes
 			}
 		}
 	}
@@ -376,7 +409,7 @@ repeatAgain:
 			dataPackage := a.CompressData(a.prepareData(metrics))
 
 			for key := range dataPackage {
-				err := key.SendData(a.Client)
+				err := key.SendDataResty(a.Client)
 				if err != nil {
 					log.Println(err)
 					return
@@ -392,6 +425,7 @@ repeatAgain:
 	}
 
 }
+
 func (a Agent) Run(ctx context.Context) {
 
 	metrics := Metrics{}

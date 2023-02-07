@@ -60,7 +60,7 @@ func (s Server) Run(ctx context.Context) error {
 	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, os.Interrupt)
 
-	 <-osSignal
+	<-osSignal
 	err := shutdown(ctx, server)
 
 	return err
@@ -101,7 +101,7 @@ func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval) * (time.Second))
+	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval))
 	defer ticker.Stop()
 
 DoitAgain:

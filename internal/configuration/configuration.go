@@ -7,31 +7,36 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/alphaonly/harvester/internal/schema"
 )
 
-const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": 300,"STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true}`
-const AgentDefaultJSON = `{"POLL_INTERVAL":2,"REPORT_INTERVAL":10,"ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":true}`
+const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true}`
+const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":true}`
 
 type AgentConfiguration struct {
-	Address        string `json:"ADDRESS,omitempty"`
-	Scheme         string `json:"SCHEME,omitempty"`
-	CompressType   string `json:"COMPRESS_TYPE,omitempty"`
-	PollInterval   int64  `json:"POLL_INTERVAL,omitempty"`
-	ReportInterval int64  `json:"REPORT_INTERVAL,omitempty"`
-	UseJSON        bool   `json:"USE_JSON,omitempty"`
+	Address        string          `json:"ADDRESS,omitempty"`
+	Scheme         string          `json:"SCHEME,omitempty"`
+	CompressType   string          `json:"COMPRESS_TYPE,omitempty"`
+	PollInterval   schema.Duration `json:"POLL_INTERVAL,omitempty"`
+	ReportInterval schema.Duration `json:"REPORT_INTERVAL,omitempty"`
+	UseJSON        bool            `json:"USE_JSON,omitempty"`
 }
 
 type ServerConfiguration struct {
-	Address       string `json:"ADDRESS,omitempty"`
-	StoreInterval int64  `json:"STORE_INTERVAL,omitempty"`
-	StoreFile     string `json:"STORE_FILE,omitempty"`
-	Restore       bool   `json:"RESTORE,omitempty"`
-	Port          string `json:"PORT,omitempty"` //additionally for listen and serve func
+	Address       string          `json:"ADDRESS,omitempty"`
+	StoreInterval schema.Duration `json:"STORE_INTERVAL,omitempty"`
+	StoreFile     string          `json:"STORE_FILE,omitempty"`
+	Restore       bool            `json:"RESTORE,omitempty"`
+	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
 }
 
 type FileArchiveConfiguration struct {
 	StoreFile string
 }
+
+// func getInterval(string) time.Duration
 
 func UnMarshalServerDefaults(s string) ServerConfiguration {
 	sc := ServerConfiguration{}
@@ -69,8 +74,8 @@ func (c *AgentConfiguration) UpdateFromEnvironment() {
 
 	c.Address = getEnv("ADDRESS", c.Address).(string)
 	c.CompressType = getEnv("COMPRESS_TYPE", c.CompressType).(string)
-	c.PollInterval = getEnv("POLL_INTERVAL", c.PollInterval).(int64)
-	c.ReportInterval = getEnv("REPORT_INTERVAL", c.ReportInterval).(int64)
+	c.PollInterval = getEnv("POLL_INTERVAL", c.PollInterval).(schema.Duration)
+	c.ReportInterval = getEnv("REPORT_INTERVAL", c.ReportInterval).(schema.Duration)
 	c.Scheme = getEnv("SCHEME", c.Scheme).(string)
 	c.UseJSON = getEnv("USE_JSON", c.UseJSON).(bool)
 }
@@ -79,7 +84,7 @@ func (c *ServerConfiguration) UpdateFromEnvironment() {
 	c.Address = getEnv("ADDRESS", c.Address).(string)
 	c.Restore = getEnv("RESTORE", c.Restore).(bool)
 	c.StoreFile = getEnv("STORE_FILE", c.StoreFile).(string)
-	c.StoreInterval = getEnv("STORE_INTERVAL", c.StoreInterval).(int64)
+	c.StoreInterval = getEnv("STORE_INTERVAL", c.StoreInterval).(schema.Duration)
 
 	//PORT is derived from ADDRESS
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
@@ -89,8 +94,8 @@ func (c *AgentConfiguration) UpdateFromFlags() {
 	dc := NewAgentConfiguration()
 	var (
 		a = flag.String("a", dc.Address, "Domain name and :port")
-		p = flag.Int64("p", dc.PollInterval, "Poll interval")
-		r = flag.Int64("r", dc.ReportInterval, "Report interval")
+		p = flag.Duration("p", time.Duration(dc.PollInterval), "Poll interval")
+		r = flag.Duration("r", time.Duration(dc.ReportInterval), "Report interval")
 		j = flag.Bool("j", dc.UseJSON, "Use JSON true/false")
 		t = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
 	)
@@ -105,12 +110,12 @@ func (c *AgentConfiguration) UpdateFromFlags() {
 		log.Printf(message, "ADDRESS", c.Address)
 	}
 	if c.PollInterval == dc.PollInterval {
-		c.PollInterval = *p
+		c.PollInterval = schema.Duration(*p)
 		log.Printf(message, "POLL_INTERVAL", c.PollInterval)
 	}
 
 	if c.ReportInterval == dc.ReportInterval {
-		c.ReportInterval = *r
+		c.ReportInterval = schema.Duration(*r)
 		log.Printf(message, "REPORT_INTERVAL", c.ReportInterval)
 	}
 
@@ -132,7 +137,7 @@ func (c *ServerConfiguration) UpdateFromFlags() {
 
 	var (
 		a = flag.String("a", dc.Address, "Domain name and :port")
-		i = flag.Int64("i", dc.StoreInterval, "Store interval")
+		i = flag.Duration("i", time.Duration(dc.StoreInterval), "Store interval")
 		f = flag.String("f", dc.StoreFile, "Store file full path")
 		r = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
 	)
@@ -147,7 +152,7 @@ func (c *ServerConfiguration) UpdateFromFlags() {
 		log.Printf(message, "PORT", c.Port)
 	}
 	if c.StoreInterval == dc.StoreInterval {
-		c.StoreInterval = *i
+		c.StoreInterval = schema.Duration(*i)
 		log.Printf(message, "STORE_INTERVAL", c.StoreInterval)
 	}
 	if c.StoreFile == dc.StoreFile {
@@ -188,6 +193,13 @@ func getEnv(variableName string, variableValue interface{}) (changedValue interf
 			changedValue, err = strconv.ParseBool(stringVal)
 			if err != nil {
 				log.Fatal("Bool Parse error")
+			}
+		}
+	case schema.Duration:
+		{
+			changedValue, err = time.ParseDuration(stringVal)
+			if err != nil {
+				log.Fatal("Duration Parse error")
 			}
 		}
 	default:

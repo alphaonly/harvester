@@ -218,7 +218,7 @@ func (data sendData) SendDataClassic(client *AgentClient) error {
 
 func (a Agent) Update(ctx context.Context, metrics *Metrics) {
 	var m runtime.MemStats
-	ticker := time.NewTicker(time.Duration(a.Configuration.PollInterval) * time.Second)
+	ticker := time.NewTicker(time.Duration(a.Configuration.PollInterval))
 	defer ticker.Stop()
 repeatAgain:
 	select {
@@ -399,7 +399,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 }
 func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 
-	ticker := time.NewTicker(time.Duration(a.Configuration.ReportInterval) * time.Second)
+	ticker := time.NewTicker(time.Duration(a.Configuration.ReportInterval))
 	defer ticker.Stop()
 
 repeatAgain:

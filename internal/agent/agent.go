@@ -4,7 +4,6 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/json"
-	"io"
 
 	"github.com/alphaonly/harvester/internal/schema"
 
@@ -168,7 +167,7 @@ func (data sendData) SendData(client *AgentClient) error {
 
 	request, err := http.NewRequest(http.MethodPost, data.url.String(), data.body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("new request error:%v", err)
 	}
 	if data.keys != nil {
 		for k, v := range data.keys {
@@ -176,17 +175,11 @@ func (data sendData) SendData(client *AgentClient) error {
 		}
 	}
 	log.Printf("url from agent):%s", data.url.String())
-	response, err := client.DoWithRetry(request)
+	readBytes, err := client.DoWithRetry(request)
 	if err != nil {
-		log.Println("an unfortunate request to server after a few retries")
-		return err
+		log.Fatal("an unfortunate request to server after a few retries")
 	}
-	defer response.Body.Close()
-	log.Println("agent:response from server:" + response.Status)
-	bytes, _ := io.ReadAll(response.Body)
-
-	log.Println("agent:body from server:" + string(bytes))
-
+	log.Printf("received body from server: %v", string(readBytes))
 	return err
 }
 

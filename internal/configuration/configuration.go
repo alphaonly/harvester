@@ -71,7 +71,7 @@ func NewServerConfiguration() *ServerConfiguration {
 }
 
 func (c *AgentConfiguration) UpdateFromEnvironment() {
-
+	log.Printf("Have environmet: %v", os.Environ())
 	c.Address = getEnv("ADDRESS", c.Address).(string)
 	c.CompressType = getEnv("COMPRESS_TYPE", c.CompressType).(string)
 	c.PollInterval = getEnv("POLL_INTERVAL", c.PollInterval).(schema.Duration)
@@ -79,8 +79,9 @@ func (c *AgentConfiguration) UpdateFromEnvironment() {
 	c.Scheme = getEnv("SCHEME", c.Scheme).(string)
 	c.UseJSON = getEnv("USE_JSON", c.UseJSON).(bool)
 }
-func (c *ServerConfiguration) UpdateFromEnvironment() {
 
+func (c *ServerConfiguration) UpdateFromEnvironment() {
+	log.Printf("Have environmet: %v", os.Environ())
 	c.Address = getEnv("ADDRESS", c.Address).(string)
 	c.Restore = getEnv("RESTORE", c.Restore).(bool)
 	c.StoreFile = getEnv("STORE_FILE", c.StoreFile).(string)
@@ -172,9 +173,9 @@ func getEnv(variableName string, variableValue interface{}) (changedValue interf
 	if variableValue == nil {
 		log.Fatal("nil pointer in getEnv")
 	}
-
-	stringVal = os.Getenv(variableName)
-	if stringVal == "" {
+	var exists bool
+	stringVal, exists = os.LookupEnv(variableName)
+	if !exists {
 		log.Printf("variable "+variableName+" not presented in environment, remains default:%v", variableValue)
 		return variableValue
 	}

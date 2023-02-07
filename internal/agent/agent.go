@@ -379,7 +379,6 @@ repeatAgain:
 	select {
 	case <-ticker.C:
 		{
-			log.Printf("test changed value of metrics.HeapAlloc:%v", metrics.HeapAlloc)
 			dataPackage := a.CompressData(a.prepareData(metrics))
 
 			for key := range dataPackage {

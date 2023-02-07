@@ -15,13 +15,14 @@ type AgentClient struct {
 
 func (c AgentClient) DoWithRetry(r *http.Request) (*http.Response, error) {
 	if c.Retries > 0 {
-		for tries := 0; tries < c.Retries; tries++ {
+		for tries := 1; tries <= c.Retries; tries++ {
 			response, err := c.Client.Do(r)
 			if err == nil {
 				return response, nil
 			}
 			if c.Retries > 1 {
-				log.Println("Request error, retry")
+				log.Printf("Request error: %v", err)
+				log.Printf("retry %v time...", tries)
 				time.Sleep(c.RetryPause)
 			}
 		}

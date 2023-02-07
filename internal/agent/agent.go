@@ -8,7 +8,6 @@ import (
 	"github.com/go-resty/resty/v2"
 
 	"log"
-	"net/http"
 	"runtime"
 
 	"bytes"
@@ -60,10 +59,10 @@ type Metrics struct {
 type Agent struct {
 	Configuration *conf.AgentConfiguration
 	baseURL       url.URL
-	Client        *AgentClient
+	Client        *resty.Client
 }
 
-func NewAgent(c *conf.AgentConfiguration, client *AgentClient) Agent {
+func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
 
 	return Agent{
 		Configuration: c,
@@ -161,58 +160,19 @@ func (sd sendData) Body() interface{} {
 	}
 }
 
-func (data sendData) SendDataResty(client *AgentClient) error {
+func (data sendData) SendDataResty(client *resty.Client) error {
 	//a resty attempt
 
-	cl := resty.New().SetRetryCount(10)
-
-	resp, err := cl.R().
+	resp, err := client.R().
 		SetHeaders(data.keys).
 		SetBody(data.Body()).
 		Post(data.url.String())
 	if err != nil {
-		log.Fatalf("new request error:%v", err)
+		log.Fatalf("send new request error:%v", err)
 	}
 	log.Println("agent:response status from server:" + resp.Status())
 	log.Printf("agent:response body from server:%v", string(resp.Body()))
 
-	// request, err := http.NewRequest(http.MethodPost, data.url.String(), data.body)
-	// if err != nil {
-	// 	log.Fatalf("new request error:%v", err)
-	// }
-	// if data.keys != nil {
-	// 	for k, v := range data.keys {
-	// 		request.Header.Set(k, v)
-	// 	}
-	// }
-	// log.Printf("url from agent):%s", data.url.String())
-	// request.Close = true
-	// readBytes, err := client.DoWithRetry(request)
-	// if err != nil {
-	// 	log.Fatal("an unfortunate request to server after a few retries")
-	// }
-	// log.Printf("received body from server: %v", string(readBytes))
-	return err
-}
-
-func (data sendData) SendDataClassic(client *AgentClient) error {
-
-	request, err := http.NewRequest(http.MethodPost, data.url.String(), bytes.NewBuffer(*data.bodyURL))
-	if err != nil {
-		log.Fatalf("new request error:%v", err)
-	}
-	if data.keys != nil {
-		for k, v := range data.keys {
-			request.Header.Set(k, v)
-		}
-	}
-	log.Printf("url from agent):%s", data.url.String())
-	request.Close = true
-	readBytes, err := client.DoWithRetry(request)
-	if err != nil {
-		log.Fatal("an unfortunate request to server after a few retries")
-	}
-	log.Printf("received body from server: %v", string(readBytes))
 	return err
 }
 

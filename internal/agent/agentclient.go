@@ -20,12 +20,12 @@ func (c AgentClient) DoWithRetry(r *http.Request) (body []byte, err error) {
 
 	if c.Retries > 0 {
 		for tries := 1; tries <= c.Retries; tries++ {
-			mutex.Lock()  
+			mutex.Lock()
 			response, err := c.Client.Do(r)
 			if err != nil {
 				log.Printf("sending request:%v", r)
 				log.Printf("getting response:%v", response)
-				log.Printf("clientDo error:%v", err)
+				log.Printf("clientDo error :%v", err)
 			}
 
 			if err == nil {
@@ -37,7 +37,7 @@ func (c AgentClient) DoWithRetry(r *http.Request) (body []byte, err error) {
 				}
 				return bytes, nil
 			}
-			mutex.Unlock()  
+			mutex.Unlock()
 			if c.Retries > 1 {
 				log.Printf("Request error: %v", err)
 				log.Printf("retry %v time...", tries)

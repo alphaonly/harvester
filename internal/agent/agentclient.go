@@ -31,7 +31,6 @@ func (c AgentClient) DoWithRetry(r *http.Request) (body []byte, err error) {
 				if err != nil {
 					log.Fatalf("read all response body error:%v", err)
 				}
-				log.Println("agent:body from server:" + string(bytes))
 				return bytes, nil
 			}
 			if c.Retries > 1 {

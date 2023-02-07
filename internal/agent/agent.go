@@ -175,6 +175,7 @@ func (data sendData) SendData(client *AgentClient) error {
 		}
 	}
 	log.Printf("url from agent):%s", data.url.String())
+	request.Close = true
 	readBytes, err := client.DoWithRetry(request)
 	if err != nil {
 		log.Fatal("an unfortunate request to server after a few retries")

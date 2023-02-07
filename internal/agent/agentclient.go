@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -15,12 +16,15 @@ type AgentClient struct {
 }
 
 func (c AgentClient) DoWithRetry(r *http.Request) (body []byte, err error) {
+	var mutex sync.Mutex
+
 	if c.Retries > 0 {
 		for tries := 1; tries <= c.Retries; tries++ {
+			mutex.Lock()  
 			response, err := c.Client.Do(r)
 			if err != nil {
 				log.Printf("sending request:%v", r)
-				log.Printf("sending response:%v", response)
+				log.Printf("getting response:%v", response)
 				log.Printf("clientDo error:%v", err)
 			}
 
@@ -33,6 +37,7 @@ func (c AgentClient) DoWithRetry(r *http.Request) (body []byte, err error) {
 				}
 				return bytes, nil
 			}
+			mutex.Unlock()  
 			if c.Retries > 1 {
 				log.Printf("Request error: %v", err)
 				log.Printf("retry %v time...", tries)

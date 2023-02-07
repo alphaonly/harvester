@@ -29,8 +29,8 @@ type ServerConfiguration struct {
 	Port          string `json:"PORT,omitempty"` //additionally for listen and serve func
 }
 
-type FileArchiveConfiguration struct{
-	StoreFile     string 
+type FileArchiveConfiguration struct {
+	StoreFile string
 }
 
 func UnMarshalServerDefaults(s string) ServerConfiguration {
@@ -86,69 +86,78 @@ func (c *ServerConfiguration) UpdateFromEnvironment() {
 }
 
 func (c *AgentConfiguration) UpdateFromFlags() {
+	dc := NewAgentConfiguration()
 	var (
-		a = flag.String("a", c.Address, "Domain name and :port")
-		p = flag.Int64("p", c.PollInterval, "Poll interval")
-		r = flag.Int64("r", c.ReportInterval, "Report interval")
-		j = flag.Bool("j", c.UseJSON, "Use JSON true/false")
-		t = flag.String("t", c.CompressType, "Compress type: \"deflate\" supported")
+		a = flag.String("a", dc.Address, "Domain name and :port")
+		p = flag.Int64("p", dc.PollInterval, "Poll interval")
+		r = flag.Int64("r", dc.ReportInterval, "Report interval")
+		j = flag.Bool("j", dc.UseJSON, "Use JSON true/false")
+		t = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
 	)
 
 	flag.Parse()
-	dc := NewAgentConfiguration()
 
 	//Если значение параметра из переменных окружения равно по умолчанию, то обновляем из флагов
-	switch true {
-	case c.Address == dc.Address:
+
+	message := "variable %v  updated from flags, value %v"
+	if c.Address == dc.Address {
 		c.Address = *a
-	case c.PollInterval == dc.PollInterval:
+		log.Printf(message, "ADDRESS", c.Address)
+	}
+	if c.PollInterval == dc.PollInterval {
 		c.PollInterval = *p
-	case c.ReportInterval == dc.ReportInterval:
+		log.Printf(message, "POLL_INTERVAL", c.PollInterval)
+	}
+
+	if c.ReportInterval == dc.ReportInterval {
 		c.ReportInterval = *r
-	case c.UseJSON == dc.UseJSON:
+		log.Printf(message, "REPORT_INTERVAL", c.ReportInterval)
+	}
+
+	if c.UseJSON == dc.UseJSON {
 		c.UseJSON = *j
-	case c.CompressType == dc.CompressType:
+		log.Printf(message, "USE_JSON", c.UseJSON)
+	}
+
+	if c.CompressType != dc.CompressType {
 		c.CompressType = *t
+		log.Printf(message, "COMPRESS_TYPE", c.CompressType)
 	}
 
 }
 
 func (c *ServerConfiguration) UpdateFromFlags() {
-	var (
-		a *string = flag.String("a", c.Address, "Domain name and :port")
-		i *int64  = flag.Int64("i", c.StoreInterval, "Store interval")
-		f *string = flag.String("f", c.StoreFile, "Store file full path")
-		r *bool   = flag.Bool("r", c.Restore, "Restore from external storage:true/false")
-	)
-	flag.Parse()
+
 	dc := NewServerConfiguration()
 
-	switch true {
-	case c.Address == dc.Address:
+	var (
+		a = flag.String("a", dc.Address, "Domain name and :port")
+		i = flag.Int64("i", dc.StoreInterval, "Store interval")
+		f = flag.String("f", dc.StoreFile, "Store file full path")
+		r = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
+	)
+	flag.Parse()
+
+	message := "variable %v  updated from flags, value %v"
+	//Если значение из переменных равно значению по умолчанию, тогда берем из flags
+	if c.Address == dc.Address {
 		c.Address = *a
 		c.Port = ":" + strings.Split(c.Address, ":")[1]
-	case c.StoreInterval == dc.StoreInterval:
-		c.StoreInterval = *i
-	case c.StoreFile == dc.StoreFile:
-		c.StoreFile = *f
-	case c.Restore == dc.Restore:
-		c.Restore = *r
+		log.Printf(message, "ADDRESS", c.Address)
+		log.Printf(message, "PORT", c.Port)
 	}
-
-	// flag.Parse()
-	// if a != nil {
-	// 	c.Address = *a
-	// 	c.Port = ":" + strings.Split(c.Address, ":")[1]
-	// }
-	// if i != nil {
-	// 	c.StoreInterval = *i
-	// }
-	// if f != nil {
-	// 	c.StoreFile = *f
-	// }
-	// if r != nil {
-	// 	c.Restore = *r
-	// }
+	if c.StoreInterval == dc.StoreInterval {
+		c.StoreInterval = *i
+		log.Printf(message, "STORE_INTERVAL", c.StoreInterval)
+	}
+	if c.StoreFile == dc.StoreFile {
+		c.StoreFile = *f
+		log.Printf(message, "STORE_FILE", c.StoreFile)
+	}
+	if c.Restore == dc.Restore {
+		c.Restore = *r
+		log.Printf(message, "RESTORE", c.Restore)
+	}
 }
 
 func getEnv(variableName string, variableValue interface{}) (changedValue interface{}) {
@@ -185,7 +194,7 @@ func getEnv(variableName string, variableValue interface{}) (changedValue interf
 		log.Fatal("unknown type getEnv")
 	}
 	if stringVal != "" {
-		log.Println("variable " + variableName + "presented in environment, value: " + stringVal)
+		log.Println("variable " + variableName + " presented in environment, value: " + stringVal)
 	}
 
 	return changedValue

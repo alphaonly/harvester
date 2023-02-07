@@ -175,14 +175,15 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
-	log.Panicln("HandlePostMetric invoked")
+	log.Println("HandlePostMetric invoked")
+
 	metricType := chi.URLParam(r, "TYPE")
 	metricName := chi.URLParam(r, "NAME")
 	metricValue := chi.URLParam(r, "VALUE")
 
-	log.Println("metricType :" + metricType +
-		" metricName :" + metricName +
-		" metricValue :" + metricValue)
+	log.Println("server:received data via URL: type :" + metricType +
+		" name :" + metricName +
+		" value :" + metricValue)
 
 	w.Header().Set("Content-Type", "text/plain")
 
@@ -262,7 +263,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
+		log.Println("HandlePostMetricJSON invoked")
 		//validation
 		if h.MemKeeper == nil {
 			http.Error(w, "storage not initiated", http.StatusInternalServerError)

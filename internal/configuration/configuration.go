@@ -179,6 +179,7 @@ func getEnv(variableName string, variableValue interface{}) (changedValue interf
 		log.Printf("variable "+variableName+" not presented in environment, remains default:%v", variableValue)
 		return variableValue
 	}
+
 	switch variableValue.(type) {
 	case string:
 		changedValue = stringVal
@@ -198,10 +199,11 @@ func getEnv(variableName string, variableValue interface{}) (changedValue interf
 		}
 	case schema.Duration:
 		{
-			changedValue, err = time.ParseDuration(stringVal)
+			interval, err := time.ParseDuration(stringVal)
 			if err != nil {
 				log.Fatal("Duration Parse error")
 			}
+			changedValue = schema.Duration(interval)
 		}
 	default:
 		log.Fatal("unknown type getEnv")

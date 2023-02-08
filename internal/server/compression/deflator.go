@@ -134,17 +134,17 @@ func (d Deflator) Compress(data []byte) ([]byte, error) {
 	var b bytes.Buffer
 	w, err := flate.NewWriter(&b, d.Level)
 	if err != nil {
-		return nil, fmt.Errorf("failed init compress writer: %v", err)
+		return nil, fmt.Errorf("failed init GzipCompress writer: %v", err)
 	}
 
 	_, err = w.Write(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed write data to compress temporary buffer: %v", err)
+		return nil, fmt.Errorf("failed write data to GzipCompress temporary buffer: %v", err)
 	}
 
 	err = w.Close()
 	if err != nil {
-		return nil, fmt.Errorf("failed compress data: %v", err)
+		return nil, fmt.Errorf("failed GzipCompress data: %v", err)
 	}
 
 	return b.Bytes(), nil
@@ -161,7 +161,7 @@ func (d Deflator) Decompress(data []byte) ([]byte, error) {
 
 	_, err := b.ReadFrom(r)
 	if err != nil {
-		return nil, fmt.Errorf("failed decompress data: %v", err)
+		return nil, fmt.Errorf("failed GzipDecompress data: %v", err)
 	}
 
 	return b.Bytes(), nil

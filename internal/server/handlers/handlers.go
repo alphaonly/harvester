@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/alphaonly/harvester/internal/server/compression"
 	"io"
 	"log"
 	"net/http"
@@ -34,12 +35,21 @@ func (h *Handlers) HandleGetMetricFieldList(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.Write([]byte("<h1><ul>"))
+	_, err = w.Write([]byte("<h1><ul>"))
+	if err != nil {
+		return
+	}
 	for key := range *ms {
-		w.Write([]byte(" <li>" + key + "</li>"))
+		_, err = w.Write([]byte(" <li>" + key + "</li>"))
+		if err != nil {
+			return
+		}
 	}
 
-	w.Write([]byte("</ul></h1>"))
+	_, err = w.Write([]byte("</ul></h1>"))
+	if err != nil {
+		return
+	}
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -374,36 +384,41 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
-	log.Println("Chi rounting error, unknown route to get handler")
+	log.Println("Chi routing error, unknown route to get handler")
 	log.Println("HandlePostErrorPattern invoked")
-	r.Body.Close()
+	err := r.Body.Close()
+	if err != nil {
+		return
+	}
 }
 func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.Request) {
 
 	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
-	log.Println("Chi rounting error, unknown route to get handler")
+	log.Println("Chi routing error, unknown route to get handler")
 	log.Println("HandlePostErrorPatternNoName invoked")
-	r.Body.Close()
+	err := r.Body.Close()
+	if err != nil {
+		return
+	}
 }
 
 func (h *Handlers) NewRouter() chi.Router {
 
-	// d := compression.Deflator{
-	// 	Level: flate.BestSpeed,
-	// }
-
 	// var postJsonCompressedScenario = d.DeCompressionHandler(h.HandlePostMetricJSON(d.CompressionHandler(d.WriteResponseBodyHandler(nil))))
-	var postJsonAndGetDataIncrement4Scenario = h.HandlePostMetricJSON(nil)
-
+	//var postJsonAndGetDataIncrement4Scenario = h.HandlePostMetricJSON(nil)
+	var postJsonAndGetDataCompressedIncrement8Scenario = compression.GZipDeCompressionHandler(
+		h.HandlePostMetricJSON(
+			compression.GZipCompressionHandler(
+				compression.GZipWriteResponseBodyHandler())))
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", h.HandleGetMetricFieldList)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
-		r.Post("/value", postJsonAndGetDataIncrement4Scenario)
-		r.Post("/value/", postJsonAndGetDataIncrement4Scenario)
-		r.Post("/update", postJsonAndGetDataIncrement4Scenario)
-		r.Post("/update/", postJsonAndGetDataIncrement4Scenario)
+		r.Post("/value", postJsonAndGetDataCompressedIncrement8Scenario)
+		r.Post("/value/", postJsonAndGetDataCompressedIncrement8Scenario)
+		r.Post("/update", postJsonAndGetDataCompressedIncrement8Scenario)
+		r.Post("/update/", postJsonAndGetDataCompressedIncrement8Scenario)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)

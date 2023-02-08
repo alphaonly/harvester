@@ -3,6 +3,8 @@ package agent
 import (
 	"compress/flate"
 	"context"
+	"encoding/json"
+	"github.com/alphaonly/harvester/internal/server/compression"
 
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/go-resty/resty/v2"
@@ -82,9 +84,9 @@ func AddCounterData(common sendData, val Counter, name string, data map[*sendDat
 
 	empty := []byte("empty")
 	sd := sendData{
-		url:     URL,
-		keys:    common.keys,
-		bodyURL: &empty, //need to transfer something
+		url:  URL,
+		keys: common.keys,
+		body: &empty, //need to transfer something
 	}
 	data[&sd] = true
 
@@ -98,9 +100,9 @@ func AddGaugeData(common sendData, val Gauge, name string, data map[*sendData]bo
 
 	empty := []byte("empty")
 	sd := sendData{
-		url:     URL,
-		keys:    common.keys,
-		bodyURL: &empty, //need to transer something
+		url:  URL,
+		keys: common.keys,
+		body: &empty, //need to transer something
 	}
 	data[&sd] = true
 
@@ -113,11 +115,15 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 		MType: "gauge",
 		Value: &v,
 	}
+	body, err := json.Marshal(mj)
+	if err != nil {
+		log.Fatal("agent:marshal json data error gauge")
+	}
 
 	sd := sendData{
-		url:      common.url,
-		keys:     common.keys,
-		bodyJSON: &mj,
+		url:  common.url,
+		keys: common.keys,
+		body: &body,
 	}
 	data[&sd] = true
 
@@ -139,11 +145,14 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sen
 			MType: "counter",
 		}
 	}
-
+	body, err := json.Marshal(mj)
+	if err != nil {
+		log.Fatal("agent:marshal json data error counter")
+	}
 	sd := sendData{
-		url:      common.url,
-		keys:     common.keys,
-		bodyJSON: &mj,
+		url:  common.url,
+		keys: common.keys,
+		body: &body,
 	}
 	data[&sd] = true
 
@@ -151,30 +160,24 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sen
 
 type HeaderKeys map[string]string
 type sendData struct {
-	url      *url.URL
-	keys     HeaderKeys
-	bodyURL  *[]byte
-	bodyJSON *schema.MetricsJSON
+	url  *url.URL
+	keys HeaderKeys
+	body *[]byte
 }
 
-func (sd sendData) Body() interface{} {
-	if sd.bodyJSON != nil {
-		return *sd.bodyJSON
-	} else if sd.bodyURL != nil {
-		return *sd.bodyURL
-	} else {
-		log.Fatal("Error sendData get body, all nil")
-		return nil
-	}
+func (sd sendData) Body() *[]byte {
+
+	return sd.body
+
 }
 
-func (data sendData) SendDataResty(client *resty.Client) error {
+func (sd sendData) SendDataResty(client *resty.Client) error {
 	//a resty attempt
 
 	resp, err := client.R().
-		SetHeaders(data.keys).
-		SetBody(data.Body()).
-		Post(data.url.String())
+		SetHeaders(sd.keys).
+		SetBody(sd.Body()).
+		Post(sd.url.String())
 	if err != nil {
 		log.Fatalf("send new request error:%v", err)
 	}
@@ -247,7 +250,7 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 				if err != nil {
 					log.Fatalf("failed init compress writer: %v", err)
 				}
-				_, err = w.Write(*k.bodyURL)
+				_, err = w.Write(*k.body)
 				if err != nil {
 					log.Fatalf("failed write data to compress temporary buffer: %v", err)
 				}
@@ -256,8 +259,20 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 				if err != nil {
 					log.Fatalf("failed compress data: %v", err)
 				}
-				bytes := b.Bytes()
-				k.bodyURL = &bytes
+				body := b.Bytes()
+				k.body = &body
+			}
+		}
+	case "gzip":
+		{
+
+			for k := range data {
+
+				compressedBody, err := compression.GzipCompress(*k.body)
+				if err != nil {
+					log.Fatal("Error body gzip compression")
+				}
+				k.body = compressedBody
 			}
 		}
 	}
@@ -270,8 +285,15 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 
 	switch a.Configuration.CompressType {
 	case "deflate":
-		keys["Accept-Encoding"] = "deflate"
-		keys["Content-Encoding"] = "deflate"
+		{
+			keys["Accept-Encoding"] = "deflate"
+			keys["Content-Encoding"] = "deflate"
+		}
+	case "gzip":
+		{
+			keys["Accept-Encoding"] = "gzip"
+			keys["Content-Encoding"] = "gzip"
+		}
 	}
 
 	switch a.Configuration.UseJSON {
@@ -281,51 +303,51 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			keys["Content-Type"] = "application/json"
 			keys["Accept"] = "application/json"
 
-			// data := sendData{
-			// 	url:  a.baseURL.JoinPath("update"),
-			// 	keys: keys,
-			// }
-
-			// AddGaugeDataJSON(data, metrics.Alloc, "Alloc", m)
-			// AddGaugeDataJSON(data, metrics.Frees, "Frees", m)
-			// AddGaugeDataJSON(data, metrics.GCCPUFraction, "GCCPUFraction", m)
-			// AddGaugeDataJSON(data, metrics.GCSys, "GCSys", m)
-			// AddGaugeDataJSON(data, metrics.HeapAlloc, "HeapAlloc", m)
-			// AddGaugeDataJSON(data, metrics.HeapIdle, "HeapIdle", m)
-			// AddGaugeDataJSON(data, metrics.HeapInuse, "HeapInuse", m)
-			// AddGaugeDataJSON(data, metrics.HeapObjects, "HeapObjects", m)
-			// AddGaugeDataJSON(data, metrics.HeapReleased, "HeapReleased", m)
-			// AddGaugeDataJSON(data, metrics.HeapSys, "HeapSys", m)
-			// AddGaugeDataJSON(data, metrics.LastGC, "LastGC", m)
-			// AddGaugeDataJSON(data, metrics.Lookups, "Lookups", m)
-			// AddGaugeDataJSON(data, metrics.MCacheSys, "MCacheSys", m)
-			// AddGaugeDataJSON(data, metrics.MSpanInuse, "MSpanInuse", m)
-			// AddGaugeDataJSON(data, metrics.MSpanSys, "MSpanSys", m)
-			// AddGaugeDataJSON(data, metrics.Mallocs, "Mallocs", m)
-			// AddGaugeDataJSON(data, metrics.NextGC, "NextGC", m)
-			// AddGaugeDataJSON(data, metrics.NumForcedGC, "NumForcedGC", m)
-			// AddGaugeDataJSON(data, metrics.NumGC, "NumGC", m)
-			// AddGaugeDataJSON(data, metrics.OtherSys, "OtherSys", m)
-			// AddGaugeDataJSON(data, metrics.PauseTotalNs, "PauseTotalNs", m)
-			// AddGaugeDataJSON(data, metrics.StackInuse, "StackInuse", m)
-			// AddGaugeDataJSON(data, metrics.StackSys, "StackSys", m)
-			// AddGaugeDataJSON(data, metrics.Sys, "Sys", m)
-			// AddGaugeDataJSON(data, metrics.TotalAlloc, "TotalAlloc", m)
-			// AddGaugeDataJSON(data, metrics.RandomValue, "RandomValue", m)
-			// AddCounterDataJSON(data, metrics.PollCount, "PollCount", m)
-			// value1, value2 := int64(rand.Int31()), int64(rand.Int31())
-			// var value0 int64
-			// value1, value2 := int64(1), int64(2)
-			// // //check api no value POST with expected response
-			baseURL := url.URL{Scheme: a.Configuration.Scheme, Host: a.Configuration.Address}
-			dataAPI := sendData{
-				url:  baseURL.JoinPath("value"),
+			data := sendData{
+				url:  a.baseURL.JoinPath("update"),
 				keys: keys,
 			}
-			// AddCounterDataJSON(dataAPI, Counter(value1), "SetGet12344", m)
-			// AddCounterDataJSON(dataAPI, Counter(value2), "SetGet12344", m)
-			AddCounterDataJSON(dataAPI, -1, "SetGet12344", m)
-			// log.Printf("sum:%v", value1+value2+value0)
+			AddGaugeDataJSON(data, metrics.Alloc, "Alloc", m)
+			AddGaugeDataJSON(data, metrics.Frees, "Frees", m)
+			AddGaugeDataJSON(data, metrics.GCCPUFraction, "GCCPUFraction", m)
+			AddGaugeDataJSON(data, metrics.GCSys, "GCSys", m)
+			AddGaugeDataJSON(data, metrics.HeapAlloc, "HeapAlloc", m)
+			AddGaugeDataJSON(data, metrics.HeapIdle, "HeapIdle", m)
+			AddGaugeDataJSON(data, metrics.HeapInuse, "HeapInuse", m)
+			AddGaugeDataJSON(data, metrics.HeapObjects, "HeapObjects", m)
+			AddGaugeDataJSON(data, metrics.HeapReleased, "HeapReleased", m)
+			AddGaugeDataJSON(data, metrics.HeapSys, "HeapSys", m)
+			AddGaugeDataJSON(data, metrics.LastGC, "LastGC", m)
+			AddGaugeDataJSON(data, metrics.Lookups, "Lookups", m)
+			AddGaugeDataJSON(data, metrics.MCacheSys, "MCacheSys", m)
+			AddGaugeDataJSON(data, metrics.MSpanInuse, "MSpanInuse", m)
+			AddGaugeDataJSON(data, metrics.MSpanSys, "MSpanSys", m)
+			AddGaugeDataJSON(data, metrics.Mallocs, "Mallocs", m)
+			AddGaugeDataJSON(data, metrics.NextGC, "NextGC", m)
+			AddGaugeDataJSON(data, metrics.NumForcedGC, "NumForcedGC", m)
+			AddGaugeDataJSON(data, metrics.NumGC, "NumGC", m)
+			AddGaugeDataJSON(data, metrics.OtherSys, "OtherSys", m)
+			AddGaugeDataJSON(data, metrics.PauseTotalNs, "PauseTotalNs", m)
+			AddGaugeDataJSON(data, metrics.StackInuse, "StackInuse", m)
+			AddGaugeDataJSON(data, metrics.StackSys, "StackSys", m)
+			AddGaugeDataJSON(data, metrics.Sys, "Sys", m)
+			AddGaugeDataJSON(data, metrics.TotalAlloc, "TotalAlloc", m)
+			AddGaugeDataJSON(data, metrics.RandomValue, "RandomValue", m)
+			AddCounterDataJSON(data, metrics.PollCount, "PollCount", m)
+
+			//// value1, value2 := int64(rand.Int31()), int64(rand.Int31())
+			//// var value0 int64
+			//// value1, value2 := int64(1), int64(2)
+			//// // //check api no value POST with expected response
+			//baseURL := url.URL{Scheme: a.Configuration.Scheme, Host: a.Configuration.Address}
+			//dataAPI := sendData{
+			//	url:  baseURL.JoinPath("value"),
+			//	keys: keys,
+			//}
+			//// AddCounterDataJSON(dataAPI, Counter(value1), "SetGet12344", m)
+			//// AddCounterDataJSON(dataAPI, Counter(value2), "SetGet12344", m)
+			//AddCounterDataJSON(dataAPI, -1, "SetGet12344", m)
+			//// log.Printf("sum:%v", value1+value2+value0)
 		}
 	default:
 		{

@@ -22,6 +22,7 @@ type AgentConfiguration struct {
 	PollInterval   schema.Duration `json:"POLL_INTERVAL,omitempty"`
 	ReportInterval schema.Duration `json:"REPORT_INTERVAL,omitempty"`
 	UseJSON        bool            `json:"USE_JSON,omitempty"`
+	EnvChanged     map[string]bool
 }
 
 type ServerConfiguration struct {
@@ -30,6 +31,7 @@ type ServerConfiguration struct {
 	StoreFile     string          `json:"STORE_FILE,omitempty"`
 	Restore       bool            `json:"RESTORE,omitempty"`
 	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
+	EnvChanged    map[string]bool
 }
 
 // func getInterval(string) time.Duration
@@ -54,7 +56,7 @@ func UnMarshalAgentDefaults(s string) AgentConfiguration {
 
 func NewAgentConfiguration() *AgentConfiguration {
 	c := UnMarshalAgentDefaults(AgentDefaultJSON)
-	// ac.PORT = ":" + strings.Split(ac.ADDRESS, ":")[1]
+	c.EnvChanged = make(map[string]bool)
 
 	return &c
 
@@ -62,26 +64,25 @@ func NewAgentConfiguration() *AgentConfiguration {
 func NewServerConfiguration() *ServerConfiguration {
 	c := UnMarshalServerDefaults(ServerDefaultJSON)
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
+	c.EnvChanged = make(map[string]bool)
 	return &c
 
 }
 
 func (c *AgentConfiguration) UpdateFromEnvironment() {
-	log.Printf("Have environmet: %v", os.Environ())
-	c.Address = getEnv("ADDRESS", c.Address).(string)
-	c.CompressType = getEnv("COMPRESS_TYPE", c.CompressType).(string)
-	c.PollInterval = getEnv("POLL_INTERVAL", c.PollInterval).(schema.Duration)
-	c.ReportInterval = getEnv("REPORT_INTERVAL", c.ReportInterval).(schema.Duration)
-	c.Scheme = getEnv("SCHEME", c.Scheme).(string)
-	c.UseJSON = getEnv("USE_JSON", c.UseJSON).(bool)
+	c.Address = getEnv("ADDRESS", c.Address, c.EnvChanged).(string)
+	c.CompressType = getEnv("COMPRESS_TYPE", c.CompressType, c.EnvChanged).(string)
+	c.PollInterval = getEnv("POLL_INTERVAL", c.PollInterval, c.EnvChanged).(schema.Duration)
+	c.ReportInterval = getEnv("REPORT_INTERVAL", c.ReportInterval, c.EnvChanged).(schema.Duration)
+	c.Scheme = getEnv("SCHEME", c.Scheme, c.EnvChanged).(string)
+	c.UseJSON = getEnv("USE_JSON", c.UseJSON, c.EnvChanged).(bool)
 }
 
 func (c *ServerConfiguration) UpdateFromEnvironment() {
-	log.Printf("Have environmet: %v", os.Environ())
-	c.Address = getEnv("ADDRESS", c.Address).(string)
-	c.Restore = getEnv("RESTORE", c.Restore).(bool)
-	c.StoreFile = getEnv("STORE_FILE", c.StoreFile).(string)
-	c.StoreInterval = getEnv("STORE_INTERVAL", c.StoreInterval).(schema.Duration)
+	c.Address = getEnv("ADDRESS", c.Address, c.EnvChanged).(string)
+	c.Restore = getEnv("RESTORE", c.Restore, c.EnvChanged).(bool)
+	c.StoreFile = getEnv("STORE_FILE", c.StoreFile, c.EnvChanged).(string)
+	c.StoreInterval = getEnv("STORE_INTERVAL", c.StoreInterval, c.EnvChanged).(schema.Duration)
 
 	//PORT is derived from ADDRESS
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
@@ -102,26 +103,26 @@ func (c *AgentConfiguration) UpdateFromFlags() {
 	//Если значение параметра из переменных окружения равно по умолчанию, то обновляем из флагов
 
 	message := "variable %v  updated from flags, value %v"
-	if c.Address == dc.Address {
+	if !c.EnvChanged["ADDRESS"] {
 		c.Address = *a
 		log.Printf(message, "ADDRESS", c.Address)
 	}
-	if c.PollInterval == dc.PollInterval {
+	if !c.EnvChanged["POLL_INTERVAL"] {
 		c.PollInterval = schema.Duration(*p)
 		log.Printf(message, "POLL_INTERVAL", c.PollInterval)
 	}
 
-	if c.ReportInterval == dc.ReportInterval {
+	if !c.EnvChanged["REPORT_INTERVAL"] {
 		c.ReportInterval = schema.Duration(*r)
 		log.Printf(message, "REPORT_INTERVAL", c.ReportInterval)
 	}
 
-	if c.UseJSON == dc.UseJSON {
+	if !c.EnvChanged["USE_JSON"] {
 		c.UseJSON = *j
 		log.Printf(message, "USE_JSON", c.UseJSON)
 	}
 
-	if c.CompressType != dc.CompressType {
+	if !c.EnvChanged["COMPRESS_TYPE"] {
 		c.CompressType = *t
 		log.Printf(message, "COMPRESS_TYPE", c.CompressType)
 	}
@@ -142,27 +143,27 @@ func (c *ServerConfiguration) UpdateFromFlags() {
 
 	message := "variable %v  updated from flags, value %v"
 	//Если значение из переменных равно значению по умолчанию, тогда берем из flags
-	if c.Address == dc.Address {
+	if !c.EnvChanged["ADDRESS"] {
 		c.Address = *a
 		c.Port = ":" + strings.Split(c.Address, ":")[1]
 		log.Printf(message, "ADDRESS", c.Address)
 		log.Printf(message, "PORT", c.Port)
 	}
-	if c.StoreInterval == dc.StoreInterval {
+	if !c.EnvChanged["STORE_INTERVAL"] {
 		c.StoreInterval = schema.Duration(*i)
 		log.Printf(message, "STORE_INTERVAL", c.StoreInterval)
 	}
-	if c.StoreFile == dc.StoreFile {
+	if !c.EnvChanged["STORE_FILE"] {
 		c.StoreFile = *f
 		log.Printf(message, "STORE_FILE", c.StoreFile)
 	}
-	if c.Restore == dc.Restore {
+	if !c.EnvChanged["RESTORE"] {
 		c.Restore = *r
 		log.Printf(message, "RESTORE", c.Restore)
 	}
 }
 
-func getEnv(variableName string, variableValue interface{}) (changedValue interface{}) {
+func getEnv(variableName string, variableValue interface{}, changed map[string]bool) (changedValue interface{}) {
 	var stringVal string
 	var err error
 
@@ -173,9 +174,10 @@ func getEnv(variableName string, variableValue interface{}) (changedValue interf
 	stringVal, exists = os.LookupEnv(variableName)
 	if !exists {
 		log.Printf("variable "+variableName+" not presented in environment, remains default:%v", variableValue)
+		changed[variableName] = false
 		return variableValue
 	}
-
+	changed[variableName] = true
 	switch variableValue.(type) {
 	case string:
 		changedValue = stringVal

@@ -10,6 +10,7 @@ import (
 
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/handlers"
+	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 
@@ -19,7 +20,7 @@ type Configuration struct {
 
 type Server struct {
 	configuration *conf.ServerConfiguration
-	memKeeper     stor.Storage
+	memKeeper     *mapstorage.MapStorage
 	archive       stor.Storage
 	handlers      *handlers.Handlers
 }
@@ -28,10 +29,10 @@ func NewConfiguration(serverPort string) *Configuration {
 	return &Configuration{serverPort: ":" + serverPort}
 }
 
-func New(configuration *conf.ServerConfiguration, memKeeper stor.Storage, archive stor.Storage, handlers *handlers.Handlers) (server Server) {
+func New(configuration *conf.ServerConfiguration, archive stor.Storage, handlers *handlers.Handlers) (server Server) {
 	return Server{
 		configuration: configuration,
-		memKeeper:     memKeeper,
+		memKeeper:     handlers.MemKeeper,
 		archive:       archive,
 		handlers:      handlers,
 	}

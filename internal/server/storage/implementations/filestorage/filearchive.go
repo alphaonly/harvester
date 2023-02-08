@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/files"
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
-	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 
 // type Storage interface {
@@ -19,14 +17,7 @@ import (
 // }
 
 type FileArchive struct {
-	configuration *configuration.FileArchiveConfiguration
-}
-
-func New(c *configuration.FileArchiveConfiguration) stor.Storage {
-	s := stor.Storage(FileArchive{
-		configuration: c,
-	})
-	return s
+	StoreFile string
 }
 
 func (fa FileArchive) GetMetric(ctx context.Context, name string) (mv mVal.MetricValue, err error) {
@@ -40,9 +31,7 @@ func (fa FileArchive) SaveMetric(ctx context.Context, name string, mv *mVal.Metr
 
 // Restore data from temp dir
 func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error) {
-	conf := *fa.configuration
-
-	consumer, err := files.NewConsumer(conf.StoreFile)
+	consumer, err := files.NewConsumer(fa.StoreFile)
 	if err != nil {
 		return nil, err
 	}
@@ -59,9 +48,7 @@ func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.Me
 
 // Park data to temp dir
 func (fa FileArchive) SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error) {
-	conf := *fa.configuration
-
-	producer, err := files.NewProducer(conf.StoreFile)
+	producer, err := files.NewProducer(fa.StoreFile)
 	if err != nil {
 		return err
 	}

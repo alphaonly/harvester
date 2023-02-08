@@ -32,10 +32,6 @@ type ServerConfiguration struct {
 	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
 }
 
-type FileArchiveConfiguration struct {
-	StoreFile string
-}
-
 // func getInterval(string) time.Duration
 
 func UnMarshalServerDefaults(s string) ServerConfiguration {

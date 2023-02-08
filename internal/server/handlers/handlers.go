@@ -10,16 +10,12 @@ import (
 
 	"github.com/alphaonly/harvester/internal/schema"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
-	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 	"github.com/go-chi/chi/v5"
 )
 
 type Handlers struct {
-	MemKeeper stor.Storage
-}
-
-func New(storage stor.Storage) *Handlers {
-	return &Handlers{MemKeeper: storage}
+	MemKeeper *mapstorage.MapStorage
 }
 
 func (h *Handlers) HandleGetMetricFieldList(w http.ResponseWriter, r *http.Request) {

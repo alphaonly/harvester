@@ -15,13 +15,22 @@ type MapStorage struct {
 	metricsMap *metricsJSON.MetricsMapType
 }
 
-func New() (sr stor.Storage) {
+func NewStorage() (sr stor.Storage) {
 	map_ := make(metricsJSON.MetricsMapType)
 	mapStorage := stor.Storage(MapStorage{
 		mutex:      &sync.Mutex{},
 		metricsMap: &map_,
 	})
 	return mapStorage
+}
+
+func New() (storage *MapStorage) {
+	map_ := make(metricsJSON.MetricsMapType)
+	mapStorage := MapStorage{
+		mutex:      &sync.Mutex{},
+		metricsMap: &map_,
+	}
+	return &mapStorage
 }
 
 //Имплементация интерфейса storage

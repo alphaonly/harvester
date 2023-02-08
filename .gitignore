@@ -12,8 +12,8 @@
 *.out
 
 # Binaries
-cmd/agent/main
-cmd/server/main
+cmd/agent/agent
+cmd/server/server
 /internal/server/server
 /internal/agent/agent
 /cmd/httplib/
@@ -29,3 +29,6 @@ vendor/
 #others
 internal/server/storage/interfaces/archive.go
 internal/agent/agentjson/
+
+# tests
+/cmd/tests/

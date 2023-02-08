@@ -9,7 +9,6 @@ import (
 	"github.com/alphaonly/harvester/internal/server"
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
-	mapStor "github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -39,11 +38,9 @@ func TestRun(t *testing.T) {
 				sc := conf.NewServerConfiguration()
 				sc.UpdateFromEnvironment()
 				sc.UpdateFromFlags()
-				
-				mapStorage := mapStor.New()
-				archive := filestorage.New(&conf.FileArchiveConfiguration{StoreFile: sc.StoreFile})
-				handlers := handlers.New(mapStorage)
-				server := server.New(sc, mapStorage, archive, handlers)
+				archive := filestorage.FileArchive{StoreFile: sc.StoreFile}
+				handlers := &handlers.Handlers{}
+				server := server.New(sc, archive, handlers)
 
 				err := server.Run(ctx)
 				if err != nil {

@@ -100,7 +100,7 @@ func TestHandleMetric(t *testing.T) {
 	fmt.Println("start!")
 
 	s := mapstorage.New()
-	h := New(s)
+	h := Handlers{MemKeeper: s}
 
 	r := h.NewRouter()
 

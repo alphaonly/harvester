@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/alphaonly/harvester/internal/server/compression"
 	"io"
 	"log"
 	"net/http"
@@ -268,8 +267,11 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
+
 	return func(w http.ResponseWriter, r *http.Request) {
+
 		log.Println("HandlePostMetricJSON invoked")
+
 		//validation
 		if h.MemKeeper == nil {
 			http.Error(w, "storage not initiated", http.StatusInternalServerError)
@@ -287,6 +289,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			return
 		}
 		log.Printf("Server:json received:" + string(byteData))
+
 		var mj schema.MetricsJSON
 		err = json.Unmarshal(byteData, &mj)
 
@@ -406,19 +409,23 @@ func (h *Handlers) NewRouter() chi.Router {
 
 	// var postJsonCompressedScenario = d.DeCompressionHandler(h.HandlePostMetricJSON(d.CompressionHandler(d.WriteResponseBodyHandler(nil))))
 	//var postJsonAndGetDataIncrement4Scenario = h.HandlePostMetricJSON(nil)
-	var postJsonAndGetDataCompressedIncrement8Scenario = compression.GZipDeCompressionHandler(
-		h.HandlePostMetricJSON(
-			compression.GZipCompressionHandler(
-				compression.GZipWriteResponseBodyHandler())))
+
+	// var postJsonAndGetDataCompressedIncrement8Scenario = compression.GZipDeCompressionHandler(
+	// 	h.HandlePostMetricJSON(
+	// 		compression.GZipDeCompressionHandler(
+	// 			compression.GZipWriteResponseBodyHandler())))
+
+	var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(nil)
+
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", h.HandleGetMetricFieldList)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
-		r.Post("/value", postJsonAndGetDataCompressedIncrement8Scenario)
-		r.Post("/value/", postJsonAndGetDataCompressedIncrement8Scenario)
-		r.Post("/update", postJsonAndGetDataCompressedIncrement8Scenario)
-		r.Post("/update/", postJsonAndGetDataCompressedIncrement8Scenario)
+		r.Post("/value", postJsonAndGetDataTestScenario)
+		r.Post("/value/", postJsonAndGetDataTestScenario)
+		r.Post("/update", postJsonAndGetDataTestScenario)
+		r.Post("/update/", postJsonAndGetDataTestScenario)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)

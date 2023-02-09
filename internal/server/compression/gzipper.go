@@ -11,6 +11,7 @@ import (
 )
 
 func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
+	log.Println("GZipDeCompressionHandler invoked")
 	return func(w http.ResponseWriter, r *http.Request) {
 		//validation for compression
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
@@ -40,8 +41,14 @@ func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
 }
 
 func GZipWriteResponseBodyHandler() http.HandlerFunc {
-
 	return func(w http.ResponseWriter, r *http.Request) {
+		
+		if !strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
+			return
+		}
+		
+		log.Println("GZipWriteResponseBodyHandler invoked")
+
 		byteData, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotImplemented)
@@ -57,19 +64,21 @@ func GZipWriteResponseBodyHandler() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 	}
 }
-func GZipDeCompressionHandler(next http.Handler) http.HandlerFunc {
+func GZipDeCompressionHandler(next http.Handler) http.HandlerFunc {	
 	return func(w http.ResponseWriter, r *http.Request) {
-
+		
+		log.Println("GZipDeCompressionHandler invoked")
 		//validation for decompression
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 
-			//always read body
+			//read compressed body
 			byteData, err := io.ReadAll(r.Body)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusNotImplemented)
 				return
 			}
 			//Decompression logic
+
 			decompressedByteData, err := GzipDecompress(byteData)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusNotImplemented)
@@ -120,6 +129,7 @@ func GzipCompress(data []byte) (*[]byte, error) {
 	}
 
 	compressedBytes := b.Bytes()
+
 	return &compressedBytes, nil
 }
 
@@ -127,7 +137,7 @@ func GzipDecompress(data []byte) ([]byte, error) {
 	reader := bytes.NewReader(data)
 	gzipReader, err := gzip.NewReader(reader)
 	if err != nil {
-		log.Fatalf("Gzip decopress error:%v", err)
+		log.Fatalf("Gzip decompress error:%v", err)
 	}
 	defer func() {
 		err := gzipReader.Close()

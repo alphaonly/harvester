@@ -4,7 +4,6 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/json"
-	"github.com/alphaonly/harvester/internal/server/compression"
 
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/go-resty/resty/v2"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"math/rand"
+	"net/http"
 	"net/url"
 
 	conf "github.com/alphaonly/harvester/internal/configuration"
@@ -165,24 +165,31 @@ type sendData struct {
 	body *[]byte
 }
 
-func (sd sendData) Body() *[]byte {
-
-	return sd.body
-
-}
-
-func (sd sendData) SendDataResty(client *resty.Client) error {
+func (sd sendData) SendData(client *resty.Client) error {
+	// var l resty.Logger
 	//a resty attempt
+	// client.SetLogger(l)
+	// resp, err := client.R().
+	// 	SetHeaders(sd.keys).
+	// 	SetBody(sd.body).
+	// 	Post(sd.url.String())
+	b := bytes.NewReader(*sd.body)
+	req, _ := http.NewRequest(http.MethodPost, sd.url.String(), b)
 
-	resp, err := client.R().
-		SetHeaders(sd.keys).
-		SetBody(sd.Body()).
-		Post(sd.url.String())
+	// req.Header.Add("Accept-Encoding", "gzip")
+	for k, v := range sd.keys {
+		req.Header.Add(k, v)
+	}
+
+	cl := &http.Client{}
+	resp, err := cl.Do(req)
 	if err != nil {
 		log.Fatalf("send new request error:%v", err)
 	}
-	log.Println("agent:response status from server:" + resp.Status())
-	log.Printf("agent:response body from server:%v", string(resp.Body()))
+	log.Println("agent:response status from server:" + resp.Status)
+	// log.Println("agent:response status from server:" + resp.Status())
+
+	// log.Printf("agent:response body from server:%v", string(resp.Body))
 
 	return err
 }
@@ -265,15 +272,13 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 		}
 	case "gzip":
 		{
-
-			for k := range data {
-
-				compressedBody, err := compression.GzipCompress(*k.body)
-				if err != nil {
-					log.Fatal("Error body gzip compression")
-				}
-				k.body = compressedBody
-			}
+			// for k := range data {
+			// 	// compressedBody, err := compression.GzipCompress(*k.body)
+			// 	// if err != nil {
+			// 	// 	log.Fatal("Error body gzip compression")
+			// 	// }
+			// 	// k.body = compressedBody
+			// }
 		}
 	}
 
@@ -401,10 +406,11 @@ repeatAgain:
 	select {
 	case <-ticker.C:
 		{
-			dataPackage := a.CompressData(a.prepareData(metrics))
+			dataPackage := a.prepareData(metrics)
+			dataPackage = a.CompressData(dataPackage)
 
 			for key := range dataPackage {
-				err := key.SendDataResty(a.Client)
+				err := key.SendData(a.Client)
 				if err != nil {
 					log.Println(err)
 					return

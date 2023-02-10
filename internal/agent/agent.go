@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"encoding/json"
-
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
 	"github.com/go-resty/resty/v2"
@@ -175,7 +174,7 @@ func (sd sendData) SendData(client *resty.Client) error {
 	}
 	log.Println("agent:response status from server:" + resp.Status())
 	log.Printf("agent:response body from server:%v", string(resp.Body()))
-	
+	log.Printf("Content-Encoding:%v", resp.Header().Get("Content-Encoding"))
 
 	return err
 }

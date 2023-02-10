@@ -265,7 +265,27 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("WriteResponseBodyHandler invoked")
 
+		byteData, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write(byteData)
+		if err != nil {
+			log.Println("byteData writing error")
+			http.Error(w, "byteData writing error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+}
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -277,12 +297,10 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			http.Error(w, "storage not initiated", http.StatusInternalServerError)
 			return
 		}
-
 		if r.Method != http.MethodPost {
 			http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
 		byteData, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
@@ -292,7 +310,6 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 
 		var mj schema.MetricsJSON
 		err = json.Unmarshal(byteData, &mj)
-
 		if err != nil {
 			http.Error(w, "unmarshal error:", http.StatusBadRequest)
 			log.Println("unmarshal error:" + err.Error())
@@ -416,7 +433,7 @@ func (h *Handlers) NewRouter() chi.Router {
 	// 			compression.GZipWriteResponseBodyHandler())))
 
 	// var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(compression.GZipCompressionHandler(compression.GZipWriteResponseBodyHandler()))
-	var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(nil)
+	var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(h.WriteResponseBodyHandler())
 
 	r := chi.NewRouter()
 	//

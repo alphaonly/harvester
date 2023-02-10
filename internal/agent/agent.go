@@ -175,6 +175,7 @@ func (sd sendData) SendData(client *resty.Client) error {
 	}
 	log.Println("agent:response status from server:" + resp.Status())
 	log.Printf("agent:response body from server:%v", string(resp.Body()))
+	
 
 	return err
 }

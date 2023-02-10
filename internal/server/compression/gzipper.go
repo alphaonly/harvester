@@ -11,10 +11,11 @@ import (
 )
 
 func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
-	log.Println("GZipDeCompressionHandler invoked")
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		//validation for compression
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
+			log.Println("GZipCompressionHandler invoked")
 			//gzip compressed response
 
 			//read body
@@ -42,11 +43,9 @@ func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
 
 func GZipWriteResponseBodyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		
 		if !strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			return
 		}
-		
 		log.Println("GZipWriteResponseBodyHandler invoked")
 
 		byteData, err := io.ReadAll(r.Body)
@@ -62,12 +61,13 @@ func GZipWriteResponseBodyHandler() http.HandlerFunc {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Encoding", "gzip")
 	}
 }
-func GZipDeCompressionHandler(next http.Handler) http.HandlerFunc {	
+func GZipDeCompressionHandler(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		
 		log.Println("GZipDeCompressionHandler invoked")
+
 		//validation for decompression
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 

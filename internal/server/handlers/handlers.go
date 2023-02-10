@@ -1,14 +1,16 @@
 package handlers
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/alphaonly/harvester/internal/schema"
+	"github.com/alphaonly/harvester/internal/server/compression"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 	"github.com/go-chi/chi/v5"
@@ -265,19 +267,40 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+
 func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("WriteResponseBodyHandler invoked")
+		//read body
+		var bytesData []byte
+		var err error
+		var prev schema.PreviousBytes
 
-		byteData, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
-			return
+		if p := r.Context().Value(schema.PKey1); p != nil {
+			prev = p.(schema.PreviousBytes)
 		}
 
+		if prev != nil {
+			//body from previous handler
+			bytesData = prev
+		} else {
+			//body from request if there is no previous handler
+			bytesData, err = io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotImplemented)
+				return
+			}
+		}
+		//Set flag in case compressed data
+		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") &&
+			strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			w.Header().Set("Content-Encoding", "gzip")
+		}
+		//Set Response Header
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, err = w.Write(byteData)
+		//write Response Body
+		_, err = w.Write(bytesData)
 		if err != nil {
 			log.Println("byteData writing error")
 			http.Error(w, "byteData writing error", http.StatusInternalServerError)
@@ -286,12 +309,10 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 	}
 
 }
+
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
-
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		log.Println("HandlePostMetricJSON invoked")
-
 		//validation
 		if h.MemKeeper == nil {
 			http.Error(w, "storage not initiated", http.StatusInternalServerError)
@@ -301,27 +322,38 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		byteData, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
-			return
-		}
-		log.Printf("Server:json received:" + string(byteData))
+		var bytesData []byte
+		var err error
+		var prev schema.PreviousBytes
 
+		if p := r.Context().Value(schema.PKey1); p != nil {
+			prev = p.(schema.PreviousBytes)
+		}
+
+		if prev != nil {
+			//body from previous handler
+			bytesData = prev
+		} else {
+			//body from request if there is no previous handler
+			bytesData, err = io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+		log.Printf("Server:json received:" + string(bytesData))
 		var mj schema.MetricsJSON
-		err = json.Unmarshal(byteData, &mj)
+		err = json.Unmarshal(bytesData, &mj)
 		if err != nil {
 			http.Error(w, "unmarshal error:", http.StatusBadRequest)
 			log.Println("unmarshal error:" + err.Error())
 			return
 		}
-
 		if mj.ID == "" {
 			http.Error(w, "not parsed, empty metric name!"+mj.ID, http.StatusNotFound)
 			log.Println("Error not parsed, empty metric name: 404")
 			return
 		}
-
 		//запрос пост в базу от агента
 		switch mj.MType {
 		case "gauge":
@@ -371,34 +403,27 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 					i = cv.GetInternalValue().(int64)
 				}
 				mj.Delta = &i
-
 			}
 		default:
 			http.Error(w, mj.MType+" not recognized type", http.StatusNotImplemented)
 			return
 		}
-
 		//перевод в json ответа
-		byteData, err = json.Marshal(mj)
-		if err != nil || byteData == nil {
+		bytesData, err = json.Marshal(mj)
+		if err != nil || bytesData == nil {
 			http.Error(w, " json response forming error", http.StatusInternalServerError)
 			return
 		}
 		//response
 		if next != nil {
-			r.Body = io.NopCloser(bytes.NewReader(byteData))
-			next.ServeHTTP(w, r)
+			//write handled body for further handle
+			prev = bytesData
+			ctx := context.WithValue(r.Context(), schema.PKey1, prev)
+			//call further handler with context parameters
+			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, err = w.Write(byteData)
-		if err != nil {
-			log.Println("response writing error")
-			http.Error(w, "response writing error", http.StatusInternalServerError)
-			return
-		}
-
+		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
 	}
 }
 
@@ -433,7 +458,9 @@ func (h *Handlers) NewRouter() chi.Router {
 	// 			compression.GZipWriteResponseBodyHandler())))
 
 	// var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(compression.GZipCompressionHandler(compression.GZipWriteResponseBodyHandler()))
-	var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(h.WriteResponseBodyHandler())
+
+	var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(compression.GZipCompressionHandler(
+		h.WriteResponseBodyHandler()))
 
 	r := chi.NewRouter()
 	//

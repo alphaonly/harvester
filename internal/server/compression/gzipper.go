@@ -3,67 +3,59 @@ package compression
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/alphaonly/harvester/internal/schema"
 )
 
 func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		//validation for compression
+		log.Println("GZipCompressionHandler invoked")
+		//read body
+		var bytesData []byte
+		var err error
+		var prev schema.PreviousBytes = r.Context().Value("previous1").(schema.PreviousBytes)
+		if prev != nil {
+			//body from previous handler
+			bytesData = prev
+		} else {
+			//body from request if there is no previous handler
+			bytesData, err = io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotImplemented)
+				return
+			}
+		}
+		//compression validation
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
-			log.Println("GZipCompressionHandler invoked")
-			//gzip compressed response
-
-			//read body
-			byteData, err := io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusNotImplemented)
-				return
-			}
 			//Compression logic
-			compressedByteData, err := GzipCompress(byteData)
+			compressedByteData, err := GzipCompress(bytesData)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusNotImplemented)
 				return
 			}
-			//compressed response to next handler
-			if next != nil {
-				r.Body = io.NopCloser(bytes.NewReader(*compressedByteData))
-				next.ServeHTTP(w, r)
-				return
-			}
-			log.Fatal("Gzip comp handler requires next handler not nil")
+			bytesData = *compressedByteData
 		}
+		//compressed response to next handler
+		if next != nil {
+			//write compressed body for further handle
+			prev = bytesData
+			ctx := context.WithValue(r.Context(), schema.PKey1, prev)
+			//call further handler with context parameters
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		log.Fatal("Gzip comp handler requires next handler not nil")
+
 	}
 }
 
-func GZipWriteResponseBodyHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
-			return
-		}
-		log.Println("GZipWriteResponseBodyHandler invoked")
-
-		byteData, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotImplemented)
-			return
-		}
-		_, err = w.Write(byteData)
-		if err != nil {
-			log.Println("byteData writing error")
-			http.Error(w, "byteData writing error", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Content-Encoding", "gzip")
-	}
-}
 func GZipDeCompressionHandler(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("GZipDeCompressionHandler invoked")
@@ -102,7 +94,6 @@ func GZipDeCompressionHandler(next http.Handler) http.HandlerFunc {
 		//compressed response
 		//initial response to next handler
 		if next != nil {
-			// r.Body = io.NopCloser(bytes.NewReader(byteData))
 			next.ServeHTTP(w, r)
 			return
 		}

@@ -1,22 +1,20 @@
 package agent
 
 import (
-	"compress/flate"
 	"context"
 	"encoding/json"
 
 	"github.com/alphaonly/harvester/internal/schema"
+	"github.com/alphaonly/harvester/internal/server/compression"
 	"github.com/go-resty/resty/v2"
 
 	"log"
 	"runtime"
 
-	"bytes"
 	"strconv"
 	"time"
 
 	"math/rand"
-	"net/http"
 	"net/url"
 
 	conf "github.com/alphaonly/harvester/internal/configuration"
@@ -82,11 +80,11 @@ func AddCounterData(common sendData, val Counter, name string, data map[*sendDat
 		JoinPath(name).
 		JoinPath(strconv.FormatUint(uint64(val), 10)) //value float
 
-	empty := []byte("empty")
+	// empty := bytes.NewBufferString(URL.String()).Bytes()
 	sd := sendData{
 		url:  URL,
 		keys: common.keys,
-		body: &empty, //need to transfer something
+		// body: &empty, //need to transfer something
 	}
 	data[&sd] = true
 
@@ -98,11 +96,12 @@ func AddGaugeData(common sendData, val Gauge, name string, data map[*sendData]bo
 		JoinPath(name).
 		JoinPath(strconv.FormatFloat(float64(val), 'E', -1, 64)) //value float
 
-	empty := []byte("empty")
+	// empty := bytes.NewBufferString(URL.String()).Bytes()
+
 	sd := sendData{
 		url:  URL,
 		keys: common.keys,
-		body: &empty, //need to transer something
+		// body: &empty, //need to transer something
 	}
 	data[&sd] = true
 
@@ -115,15 +114,11 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 		MType: "gauge",
 		Value: &v,
 	}
-	body, err := json.Marshal(mj)
-	if err != nil {
-		log.Fatal("agent:marshal json data error gauge")
-	}
 
 	sd := sendData{
-		url:  common.url,
-		keys: common.keys,
-		body: &body,
+		url:      common.url,
+		keys:     common.keys,
+		JSONbody: &mj,
 	}
 	data[&sd] = true
 
@@ -145,14 +140,11 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sen
 			MType: "counter",
 		}
 	}
-	body, err := json.Marshal(mj)
-	if err != nil {
-		log.Fatal("agent:marshal json data error counter")
-	}
+
 	sd := sendData{
-		url:  common.url,
-		keys: common.keys,
-		body: &body,
+		url:      common.url,
+		keys:     common.keys,
+		JSONbody: &mj,
 	}
 	data[&sd] = true
 
@@ -160,36 +152,29 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sen
 
 type HeaderKeys map[string]string
 type sendData struct {
-	url  *url.URL
-	keys HeaderKeys
-	body *[]byte
+	url            *url.URL
+	keys           HeaderKeys
+	JSONbody       *schema.MetricsJSON
+	compressedBody *[]byte
 }
 
 func (sd sendData) SendData(client *resty.Client) error {
-	// var l resty.Logger
+
 	//a resty attempt
-	// client.SetLogger(l)
-	// resp, err := client.R().
-	// 	SetHeaders(sd.keys).
-	// 	SetBody(sd.body).
-	// 	Post(sd.url.String())
-	b := bytes.NewReader(*sd.body)
-	req, _ := http.NewRequest(http.MethodPost, sd.url.String(), b)
 
-	// req.Header.Add("Accept-Encoding", "gzip")
-	for k, v := range sd.keys {
-		req.Header.Add(k, v)
+	r := client.R().
+		SetHeaders(sd.keys)
+
+	if sd.JSONbody != nil {
+		r.SetBody(sd.JSONbody)
 	}
-
-	cl := &http.Client{}
-	resp, err := cl.Do(req)
+	resp, err := r.
+		Post(sd.url.String())
 	if err != nil {
 		log.Fatalf("send new request error:%v", err)
 	}
-	log.Println("agent:response status from server:" + resp.Status)
-	// log.Println("agent:response status from server:" + resp.Status())
-
-	// log.Printf("agent:response body from server:%v", string(resp.Body))
+	log.Println("agent:response status from server:" + resp.Status())
+	log.Printf("agent:response body from server:%v", string(resp.Body()))
 
 	return err
 }
@@ -247,38 +232,45 @@ repeatAgain:
 func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 
 	switch a.Configuration.CompressType {
-	case "deflate":
-		{
-			for k := range data {
+	// case "deflate":
+	// 	{
+	// 		for k := range data {
 
-				var b bytes.Buffer
+	// 			var b bytes.Buffer
 
-				w, err := flate.NewWriter(&b, flate.BestCompression)
-				if err != nil {
-					log.Fatalf("failed init compress writer: %v", err)
-				}
-				_, err = w.Write(*k.body)
-				if err != nil {
-					log.Fatalf("failed write data to compress temporary buffer: %v", err)
-				}
+	// 			w, err := flate.NewWriter(&b, flate.BestCompression)
+	// 			if err != nil {
+	// 				log.Fatalf("failed init compress writer: %v", err)
+	// 			}
+	// 			_, err = w.Write(*k.JSONbody)
+	// 			if err != nil {
+	// 				log.Fatalf("failed write data to compress temporary buffer: %v", err)
+	// 			}
 
-				err = w.Close()
-				if err != nil {
-					log.Fatalf("failed compress data: %v", err)
-				}
-				body := b.Bytes()
-				k.body = &body
-			}
-		}
+	// 			err = w.Close()
+	// 			if err != nil {
+	// 				log.Fatalf("failed compress data: %v", err)
+	// 			}
+	// 			body := b.Bytes()
+	// 			k.JSONbody = &body
+	// 		}
+	// 	}
 	case "gzip":
 		{
-			// for k := range data {
-			// 	// compressedBody, err := compression.GzipCompress(*k.body)
-			// 	// if err != nil {
-			// 	// 	log.Fatal("Error body gzip compression")
-			// 	// }
-			// 	// k.body = compressedBody
-			// }
+			for k := range data {
+				if k.JSONbody != nil {
+					b, err := json.Marshal(*k.JSONbody)
+					if err != nil {
+						log.Println("error:", err)
+					}
+
+					compressedBody, err := compression.GzipCompress(b)
+					if err != nil {
+						log.Fatal("Error body gzip compression")
+					}
+					k.compressedBody = compressedBody
+				}
+			}
 		}
 	}
 

@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/alphaonly/harvester/internal/schema"
-	"github.com/alphaonly/harvester/internal/server/compression"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 	"github.com/go-chi/chi/v5"
@@ -416,8 +415,9 @@ func (h *Handlers) NewRouter() chi.Router {
 	// 		compression.GZipDeCompressionHandler(
 	// 			compression.GZipWriteResponseBodyHandler())))
 
-	var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(compression.GZipCompressionHandler(compression.GZipWriteResponseBodyHandler()))	
-	
+	// var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(compression.GZipCompressionHandler(compression.GZipWriteResponseBodyHandler()))
+	var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(nil)
+
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {

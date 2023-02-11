@@ -271,6 +271,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("WriteResponseBodyHandler invoked")
+		log.Printf("requsest Content-Encoding:%v", r.Header.Get("Content-Encoding"))
 		//read body
 		var bytesData []byte
 		var err error
@@ -283,6 +284,7 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		if prev != nil {
 			//body from previous handler
 			bytesData = prev
+			log.Printf("got body from previous handler:%v", string(bytesData))
 		} else {
 			//body from request if there is no previous handler
 			bytesData, err = io.ReadAll(r.Body)
@@ -290,10 +292,10 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusNotImplemented)
 				return
 			}
+			log.Printf("got body from request:%v", string(bytesData))
 		}
 		//Set flag in case compressed data
-		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") &&
-			strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			log.Println("Set Content-Encoding gzip with w.Header().Set()")
 			w.Header().Set("Content-Encoding", "gzip")
 			log.Printf("Check Content-Encoding gzip with w.Header().Get(), value:%v", w.Header().Get("Content-Encoding"))
@@ -315,6 +317,7 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("HandlePostMetricJSON invoked")
+		log.Printf("requsest Content-Encoding:%v", r.Header.Get("Content-Encoding"))
 		//validation
 		if h.MemKeeper == nil {
 			http.Error(w, "storage not initiated", http.StatusInternalServerError)
@@ -335,6 +338,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		if prev != nil {
 			//body from previous handler
 			bytesData = prev
+			log.Printf("got body from previous handler:%v", string(bytesData))
 		} else {
 			//body from request if there is no previous handler
 			bytesData, err = io.ReadAll(r.Body)
@@ -342,6 +346,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
 				return
 			}
+			log.Printf("got body from request:%v", string(bytesData))
 		}
 		log.Printf("Server:json received:" + string(bytesData))
 		var mj schema.MetricsJSON

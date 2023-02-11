@@ -48,6 +48,9 @@ func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
 			}
 			bytesData = *compressedByteData
 		}
+		log.Printf("Check response Content-Encoding in final header, value:%v", w.Header().Get("Content-Encoding"))
+		log.Printf("Check response Content-Type in final header, value:%v", w.Header().Get("Content-Type"))
+
 		//compressed response to next handler
 		if next != nil {
 			//write compressed body for further handle

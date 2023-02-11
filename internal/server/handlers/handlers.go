@@ -50,6 +50,9 @@ func (h *Handlers) HandleGetMetricFieldList(next http.Handler) http.HandlerFunc 
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "text/html")
 
+		log.Printf("Check response Content-Encoding in final header, value:%v", w.Header().Get("Content-Encoding"))
+		log.Printf("Check response Content-Type in final header, value:%v", w.Header().Get("Content-Type"))
+
 		//response to further handler
 		if next != nil {
 			//write handled body for further handle
@@ -284,8 +287,8 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("WriteResponseBodyHandler invoked")
-		log.Printf("requsest Content-Encoding:%v", r.Header.Get("Content-Encoding"))
-		log.Printf("requsest Accept-Encoding:%v", r.Header.Get("Accept-Encoding"))
+		log.Printf("request Content-Encoding:%v", r.Header.Get("Content-Encoding"))
+		log.Printf("request Accept-Encoding:%v", r.Header.Get("Accept-Encoding"))
 		//read body
 		var bytesData []byte
 		var err error
@@ -324,7 +327,7 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		}
 
 		log.Printf("Check response Content-Encoding in final header, value:%v", w.Header().Get("Content-Encoding"))
-		log.Printf("Check response Content-Tyoe in final header, value:%v", w.Header().Get("Content-Type"))
+		log.Printf("Check response Content-Type in final header, value:%v", w.Header().Get("Content-Type"))
 	}
 
 }

@@ -294,7 +294,9 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		//Set flag in case compressed data
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") &&
 			strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			log.Println("Set Content-Encoding gzip with w.Header().Set()")
 			w.Header().Set("Content-Encoding", "gzip")
+			log.Printf("Check Content-Encoding gzip with w.Header().Get(), value:%v", w.Header().Get("Content-Encoding"))
 		}
 		//Set Response Header
 		w.Header().Set("Content-Type", "application/json")

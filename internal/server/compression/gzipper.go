@@ -20,8 +20,7 @@ func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
 		//read body
 		var bytesData []byte
 		var err error
-		
-		
+
 		var prev schema.PreviousBytes = r.Context().Value(schema.PKey1).(schema.PreviousBytes)
 		if prev != nil {
 			//body from previous handler

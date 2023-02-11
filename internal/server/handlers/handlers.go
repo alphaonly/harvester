@@ -282,7 +282,6 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		if p := r.Context().Value(schema.PKey1); p != nil {
 			prev = p.(schema.PreviousBytes)
 		}
-
 		if prev != nil {
 			//body from previous handler
 			bytesData = prev
@@ -321,6 +320,9 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("HandlePostMetricJSON invoked")
+		log.Printf("Check request  Content-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Content-Encoding"))
+		log.Printf("Check request  Accept-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Accept-Encoding"))
+
 		//validation
 		if h.MemKeeper == nil {
 			http.Error(w, "storage not initiated", http.StatusInternalServerError)
@@ -341,6 +343,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		if prev != nil {
 			//body from previous handler
 			bytesData = prev
+			log.Printf("Got body from previous handler:%v", string(bytesData))
 		} else {
 			//body from request if there is no previous handler
 			bytesData, err = io.ReadAll(r.Body)
@@ -348,6 +351,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
 				return
 			}
+			log.Printf("Got body from request:%v", string(bytesData))
 		}
 		log.Printf("Server:json received:" + string(bytesData))
 		var mj schema.MetricsJSON

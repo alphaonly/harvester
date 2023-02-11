@@ -17,15 +17,18 @@ func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("GZipCompressionHandler invoked")
+		log.Printf("Check request  Content-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Content-Encoding"))
+		log.Printf("Check request  Accept-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Accept-Encoding"))
+
 		//read body
 		var bytesData []byte
 		var err error
-		
-		
-		var prev schema.PreviousBytes = r.Context().Value(schema.PKey1).(schema.PreviousBytes)
+
+		var prev = r.Context().Value(schema.PKey1).(schema.PreviousBytes)
 		if prev != nil {
 			//body from previous handler
 			bytesData = prev
+			log.Printf("Got body from previous handler:%v", string(bytesData))
 		} else {
 			//body from request if there is no previous handler
 			bytesData, err = io.ReadAll(r.Body)
@@ -33,6 +36,7 @@ func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusNotImplemented)
 				return
 			}
+			log.Printf("Got body from request:%v", string(bytesData))
 		}
 		//compression validation
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {

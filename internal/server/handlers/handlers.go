@@ -489,7 +489,7 @@ func (h *Handlers) NewRouter() chi.Router {
 		//The sequence for post JSON and respond compressed JSON if no value
 		postJsonAndGetCompressed = handlePost(compressPost(writePost()))
 
-		//The sequence for get compressed metrics Html list
+		//The sequence for get compressed metrics html list
 		getListCompressed = handleList(compressList(writeList()))
 	)
 	r := chi.NewRouter()

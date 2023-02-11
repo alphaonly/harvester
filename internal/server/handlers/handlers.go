@@ -484,7 +484,7 @@ func (h *Handlers) NewRouter() chi.Router {
 		compressList = compression.GZipCompressionHandler
 
 		handlePost = h.HandlePostMetricJSON
-		handleList = h.HandlePostMetricJSON
+		handleList = h.HandleGetMetricFieldList
 
 		//The sequence for post JSON and respond compressed JSON if no value
 		postJsonAndGetCompressed = handlePost(compressPost(writePost()))

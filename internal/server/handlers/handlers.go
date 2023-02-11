@@ -21,6 +21,59 @@ type Handlers struct {
 	MemKeeper *mapstorage.MapStorage
 }
 
+func (h *Handlers) HandleGetMetricFieldListXXX(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		log.Println("HandleGetMetricFieldListXXX invoked")
+
+		ms, err := h.MemKeeper.GetAllMetrics(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		//new byte buffer
+		bw := bytes.NewBuffer(*new([]byte))
+		_, err = bw.Write([]byte("<h1><ul>"))
+		logFatal(err)
+		//insert all metrics from memKeeper
+		for key := range *ms {
+			_, err = bw.Write([]byte(" <li>" + key + "</li>"))
+			logFatal(err)
+		}
+		_, err = bw.Write([]byte("</ul></h1>"))
+		logFatal(err)
+
+		//compress
+		var bytesData = bw.Bytes()
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			//Compression logic
+			compressedByteData, err := compression.GzipCompress(bytesData)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotImplemented)
+				return
+			}
+			bytesData = *compressedByteData
+		}
+
+		//Add header keys
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("Content-Encoding", "gzip")
+		w.WriteHeader(http.StatusOK)
+
+		//response to further handler
+		if next == nil {
+			//write handled body for further handle
+			_, err = w.Write(bytesData)
+			logFatal(err)
+			return
+		}
+		log.Fatal(" HandleGetMetricFieldList requires next handler nil")
+	}
+}
+
 func (h *Handlers) HandleGetMetricFieldList(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -314,7 +367,6 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			log.Println("Set Content-Encoding gzip with w.Header().Set()")
 			w.Header().Set("Content-Encoding", "gzip")
-
 		}
 		//Set Response Header
 		w.WriteHeader(http.StatusOK)
@@ -478,19 +530,20 @@ func (h *Handlers) NewRouter() chi.Router {
 
 	var (
 		writePost = h.WriteResponseBodyHandler
-		writeList = h.WriteResponseBodyHandler
+		//writeList = h.WriteResponseBodyHandler
 
 		compressPost = compression.GZipCompressionHandler
-		compressList = compression.GZipCompressionHandler
+		//compressList = compression.GZipCompressionHandler
 
 		handlePost = h.HandlePostMetricJSON
-		handleList = h.HandleGetMetricFieldList
+		//handleList = h.HandleGetMetricFieldList
 
 		//The sequence for post JSON and respond compressed JSON if no value
 		postJsonAndGetCompressed = handlePost(compressPost(writePost()))
 
 		//The sequence for get compressed metrics html list
-		getListCompressed = handleList(compressList(writeList()))
+		//getListCompressed = handleList(compressList(writeList()))
+		getListCompressed = h.HandleGetMetricFieldListXXX(nil)
 	)
 	r := chi.NewRouter()
 	//

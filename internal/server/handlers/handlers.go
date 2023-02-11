@@ -27,6 +27,7 @@ func (h *Handlers) HandleGetMetricFieldList(next http.Handler) http.HandlerFunc 
 			http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		log.Println("HandleGetMetricFieldList invoked")
 
 		ms, err := h.MemKeeper.GetAllMetrics(r.Context())
 		if err != nil {

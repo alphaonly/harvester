@@ -272,6 +272,7 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("WriteResponseBodyHandler invoked")
 		log.Printf("requsest Content-Encoding:%v", r.Header.Get("Content-Encoding"))
+		log.Printf("requsest Accept-Encoding:%v", r.Header.Get("Accept-Encoding"))
 		//read body
 		var bytesData []byte
 		var err error
@@ -295,7 +296,7 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 			log.Printf("got body from request:%v", string(bytesData))
 		}
 		//Set flag in case compressed data
-		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			log.Println("Set Content-Encoding gzip with w.Header().Set()")
 			w.Header().Set("Content-Encoding", "gzip")
 			log.Printf("Check Content-Encoding gzip with w.Header().Get(), value:%v", w.Header().Get("Content-Encoding"))

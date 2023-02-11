@@ -310,7 +310,7 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			log.Println("Set Content-Encoding gzip with w.Header().Set()")
 			w.Header().Set("Content-Encoding", "gzip")
-			log.Printf("Check Content-Encoding gzip with w.Header().Get(), value:%v", w.Header().Get("Content-Encoding"))
+
 		}
 		//Set Response Header
 		w.WriteHeader(http.StatusOK)
@@ -321,6 +321,9 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 			http.Error(w, "byteData writing error", http.StatusInternalServerError)
 			return
 		}
+
+		log.Printf("Check response Content-Encoding in final header, value:%v", w.Header().Get("Content-Encoding"))
+		log.Printf("Check response Content-Tyoe in final header, value:%v", w.Header().Get("Content-Type"))
 	}
 
 }

@@ -37,7 +37,7 @@ func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
 			log.Printf("got body from request:%v", string(bytesData))
 		}
 		//compression validation
-		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			//Compression logic
 			compressedByteData, err := GzipCompress(bytesData)
 			if err != nil {

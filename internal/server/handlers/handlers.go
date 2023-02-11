@@ -476,22 +476,31 @@ func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.R
 
 func (h *Handlers) NewRouter() chi.Router {
 
-	//The sequence for PostJson leaf
-	var postJsonAndGetDataCompressed = h.HandlePostMetricJSON(compression.GZipCompressionHandler(
-		h.WriteResponseBodyHandler()))
-	//The sequence for GetHtmlList leaf
-	var getMetricListCompressed = h.HandleGetMetricFieldList(compression.GZipCompressionHandler(
-		h.WriteResponseBodyHandler()))
+	var (
+		writePost = h.WriteResponseBodyHandler
+		writeList = h.WriteResponseBodyHandler
 
+		compressPost = compression.GZipCompressionHandler
+		compressList = compression.GZipCompressionHandler
+
+		handlePost = h.HandlePostMetricJSON
+		handleList = h.HandlePostMetricJSON
+
+		//The sequence for post JSON and respond compressed JSON if no value
+		postJsonAndGetCompressed = handlePost(compressPost(writePost()))
+
+		//The sequence for get compressed metrics Html list
+		getListCompressed = handleList(compressList(writeList()))
+	)
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {
-		r.Get("/", getMetricListCompressed)
+		r.Get("/", getListCompressed)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
-		r.Post("/value", postJsonAndGetDataCompressed)
-		r.Post("/value/", postJsonAndGetDataCompressed)
-		r.Post("/update", postJsonAndGetDataCompressed)
-		r.Post("/update/", postJsonAndGetDataCompressed)
+		r.Post("/value", postJsonAndGetCompressed)
+		r.Post("/value/", postJsonAndGetCompressed)
+		r.Post("/update", postJsonAndGetCompressed)
+		r.Post("/update/", postJsonAndGetCompressed)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)

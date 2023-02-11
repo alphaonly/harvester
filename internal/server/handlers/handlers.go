@@ -291,15 +291,12 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 				return
 			}
 		}
-		log.Printf("Check request  Content-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Content-Encoding"))
-		log.Printf("Check request  Accept-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Accept-Encoding"))
-
 		//Set flag in case compressed data
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") &&
 			strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			log.Println("Set response Content-Encoding gzip with w.Header().Set()")
+			log.Println("Set Content-Encoding gzip with w.Header().Set()")
 			w.Header().Set("Content-Encoding", "gzip")
-			log.Printf("Check Content-Encoding gzip with w.Header().Get() has been set , value:%v", w.Header().Get("Content-Encoding"))
+			log.Printf("Check Content-Encoding gzip with w.Header().Get(), value:%v", w.Header().Get("Content-Encoding"))
 		}
 		//Set Response Header
 		w.Header().Set("Content-Type", "application/json")

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -20,39 +21,50 @@ type Handlers struct {
 	MemKeeper *mapstorage.MapStorage
 }
 
-func (h *Handlers) HandleGetMetricFieldList(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != http.MethodGet {
-		http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-
-	ms, err := h.MemKeeper.GetAllMetrics(r.Context())
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	_, err = w.Write([]byte("<h1><ul>"))
-	if err != nil {
-		return
-	}
-	for key := range *ms {
-		_, err = w.Write([]byte(" <li>" + key + "</li>"))
-		if err != nil {
+func (h *Handlers) HandleGetMetricFieldList(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
 			return
 		}
-	}
 
-	_, err = w.Write([]byte("</ul></h1>"))
+		ms, err := h.MemKeeper.GetAllMetrics(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		//new byte buffer
+		bw := bytes.NewBuffer(*new([]byte))
+		_, err = bw.Write([]byte("<h1><ul>"))
+		logFatal(err)
+		//insert all metrics from memKeeper
+		for key := range *ms {
+			_, err = bw.Write([]byte(" <li>" + key + "</li>"))
+			logFatal(err)
+		}
+		_, err = bw.Write([]byte("</ul></h1>"))
+		logFatal(err)
+
+		//Add header keys
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "text/html")
+
+		//response to further handler
+		if next != nil {
+			//write handled body for further handle
+
+			ctx := context.WithValue(r.Context(), schema.PKey1, schema.PreviousBytes(bw.Bytes()))
+			//call further handler with context parameters
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		log.Fatal(" HandleGetMetricFieldList requires next handler not nil")
+	}
+}
+func logFatal(err error) {
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
-
-	w.WriteHeader(http.StatusOK)
 }
 func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) {
 
@@ -281,7 +293,6 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		if p := r.Context().Value(schema.PKey1); p != nil {
 			prev = p.(schema.PreviousBytes)
 		}
-
 		if prev != nil {
 			//body from previous handler
 			bytesData = prev
@@ -302,7 +313,6 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 			log.Printf("Check Content-Encoding gzip with w.Header().Get(), value:%v", w.Header().Get("Content-Encoding"))
 		}
 		//Set Response Header
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		//write Response Body
 		_, err = w.Write(bytesData)
@@ -422,6 +432,8 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			http.Error(w, " json response forming error", http.StatusInternalServerError)
 			return
 		}
+		//Set Header keys
+		w.Header().Set("Content-Type", "application/json")
 		//response
 		if next != nil {
 			//write handled body for further handle
@@ -457,28 +469,22 @@ func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.R
 
 func (h *Handlers) NewRouter() chi.Router {
 
-	// var postJsonCompressedScenario = d.DeCompressionHandler(h.HandlePostMetricJSON(d.CompressionHandler(d.WriteResponseBodyHandler(nil))))
-	//var postJsonAndGetDataIncrement4Scenario = h.HandlePostMetricJSON(nil)
-
-	// var postJsonAndGetDataCompressedIncrement8Scenario = compression.GZipDeCompressionHandler(
-	// 	h.HandlePostMetricJSON(
-	// 		compression.GZipDeCompressionHandler(
-	// 			compression.GZipWriteResponseBodyHandler())))
-
-	// var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(compression.GZipCompressionHandler(compression.GZipWriteResponseBodyHandler()))
-
-	var postJsonAndGetDataTestScenario = h.HandlePostMetricJSON(compression.GZipCompressionHandler(
+	//The sequence for PostJson leaf
+	var postJsonAndGetDataCompressed = h.HandlePostMetricJSON(compression.GZipCompressionHandler(
+		h.WriteResponseBodyHandler()))
+	//The sequence for GetHtmlList leaf
+	var getMetricListCompressed = h.HandleGetMetricFieldList(compression.GZipCompressionHandler(
 		h.WriteResponseBodyHandler()))
 
 	r := chi.NewRouter()
 	//
 	r.Route("/", func(r chi.Router) {
-		r.Get("/", h.HandleGetMetricFieldList)
+		r.Get("/", getMetricListCompressed)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
-		r.Post("/value", postJsonAndGetDataTestScenario)
-		r.Post("/value/", postJsonAndGetDataTestScenario)
-		r.Post("/update", postJsonAndGetDataTestScenario)
-		r.Post("/update/", postJsonAndGetDataTestScenario)
+		r.Post("/value", postJsonAndGetDataCompressed)
+		r.Post("/value/", postJsonAndGetDataCompressed)
+		r.Post("/update", postJsonAndGetDataCompressed)
+		r.Post("/update/", postJsonAndGetDataCompressed)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)

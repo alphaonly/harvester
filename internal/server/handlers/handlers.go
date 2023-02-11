@@ -271,9 +271,6 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("WriteResponseBodyHandler invoked")
-		log.Printf("Check request  Content-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Content-Encoding"))
-		log.Printf("Check request  Accept-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Accept-Encoding"))
-
 		//read body
 		var bytesData []byte
 		var err error
@@ -286,7 +283,6 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		if prev != nil {
 			//body from previous handler
 			bytesData = prev
-			log.Printf("Got bytes from previous handler, value:%v", string(bytesData))
 		} else {
 			//body from request if there is no previous handler
 			bytesData, err = io.ReadAll(r.Body)
@@ -294,8 +290,9 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusNotImplemented)
 				return
 			}
-			log.Printf("Got bytes from request, value:%v", string(bytesData))
 		}
+		log.Printf("Check request  Content-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Content-Encoding"))
+		log.Printf("Check request  Accept-Encoding gzip with r.Header().Get(), value:%v", r.Header.Get("Accept-Encoding"))
 
 		//Set flag in case compressed data
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") &&

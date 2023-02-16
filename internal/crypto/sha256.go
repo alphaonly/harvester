@@ -21,7 +21,8 @@ func CounterHash(id string, delta int64, key []byte) ([]byte, error) {
 
 	_, err := h.Write(msg)
 	if err != nil {
-		return nil, err
+		return nil,
+			err
 	}
 
 	return h.Sum(nil), nil

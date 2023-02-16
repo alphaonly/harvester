@@ -151,7 +151,7 @@ func (c *ServerConfiguration) UpdateFromFlags() {
 	flag.Parse()
 
 	message := "variable %v  updated from flags, value %v"
-	//Если значение из переменных равно значению по умолчанию, тогда берем из flags
+	//Если значение из переменных равно значению по умолчанию, тогда берем из flagS
 	if !c.EnvChanged["ADDRESS"] {
 		c.Address = *a
 		c.Port = ":" + strings.Split(c.Address, ":")[1]

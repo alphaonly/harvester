@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -14,14 +15,75 @@ import (
 	"github.com/alphaonly/harvester/internal/server/compression"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+	"github.com/alphaonly/harvester/internal/signchecker"
 	"github.com/go-chi/chi/v5"
 )
 
 type Handlers struct {
 	MemKeeper *mapstorage.MapStorage
+	Signer    signchecker.Signer
 }
 
-func (h *Handlers) HandleGetMetricFieldListXXX(next http.Handler) http.HandlerFunc {
+func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.ResponseWriter, r *http.Request) (err error) {
+	switch mj.MType {
+	case "gauge":
+		{
+			if mj.Value != nil {
+				mjVal := *mj.Value
+				//пишем если есть значение
+				mv := mVal.MetricValue(mVal.NewFloat(mjVal))
+				err := h.MemKeeper.SaveMetric(r.Context(), mj.ID, &mv)
+				if err != nil {
+					http.Error(w, "internal value add error", http.StatusInternalServerError)
+					return err
+				}
+			}
+			//читаем  для ответа
+			var f float64 = 0
+			gv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+			if err != nil {
+				log.Println("value not found")
+			} else {
+				f = gv.GetInternalValue().(float64)
+			}
+			mj.Value = &f
+		}
+	case "counter":
+		{
+			if mj.Delta != nil {
+				mjVal := *mj.Delta
+				//пишем если есть значение
+				prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+				if err != nil {
+					prevMetricValue = mVal.NewCounterValue()
+				}
+				sum := mVal.NewInt(mjVal).AddValue(prevMetricValue)
+				err = h.MemKeeper.SaveMetric(r.Context(), mj.ID, &sum)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					w.WriteHeader(http.StatusInternalServerError)
+					return err
+				}
+			}
+			//читаем для ответа
+			var i int64 = 0
+			cv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+			if err != nil {
+				log.Println("value not found")
+			} else {
+				i = cv.GetInternalValue().(int64)
+			}
+			mj.Delta = &i
+		}
+	default:
+		mess := " not recognized type"
+		http.Error(w, mj.MType+mess, http.StatusNotImplemented)
+		return errors.New(mj.MType + mess)
+	}
+	return nil
+}
+
+func (h *Handlers) HandleGetMetricFieldListSimple(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
@@ -431,60 +493,16 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			log.Println("Error not parsed, empty metric name: 404")
 			return
 		}
-		//запрос пост в базу от агента
-		switch mj.MType {
-		case "gauge":
-			{
-				if mj.Value != nil {
-					mjVal := *mj.Value
-					//пишем если есть значение
-					mv := mVal.MetricValue(mVal.NewFloat(mjVal))
-					err := h.MemKeeper.SaveMetric(r.Context(), mj.ID, &mv)
-					if err != nil {
-						http.Error(w, "internal value add error", http.StatusInternalServerError)
-						return
-					}
-				}
-				//читаем  для ответа
-				var f float64 = 0
-				gv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
-				if err != nil {
-					log.Println("value not found")
-				} else {
-					f = gv.GetInternalValue().(float64)
-				}
-				mj.Value = &f
-			}
-		case "counter":
-			{
-				if mj.Delta != nil {
-					mjVal := *mj.Delta
-					//пишем если есть значение
-					prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
-					if err != nil {
-						prevMetricValue = mVal.NewCounterValue()
-					}
-					sum := mVal.NewInt(mjVal).AddValue(prevMetricValue)
-					err = h.MemKeeper.SaveMetric(r.Context(), mj.ID, &sum)
-					if err != nil {
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-						w.WriteHeader(http.StatusInternalServerError)
-					}
-				}
-				//читаем для ответа
-				var i int64 = 0
-				cv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
-				if err != nil {
-					log.Println("value not found")
-				} else {
-					i = cv.GetInternalValue().(int64)
-				}
-				mj.Delta = &i
-			}
-		default:
-			http.Error(w, mj.MType+" not recognized type", http.StatusNotImplemented)
-			return
+
+		//Проверяем подпись по ключу
+		if h.Signer.IsValidSign(mj) {
+			//Сохраняем в базу от агента и ответ обратно
+			err := h.writeToStorageAndRespond(&mj, w, r)
+			logFatal(err)
 		}
+		//Подписываем ответ
+		err=h.Signer.Sign(&mj)
+		logFatal(err)
 		//перевод в json ответа
 		bytesData, err = json.Marshal(mj)
 		if err != nil || bytesData == nil {
@@ -543,7 +561,7 @@ func (h *Handlers) NewRouter() chi.Router {
 
 		//The sequence for get compressed metrics html list
 		//getListCompressed = handleList(compressList(writeList()))
-		getListCompressed = h.HandleGetMetricFieldListXXX(nil)
+		getListCompressed = h.HandleGetMetricFieldListSimple(nil)
 	)
 	r := chi.NewRouter()
 	//

@@ -2,9 +2,12 @@ package agent
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
+
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
+	sign "github.com/alphaonly/harvester/internal/signchecker"
 	"github.com/go-resty/resty/v2"
 
 	"log"
@@ -59,6 +62,7 @@ type Agent struct {
 	Configuration *conf.AgentConfiguration
 	baseURL       url.URL
 	Client        *resty.Client
+	Signer        sign.Signer
 }
 
 func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
@@ -70,6 +74,7 @@ func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
 			Host:   c.Address,
 		},
 		Client: client,
+		Signer: sign.NewSHA256(c.Key),
 	}
 }
 
@@ -79,11 +84,9 @@ func AddCounterData(common sendData, val Counter, name string, data map[*sendDat
 		JoinPath(name).
 		JoinPath(strconv.FormatUint(uint64(val), 10)) //value float
 
-	// empty := bytes.NewBufferString(URL.String()).Bytes()
 	sd := sendData{
 		url:  URL,
 		keys: common.keys,
-		// body: &empty, //need to transfer something
 	}
 	data[&sd] = true
 
@@ -106,12 +109,24 @@ func AddGaugeData(common sendData, val Gauge, name string, data map[*sendData]bo
 
 }
 
+func logFatal(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+
+}
 func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendData]bool) {
 	v := float64(val)
+
+	//Вычисляем hash
+	hash, err := common.signer.GaugeHash(name, &v)
+	logFatal(err)
+
 	mj := schema.MetricsJSON{
 		ID:    name,
 		MType: "gauge",
 		Value: &v,
+		Hash:  hex.EncodeToString(hash),
 	}
 
 	sd := sendData{
@@ -124,20 +139,15 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 }
 func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sendData]bool) {
 	v := int64(val)
-	var mj schema.MetricsJSON
+	//Вычисляем hash
+	hash, err := common.signer.CounterHash(name, &v)
+	logFatal(err)
 
-	mj = schema.MetricsJSON{
+	mj := schema.MetricsJSON{
 		ID:    name,
 		MType: "counter",
 		Delta: &v,
-	}
-
-	if val == -1 {
-		log.Println("Check API without value")
-		mj = schema.MetricsJSON{
-			ID:    name,
-			MType: "counter",
-		}
+		Hash:  hex.EncodeToString(hash),
 	}
 
 	sd := sendData{
@@ -155,6 +165,7 @@ type sendData struct {
 	keys           HeaderKeys
 	JSONbody       *schema.MetricsJSON
 	compressedBody *[]byte
+	signer         sign.Signer
 }
 
 func (sd sendData) SendData(client *resty.Client) error {
@@ -301,8 +312,9 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			keys["Accept"] = "application/json"
 
 			data := sendData{
-				url:  a.baseURL.JoinPath("update"),
-				keys: keys,
+				url:    a.baseURL.JoinPath("update"),
+				keys:   keys,
+				signer: a.Signer,
 			}
 			AddGaugeDataJSON(data, metrics.Alloc, "Alloc", m)
 			AddGaugeDataJSON(data, metrics.Frees, "Frees", m)

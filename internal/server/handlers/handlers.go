@@ -24,65 +24,6 @@ type Handlers struct {
 	Signer    signchecker.Signer
 }
 
-func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.ResponseWriter, r *http.Request) (err error) {
-	switch mj.MType {
-	case "gauge":
-		{
-			if mj.Value != nil {
-				mjVal := *mj.Value
-				//пишем если есть значение
-				mv := mVal.MetricValue(mVal.NewFloat(mjVal))
-				err := h.MemKeeper.SaveMetric(r.Context(), mj.ID, &mv)
-				if err != nil {
-					http.Error(w, "internal value add error", http.StatusInternalServerError)
-					return err
-				}
-			}
-			//читаем  для ответа
-			var f float64 = 0
-			gv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
-			if err != nil {
-				log.Println("value not found")
-			} else {
-				f = gv.GetInternalValue().(float64)
-			}
-			mj.Value = &f
-		}
-	case "counter":
-		{
-			if mj.Delta != nil {
-				mjVal := *mj.Delta
-				//пишем если есть значение
-				prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
-				if err != nil {
-					prevMetricValue = mVal.NewCounterValue()
-				}
-				sum := mVal.NewInt(mjVal).AddValue(prevMetricValue)
-				err = h.MemKeeper.SaveMetric(r.Context(), mj.ID, &sum)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					w.WriteHeader(http.StatusInternalServerError)
-					return err
-				}
-			}
-			//читаем для ответа
-			var i int64 = 0
-			cv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
-			if err != nil {
-				log.Println("value not found")
-			} else {
-				i = cv.GetInternalValue().(int64)
-			}
-			mj.Delta = &i
-		}
-	default:
-		mess := " not recognized type"
-		http.Error(w, mj.MType+mess, http.StatusNotImplemented)
-		return errors.New(mj.MType + mess)
-	}
-	return nil
-}
-
 func (h *Handlers) HandleGetMetricFieldListSimple(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -135,7 +76,6 @@ func (h *Handlers) HandleGetMetricFieldListSimple(next http.Handler) http.Handle
 		log.Fatal(" HandleGetMetricFieldList requires next handler nil")
 	}
 }
-
 func (h *Handlers) HandleGetMetricFieldList(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -178,11 +118,6 @@ func (h *Handlers) HandleGetMetricFieldList(next http.Handler) http.HandlerFunc 
 			return
 		}
 		log.Fatal(" HandleGetMetricFieldList requires next handler not nil")
-	}
-}
-func logFatal(err error) {
-	if err != nil {
-		log.Fatal(err)
 	}
 }
 func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +164,6 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "plain/text")
 
 }
-
 func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
@@ -311,7 +245,6 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 
 }
-
 func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 	log.Println("HandlePostMetric invoked")
 
@@ -398,54 +331,6 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-
-func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("WriteResponseBodyHandler invoked")
-		log.Printf("request Content-Encoding:%v", r.Header.Get("Content-Encoding"))
-		log.Printf("request Accept-Encoding:%v", r.Header.Get("Accept-Encoding"))
-		//read body
-		var bytesData []byte
-		var err error
-		var prev schema.PreviousBytes
-
-		if p := r.Context().Value(schema.PKey1); p != nil {
-			prev = p.(schema.PreviousBytes)
-		}
-		if prev != nil {
-			//body from previous handler
-			bytesData = prev
-			log.Printf("got body from previous handler:%v", string(bytesData))
-		} else {
-			//body from request if there is no previous handler
-			bytesData, err = io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusNotImplemented)
-				return
-			}
-			log.Printf("got body from request:%v", string(bytesData))
-		}
-		//Set flag in case compressed data
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			log.Println("Set Content-Encoding gzip with w.Header().Set()")
-			w.Header().Set("Content-Encoding", "gzip")
-		}
-		//Set Response Header
-		w.WriteHeader(http.StatusOK)
-		//write Response Body
-		_, err = w.Write(bytesData)
-		if err != nil {
-			log.Println("byteData writing error")
-			http.Error(w, "byteData writing error", http.StatusInternalServerError)
-			return
-		}
-
-		log.Printf("Check response Content-Encoding in final header, value:%v", w.Header().Get("Content-Encoding"))
-		log.Printf("Check response Content-Type in final header, value:%v", w.Header().Get("Content-Type"))
-	}
-
-}
-
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("HandlePostMetricJSON invoked")
@@ -495,14 +380,14 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		}
 
 		//Проверяем подпись по ключу
-		if h.Signer.IsValidSign(mj) {
-			//Сохраняем в базу от агента и ответ обратно
-			err := h.writeToStorageAndRespond(&mj, w, r)
-			logFatal(err)
-		}
-		//Подписываем ответ
-		err=h.Signer.Sign(&mj)
+		//if h.Signer.IsValidSign(mj) {
+		//	//Сохраняем в базу от агента и ответ обратно
+		err = h.writeToStorageAndRespond(&mj, w, r)
 		logFatal(err)
+		//}
+		//Подписываем ответ
+		//err = h.Signer.Sign(&mj)
+		//logFatal(err)
 		//перевод в json ответа
 		bytesData, err = json.Marshal(mj)
 		if err != nil || bytesData == nil {
@@ -523,7 +408,6 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
 	}
 }
-
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
 	log.Println("Chi routing error, unknown route to get handler")
@@ -543,7 +427,52 @@ func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.R
 		return
 	}
 }
+func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("WriteResponseBodyHandler invoked")
+		log.Printf("request Content-Encoding:%v", r.Header.Get("Content-Encoding"))
+		log.Printf("request Accept-Encoding:%v", r.Header.Get("Accept-Encoding"))
+		//read body
+		var bytesData []byte
+		var err error
+		var prev schema.PreviousBytes
 
+		if p := r.Context().Value(schema.PKey1); p != nil {
+			prev = p.(schema.PreviousBytes)
+		}
+		if prev != nil {
+			//body from previous handler
+			bytesData = prev
+			log.Printf("got body from previous handler:%v", string(bytesData))
+		} else {
+			//body from request if there is no previous handler
+			bytesData, err = io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotImplemented)
+				return
+			}
+			log.Printf("got body from request:%v", string(bytesData))
+		}
+		//Set flag in case compressed data
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			log.Println("Set Content-Encoding gzip with w.Header().Set()")
+			w.Header().Set("Content-Encoding", "gzip")
+		}
+		//Set Response Header
+		w.WriteHeader(http.StatusOK)
+		//write Response Body
+		_, err = w.Write(bytesData)
+		if err != nil {
+			log.Println("byteData writing error")
+			http.Error(w, "byteData writing error", http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Check response Content-Encoding in final header, value:%v", w.Header().Get("Content-Encoding"))
+		log.Printf("Check response Content-Type in final header, value:%v", w.Header().Get("Content-Type"))
+	}
+
+}
 func (h *Handlers) NewRouter() chi.Router {
 
 	var (
@@ -580,4 +509,68 @@ func (h *Handlers) NewRouter() chi.Router {
 	})
 
 	return r
+}
+
+func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.ResponseWriter, r *http.Request) (err error) {
+	switch mj.MType {
+	case "gauge":
+		{
+			if mj.Value != nil {
+				mjVal := *mj.Value
+				//пишем если есть значение
+				mv := mVal.MetricValue(mVal.NewFloat(mjVal))
+				err := h.MemKeeper.SaveMetric(r.Context(), mj.ID, &mv)
+				if err != nil {
+					http.Error(w, "internal value add error", http.StatusInternalServerError)
+					return err
+				}
+			}
+			//читаем  для ответа
+			var f float64 = 0
+			gv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+			if err != nil {
+				log.Println("value not found")
+			} else {
+				f = gv.GetInternalValue().(float64)
+			}
+			mj.Value = &f
+		}
+	case "counter":
+		{
+			if mj.Delta != nil {
+				mjVal := *mj.Delta
+				//пишем если есть значение
+				prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+				if err != nil {
+					prevMetricValue = mVal.NewCounterValue()
+				}
+				sum := mVal.NewInt(mjVal).AddValue(prevMetricValue)
+				err = h.MemKeeper.SaveMetric(r.Context(), mj.ID, &sum)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					w.WriteHeader(http.StatusInternalServerError)
+					return err
+				}
+			}
+			//читаем для ответа
+			var i int64 = 0
+			cv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+			if err != nil {
+				log.Println("value not found")
+			} else {
+				i = cv.GetInternalValue().(int64)
+			}
+			mj.Delta = &i
+		}
+	default:
+		mess := " not recognized type"
+		http.Error(w, mj.MType+mess, http.StatusNotImplemented)
+		return errors.New(mj.MType + mess)
+	}
+	return nil
+}
+func logFatal(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }

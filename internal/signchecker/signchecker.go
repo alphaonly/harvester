@@ -12,8 +12,7 @@ import (
 
 type Signer interface {
 	IsValidSign(mj schema.MetricsJSON) bool
-	CounterHash(id string, delta *int64) ([]byte, error)
-	GaugeHash(id string, value *float64) ([]byte, error)
+	Hash(mj schema.MetricsJSON) (hash string, err error)
 	Sign(mj *schema.MetricsJSON) (err error)
 }
 
@@ -22,7 +21,7 @@ type CheckerSHA256 struct {
 }
 
 func NewSHA256(key string) Signer {
-	return CheckerSHA256{key: make([]byte, len(key))}
+	return CheckerSHA256{key: []byte(key)}
 }
 func logFatal(err error) {
 	if err != nil {
@@ -31,18 +30,22 @@ func logFatal(err error) {
 }
 func (c CheckerSHA256) IsValidSign(mj schema.MetricsJSON) (result bool) {
 
+	if c.key == nil || len(c.key) == 0 {
+		return true
+	}
 	var leftHash []byte
 	var err error
 
 	//mj hash came to confirm the sign
-	leftHash,err= hex.DecodeString(mj.Hash)
+	leftHash, err = hex.DecodeString(mj.Hash)
 	logFatal(err)
-	//signing it again to update hash to compare
-	err = c.Sign(&mj)
+	//signing a json copy to compare hashes mjCopy and mj
+	mjCopy := mj
+	err = c.Sign(&mjCopy)
 	logFatal(err)
 
 	//get updated hash to compare with left(original)
-	rightHash, err := hex.DecodeString(mj.Hash)
+	rightHash, err := hex.DecodeString(mjCopy.Hash)
 	logFatal(err)
 	//compare
 	return hmac.Equal(leftHash, rightHash)
@@ -56,7 +59,7 @@ var gaugeHashMessage = func(id string, value *float64) []byte {
 	return []byte(fmt.Sprintf("%s:gauge:%f", id, *value))
 }
 
-func (c CheckerSHA256) CounterHash(id string, delta *int64) ([]byte, error) {
+func (c CheckerSHA256) counterHash(id string, delta *int64) ([]byte, error) {
 	msg := counterHashMessage(id, delta)
 	h := hmac.New(sha256.New, c.key)
 	_, err := h.Write(msg)
@@ -65,7 +68,7 @@ func (c CheckerSHA256) CounterHash(id string, delta *int64) ([]byte, error) {
 	}
 	return h.Sum(nil), nil
 }
-func (c CheckerSHA256) GaugeHash(id string, value *float64) ([]byte, error) {
+func (c CheckerSHA256) gaugeHash(id string, value *float64) ([]byte, error) {
 	msg := gaugeHashMessage(id, value)
 	h := hmac.New(sha256.New, c.key)
 	_, err := h.Write(msg)
@@ -74,25 +77,33 @@ func (c CheckerSHA256) GaugeHash(id string, value *float64) ([]byte, error) {
 	}
 	return h.Sum(nil), nil
 }
+
+func (c CheckerSHA256) Hash(mj schema.MetricsJSON) (hash string, err error) {
+	err = c.Sign(&mj)
+	if err != nil {
+		return "", err
+	}
+	return mj.Hash, nil
+}
 func (c CheckerSHA256) Sign(mj *schema.MetricsJSON) (err error) {
+	if c.key == nil || len(c.key) == 0 {
+		return nil
+	}
 	var hashBytes []byte
 
 	switch mj.MType {
 	case "gauge":
 		{
-			hashBytes, err = c.GaugeHash(mj.ID, mj.Value)
-			return err
+			hashBytes, err = c.gaugeHash(mj.ID, mj.Value)
 		}
 	case "counter":
 		{
-			hashBytes, err = c.CounterHash(mj.ID, mj.Delta)
-			return err
+			hashBytes, err = c.counterHash(mj.ID, mj.Delta)
 		}
 	default:
 		log.Panic("CheckJSON unknown type")
 		return
 	}
-
 	mj.Hash = hex.EncodeToString(hashBytes)
-	return nil
+	return err
 }

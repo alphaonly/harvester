@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 
 	"github.com/alphaonly/harvester/internal/schema"
@@ -118,16 +117,14 @@ func logFatal(err error) {
 func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendData]bool) {
 	v := float64(val)
 
-	//Вычисляем hash
-	hash, err := common.signer.GaugeHash(name, &v)
-	logFatal(err)
-
 	mj := schema.MetricsJSON{
 		ID:    name,
 		MType: "gauge",
 		Value: &v,
-		Hash:  hex.EncodeToString(hash),
 	}
+	//Вычисляем hash и помещаем в mj.Hash
+	err := common.signer.Sign(&mj)
+	logFatal(err)
 
 	sd := sendData{
 		url:      common.url,
@@ -139,16 +136,15 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 }
 func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sendData]bool) {
 	v := int64(val)
-	//Вычисляем hash
-	hash, err := common.signer.CounterHash(name, &v)
-	logFatal(err)
 
 	mj := schema.MetricsJSON{
 		ID:    name,
 		MType: "counter",
 		Delta: &v,
-		Hash:  hex.EncodeToString(hash),
 	}
+	//Вычисляем hash и помещаем в mj.Hash
+	err := common.signer.Sign(&mj)
+	logFatal(err)
 
 	sd := sendData{
 		url:      common.url,

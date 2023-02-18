@@ -379,15 +379,20 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			return
 		}
 
-		//Проверяем подпись по ключу
-		//if h.Signer.IsValidSign(mj) {
-		//	//Сохраняем в базу от агента и ответ обратно
+		//Проверяем подпись по ключу, нормально если ключ пуст
+		if !h.Signer.IsValidSign(mj) {
+			http.Error(w, "sign is not confirmed error:", http.StatusBadRequest)
+			log.Println("sign key is not confirmed")
+			return
+		}
+
+		//Сохраняем в базу от агента и ответ обратно
 		err = h.writeToStorageAndRespond(&mj, w, r)
 		logFatal(err)
-		//}
+
 		//Подписываем ответ
-		//err = h.Signer.Sign(&mj)
-		//logFatal(err)
+		err = h.Signer.Sign(&mj)
+		logFatal(err)
 		//перевод в json ответа
 		bytesData, err = json.Marshal(mj)
 		if err != nil || bytesData == nil {

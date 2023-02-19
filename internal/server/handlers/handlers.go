@@ -394,15 +394,20 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			httpError(w, "unmarshal error:", http.StatusBadRequest)
 			return
 		}
+
+		//3.Проверяем подпись по ключу, нормально если ключ пуст в случае /update
+		if !(mj.Delta == nil && mj.Value == nil) {
+			if !h.Signer.IsValidSign(mj) {
+				httpError(w, "sign is not confirmed error:", http.StatusBadRequest)
+				return
+			}
+		}
+		//4. Валидация полученных данных
 		if mj.ID == "" {
 			httpError(w, "not parsed, empty metric name!"+mj.ID, http.StatusNotFound)
 			return
 		}
-		//3.Проверяем подпись по ключу, нормально если ключ пуст
-		if !h.Signer.IsValidSign(mj) {
-			httpError(w, "sign is not confirmed error:", http.StatusBadRequest)
-			return
-		}
+
 		//Сохраняем в базу от агента и ответ обратно
 		err = h.writeToStorageAndRespond(&mj, w, r)
 		logFatal(err)

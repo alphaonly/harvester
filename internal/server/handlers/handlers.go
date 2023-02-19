@@ -399,11 +399,6 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			httpError(w, "not parsed, empty metric name!"+mj.ID, http.StatusNotFound)
 			return
 		}
-		if mj.Delta != nil && mj.Value != nil {
-			httpError(w, "both value or delta not nil", http.StatusBadRequest)
-			return
-		}
-
 		//4.Проверяем подпись по ключу, нормально если ключ пуст в случае /update
 		if mj.Delta != nil || mj.Value != nil {
 			if !h.Signer.IsValidSign(mj) {
@@ -412,7 +407,6 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				return
 			}
 		}
-
 		//Сохраняем в базу от агента и ответ обратно
 		err = h.writeToStorageAndRespond(&mj, w, r)
 		logFatal(err)

@@ -142,9 +142,9 @@ func (c CheckerSHA256) Sign(mj *schema.MetricsJSON) (err error) {
 	mj.Hash = hex.EncodeToString(hashBytes)
 
 	if mj.Delta != nil {
-		log.Printf("agent: outbound data: id:%v,type:%v,delta:%v,hash:%v", mj.ID, mj.MType, *mj.Delta, mj.Hash)
+		log.Printf("agent: outbound data: key:%v, id:%v,type:%v,delta:%v,hash:%v", string(c.key), mj.ID, mj.MType, *mj.Delta, mj.Hash)
 	} else {
-		log.Printf("agent: outbound data: id:%v,type:%v,value:%v,hash:%v", mj.ID, mj.MType, *mj.Value, mj.Hash)
+		log.Printf("agent: outbound data: key:%v, id:%v,type:%v,value:%v,hash:%v", string(c.key), mj.ID, mj.MType, *mj.Value, mj.Hash)
 	}
 
 	return err

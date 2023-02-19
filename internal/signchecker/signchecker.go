@@ -52,10 +52,18 @@ func (c CheckerSHA256) IsValidSign(mj schema.MetricsJSON) (result bool) {
 }
 
 var counterHashMessage = func(id string, delta *int64) []byte {
-	return []byte(fmt.Sprintf("%s:counter:%d", id, *delta))
+	if delta == nil {
+		v := int64(0)
+		delta = &v
+	}
+	return []byte(fmt.Sprintf("%s:counter:%d", id, delta))
 }
 
 var gaugeHashMessage = func(id string, value *float64) []byte {
+	if value == nil {
+		v := float64(0)
+		value = &v
+	}
 	return []byte(fmt.Sprintf("%s:gauge:%f", id, *value))
 }
 

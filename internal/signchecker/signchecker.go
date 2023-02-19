@@ -50,6 +50,7 @@ func (c CheckerSHA256) IsValidSign(mj schema.MetricsJSON) (result bool) {
 	//compare
 	ans := hmac.Equal(leftHash, rightHash)
 	if !ans {
+		log.Printf("KEY:%v", string(c.key))
 		log.Printf("inbound structure:%v", mj)
 		log.Printf("structure for calc hash:%v", mjCopy)
 		log.Printf("inbound hash:%v", leftHash)

@@ -51,8 +51,27 @@ func (c CheckerSHA256) IsValidSign(mj schema.MetricsJSON) (result bool) {
 	ans := hmac.Equal(leftHash, rightHash)
 	if !ans {
 		log.Printf("KEY:%v", string(c.key))
-		log.Printf("inbound structure:%v", mj)
-		log.Printf("structure for calc hash:%v", mjCopy)
+		var (
+			v  float64
+			d  int64
+			vc float64
+			dc int64
+		)
+		if mj.Value != nil {
+			v = *mj.Value
+		}
+		if mj.Delta != nil {
+			d = *mj.Delta
+		}
+		if mjCopy.Value != nil {
+			vc = *mjCopy.Value
+		}
+		if mjCopy.Delta != nil {
+			dc = *mjCopy.Delta
+		}
+
+		log.Printf("inbound data: id:%v,type:%v,delta:%v,value:%v,hash:%v", mj.ID, mj.MType, d, v, mj.Hash)
+		log.Printf("calc    data: id:%v,type:%v,delta:%v,value:%v,hash:%v", mjCopy.ID, mjCopy.MType, dc, vc, mjCopy.Hash)
 		log.Printf("inbound hash:%v", leftHash)
 		log.Printf("calcula hash:%v", rightHash)
 	}

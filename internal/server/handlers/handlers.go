@@ -413,10 +413,12 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		err = h.writeToStorageAndRespond(&mj, w, r)
 		logFatal(err)
 
-		//Подписываем ответ
-		err = h.Signer.Sign(&mj)
-		logFatal(err)
-		//перевод в json ответа
+		//Подписываем ответ если есть значение
+		if !(mj.Delta == nil && mj.Value == nil) {
+			err = h.Signer.Sign(&mj)
+			logFatal(err)
+			//перевод в json ответа
+		}
 		bytesData, err = json.Marshal(mj)
 		if err != nil || bytesData == nil {
 			httpError(w, " json response forming error", http.StatusInternalServerError)
@@ -583,7 +585,7 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.Respo
 			var i int64 = 0
 			cv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
 			if err != nil {
-				log.Println("value not found")
+				log.Println("server:value not found:" + mj.ID)
 			} else {
 				i = cv.GetInternalValue().(int64)
 			}

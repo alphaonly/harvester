@@ -331,61 +331,78 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+
+func (h *Handlers) handlePostMetricJSONValidate(w http.ResponseWriter, r *http.Request) (ok bool) {
+	if h.MemKeeper == nil {
+		http.Error(w, "storage not initiated", http.StatusInternalServerError)
+		return false
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
+		return false
+	}
+	return true
+}
+
+func (h *Handlers) getBody(w http.ResponseWriter, r *http.Request) (b []byte, ok bool) {
+
+	var bytesData []byte
+	var err error
+	var prev schema.PreviousBytes
+
+	if p := r.Context().Value(schema.PKey1); p != nil {
+		prev = p.(schema.PreviousBytes)
+	}
+	if prev != nil {
+		//body from previous handler
+		bytesData = prev
+		log.Printf("got body from previous handler:%v", string(bytesData))
+	} else {
+		//body from request if there is no previous handler
+		bytesData, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
+			return nil, false
+		}
+		log.Printf("got body from request:%v", string(bytesData))
+	}
+	log.Printf("Server:json body received:" + string(bytesData))
+	return bytesData, true
+}
+func httpError(w http.ResponseWriter, err string, status int) {
+	http.Error(w, err, status)
+	log.Println("unmarshal error:" + err)
+}
+
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("HandlePostMetricJSON invoked")
-		log.Printf("requsest Content-Encoding:%v", r.Header.Get("Content-Encoding"))
 		//validation
-		if h.MemKeeper == nil {
-			http.Error(w, "storage not initiated", http.StatusInternalServerError)
+		if !h.handlePostMetricJSONValidate(w, r) {
 			return
 		}
-		if r.Method != http.MethodPost {
-			http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
+		//Handle
+		//1. get body
+		bytesData, ok := h.getBody(w, r)
+		if !ok {
 			return
 		}
-		var bytesData []byte
-		var err error
-		var prev schema.PreviousBytes
-
-		if p := r.Context().Value(schema.PKey1); p != nil {
-			prev = p.(schema.PreviousBytes)
-		}
-
-		if prev != nil {
-			//body from previous handler
-			bytesData = prev
-			log.Printf("got body from previous handler:%v", string(bytesData))
-		} else {
-			//body from request if there is no previous handler
-			bytesData, err = io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
-				return
-			}
-			log.Printf("got body from request:%v", string(bytesData))
-		}
-		log.Printf("Server:json received:" + string(bytesData))
+		//2. JSON
 		var mj schema.MetricsJSON
-		err = json.Unmarshal(bytesData, &mj)
+		err := json.Unmarshal(bytesData, &mj)
 		if err != nil {
-			http.Error(w, "unmarshal error:", http.StatusBadRequest)
-			log.Println("unmarshal error:" + err.Error())
+			httpError(w, "unmarshal error:", http.StatusBadRequest)
 			return
 		}
 		if mj.ID == "" {
-			http.Error(w, "not parsed, empty metric name!"+mj.ID, http.StatusNotFound)
-			log.Println("Error not parsed, empty metric name: 404")
+			httpError(w, "not parsed, empty metric name!"+mj.ID, http.StatusNotFound)
 			return
 		}
-
-		//Проверяем подпись по ключу, нормально если ключ пуст
+		//3.Проверяем подпись по ключу, нормально если ключ пуст
 		if !h.Signer.IsValidSign(mj) {
-			http.Error(w, "sign is not confirmed error:", http.StatusBadRequest)
-			log.Println("sign key is not confirmed")
+			httpError(w, "sign is not confirmed error:", http.StatusBadRequest)
 			return
 		}
-
 		//Сохраняем в базу от агента и ответ обратно
 		err = h.writeToStorageAndRespond(&mj, w, r)
 		logFatal(err)
@@ -396,7 +413,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		//перевод в json ответа
 		bytesData, err = json.Marshal(mj)
 		if err != nil || bytesData == nil {
-			http.Error(w, " json response forming error", http.StatusInternalServerError)
+			httpError(w, " json response forming error", http.StatusInternalServerError)
 			return
 		}
 		//Set Header keys
@@ -404,8 +421,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		//response
 		if next != nil {
 			//write handled body for further handle
-			prev = bytesData
-			ctx := context.WithValue(r.Context(), schema.PKey1, prev)
+			ctx := context.WithValue(r.Context(), schema.PKey1, schema.PreviousBytes(bytesData))
 			//call further handler with context parameters
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return

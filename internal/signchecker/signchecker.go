@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 
@@ -80,18 +81,10 @@ func (c CheckerSHA256) IsValidSign(mj schema.MetricsJSON) (result bool) {
 }
 
 var counterHashMessage = func(id string, delta *int64) []byte {
-	if delta == nil {
-		v := int64(0)
-		delta = &v
-	}
 	return []byte(fmt.Sprintf("%s:counter:%d", id, delta))
 }
 
 var gaugeHashMessage = func(id string, value *float64) []byte {
-	if value == nil {
-		v := float64(0)
-		value = &v
-	}
 	return []byte(fmt.Sprintf("%s:gauge:%f", id, *value))
 }
 
@@ -130,10 +123,16 @@ func (c CheckerSHA256) Sign(mj *schema.MetricsJSON) (err error) {
 	switch mj.MType {
 	case "gauge":
 		{
+			if mj.Value == nil {
+				return errors.New("signer:value is nil")
+			}
 			hashBytes, err = c.gaugeHash(mj.ID, mj.Value)
 		}
 	case "counter":
 		{
+			if mj.Delta == nil {
+				return errors.New("signer:delta is  nil")
+			}
 			hashBytes, err = c.counterHash(mj.ID, mj.Delta)
 		}
 	default:

@@ -402,7 +402,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		//4.Проверяем подпись по ключу, нормально если ключ пуст в случае /update
 		if mj.Delta != nil || mj.Value != nil {
 			if !h.Signer.IsValidSign(mj) {
-				httpError(w, "sign is not confirmed error:", http.StatusBadRequest)
+				httpError(w, "sign is not confirmed error", http.StatusBadRequest)
 				log.Printf("server:sign is not confirmed error:%v", string(bytesData))
 				return
 			}

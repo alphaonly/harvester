@@ -371,7 +371,7 @@ func (h *Handlers) getBody(w http.ResponseWriter, r *http.Request) (b []byte, ok
 }
 func httpError(w http.ResponseWriter, err string, status int) {
 	http.Error(w, err, status)
-	log.Println("unmarshal error:" + err)
+	log.Println("server:" + err)
 }
 
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
@@ -399,6 +399,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		if !(mj.Delta == nil && mj.Value == nil) {
 			if !h.Signer.IsValidSign(mj) {
 				httpError(w, "sign is not confirmed error:", http.StatusBadRequest)
+				log.Printf("server:sign is not confirmed error:%v", mj)
 				return
 			}
 		}

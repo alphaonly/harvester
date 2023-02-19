@@ -403,7 +403,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		if mj.Delta != nil || mj.Value != nil {
 			if !h.Signer.IsValidSign(mj) {
 				httpError(w, "sign is not confirmed error:", http.StatusBadRequest)
-				log.Printf("server:sign is not confirmed error:%v", bytesData)
+				log.Printf("server:sign is not confirmed error:%v", string(bytesData))
 				return
 			}
 		}

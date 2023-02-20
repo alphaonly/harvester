@@ -33,6 +33,7 @@ type ServerConfiguration struct {
 	Restore       bool            `json:"RESTORE,omitempty"`
 	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
 	Key           string          `json:"KEY,omitempty"`
+	DatabaseDsn   string          `json:"DATABASE_DSN,omitempty"`
 	EnvChanged    map[string]bool
 }
 
@@ -89,6 +90,7 @@ func (c *ServerConfiguration) UpdateFromEnvironment() {
 	c.Key = getEnv("KEY", c.Key, c.EnvChanged).(string)
 	//PORT is derived from ADDRESS
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
+	c.DatabaseDsn = getEnv("DATABASE_DSN", c.Key, c.EnvChanged).(string)
 }
 
 func (c *AgentConfiguration) UpdateFromFlags() {
@@ -147,6 +149,7 @@ func (c *ServerConfiguration) UpdateFromFlags() {
 		f = flag.String("f", dc.StoreFile, "Store file full path")
 		r = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
 		k = flag.String("k", dc.Key, "string key for hash signing")
+		d = flag.String("d", dc.DatabaseDsn, "database destination string")
 	)
 	flag.Parse()
 
@@ -173,6 +176,10 @@ func (c *ServerConfiguration) UpdateFromFlags() {
 	if !c.EnvChanged["KEY"] {
 		c.Key = *k
 		log.Printf(message, "KEY", c.Key)
+	}
+	if !c.EnvChanged["DATABASE_DSN"] {
+		c.DatabaseDsn = *d
+		log.Printf(message, "DATABASE_DSN", c.DatabaseDsn)
 	}
 }
 

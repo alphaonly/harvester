@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 	"github.com/alphaonly/harvester/internal/signchecker"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 type Handlers struct {
@@ -500,6 +502,22 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 	}
 
 }
+
+func (h *Handlers) HandlePing(w http.ResponseWriter, r *http.Request) {
+
+	conn, err := pgx.Connect(r.Context(), os.Getenv("DATABASE_DSN"))
+
+	if err != nil {
+		httpError(w, "Unable to connect to database:"+err.Error(), http.StatusInternalServerError)
+
+		return
+	}
+	defer conn.Close(context.Background())
+
+	w.WriteHeader(http.StatusOK)
+
+}
+
 func (h *Handlers) NewRouter() chi.Router {
 
 	var (
@@ -521,8 +539,11 @@ func (h *Handlers) NewRouter() chi.Router {
 	)
 	r := chi.NewRouter()
 	//
+
+	// var p PingHandler
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", getListCompressed)
+		r.Get("/ping", h.HandlePing)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		r.Post("/value", postJsonAndGetCompressed)
 		r.Post("/value/", postJsonAndGetCompressed)

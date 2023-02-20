@@ -90,7 +90,7 @@ func (c *ServerConfiguration) UpdateFromEnvironment() {
 	c.Key = getEnv("KEY", c.Key, c.EnvChanged).(string)
 	//PORT is derived from ADDRESS
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
-	c.DatabaseDsn = getEnv("DATABASE_DSN", c.Key, c.EnvChanged).(string)
+	c.DatabaseDsn = getEnv("DATABASE_DSN", c.DatabaseDsn, c.EnvChanged).(string)
 }
 
 func (c *AgentConfiguration) UpdateFromFlags() {

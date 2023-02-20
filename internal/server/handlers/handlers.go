@@ -542,6 +542,7 @@ func (h *Handlers) NewRouter() chi.Router {
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", getListCompressed)
 		r.Get("/ping", h.HandlePing)
+		r.Get("/ping/", h.HandlePing)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		r.Post("/value", postJsonAndGetCompressed)
 		r.Post("/value/", postJsonAndGetCompressed)

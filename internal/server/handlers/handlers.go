@@ -504,18 +504,17 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 }
 
 func (h *Handlers) HandlePing(w http.ResponseWriter, r *http.Request) {
-
+	log.Println("HandlePing invoked")
 	conn, err := pgx.Connect(r.Context(), os.Getenv("DATABASE_DSN"))
-
 	if err != nil {
-		httpError(w, "Unable to connect to database:"+err.Error(), http.StatusInternalServerError)
-
+		httpError(w, "server: ping handler: Unable to connect to database:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer conn.Close(context.Background())
-
+	log.Println("server: ping handler: connection established, 200 OK ")
+	w.Write([]byte("200 OK"))
+	w.
 	w.WriteHeader(http.StatusOK)
-
 }
 
 func (h *Handlers) NewRouter() chi.Router {

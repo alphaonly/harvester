@@ -513,7 +513,6 @@ func (h *Handlers) HandlePing(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close(context.Background())
 	log.Println("server: ping handler: connection established, 200 OK ")
 	w.Write([]byte("200 OK"))
-	w.
 	w.WriteHeader(http.StatusOK)
 }
 

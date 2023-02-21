@@ -22,6 +22,8 @@ func main() {
 	handlers := &handlers.Handlers{
 		MemKeeper: mapstorage.New(),
 		Signer:    signchecker.NewSHA256(configuration.Key),
+		Conf: conf.ServerConfiguration{DatabaseDsn:configuration.DatabaseDsn},
+		
 	}
 	server := server.New(configuration, fileStorage, handlers)
 

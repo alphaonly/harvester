@@ -8,10 +8,10 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
+	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
@@ -24,6 +24,7 @@ import (
 type Handlers struct {
 	MemKeeper *mapstorage.MapStorage
 	Signer    signchecker.Signer
+	Conf      configuration.ServerConfiguration
 }
 
 func (h *Handlers) HandleGetMetricFieldListSimple(next http.Handler) http.HandlerFunc {
@@ -438,19 +439,17 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 	}
 }
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
-	log.Println("Chi routing error, unknown route to get handler")
 	log.Println("HandlePostErrorPattern invoked")
+
+	httpError(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
 	err := r.Body.Close()
 	if err != nil {
 		return
 	}
 }
 func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.Request) {
-
-	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
-	log.Println("Chi routing error, unknown route to get handler")
 	log.Println("HandlePostErrorPatternNoName invoked")
+	httpError(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
 	err := r.Body.Close()
 	if err != nil {
 		return
@@ -459,8 +458,7 @@ func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.R
 func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("WriteResponseBodyHandler invoked")
-		log.Printf("request Content-Encoding:%v", r.Header.Get("Content-Encoding"))
-		log.Printf("request Accept-Encoding:%v", r.Header.Get("Accept-Encoding"))
+
 		//read body
 		var bytesData []byte
 		var err error
@@ -484,7 +482,6 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		}
 		//Set flag in case compressed data
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			log.Println("Set Content-Encoding gzip with w.Header().Set()")
 			w.Header().Set("Content-Encoding", "gzip")
 		}
 		//Set Response Header
@@ -496,16 +493,14 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 			http.Error(w, "byteData writing error", http.StatusInternalServerError)
 			return
 		}
-
-		log.Printf("Check response Content-Encoding in final header, value:%v", w.Header().Get("Content-Encoding"))
-		log.Printf("Check response Content-Type in final header, value:%v", w.Header().Get("Content-Type"))
 	}
 
 }
 
 func (h *Handlers) HandlePing(w http.ResponseWriter, r *http.Request) {
 	log.Println("HandlePing invoked")
-	conn, err := pgx.Connect(r.Context(), os.Getenv("DATABASE_DSN"))
+	log.Println("server:HandlePing:database string:" + h.Conf.DatabaseDsn)
+	conn, err := pgx.Connect(r.Context(), h.Conf.DatabaseDsn)
 	if err != nil {
 		httpError(w, "server: ping handler: Unable to connect to database:"+err.Error(), http.StatusInternalServerError)
 		return

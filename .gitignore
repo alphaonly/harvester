@@ -12,14 +12,23 @@
 *.out
 
 # Binaries
-cmd/agent/main
 cmd/agent/agent
-cmd/server/main
 cmd/server/server
+/internal/server/server
+/internal/agent/agent
+/cmd/httplib/
 
+devopstest-windows-amd64.exe
 # Dependency directories (remove the comment below to include it)
 vendor/
 
 # IDEs directories
 .idea
 .vscode
+
+#others
+internal/server/storage/interfaces/archive.go
+internal/agent/agentjson/
+
+# tests
+/cmd/tests/

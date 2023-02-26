@@ -240,6 +240,7 @@ func (s DBStorage) GetAllMetrics(ctx context.Context) (mvList *metricsjson.Metri
 
 // SaveAllMetrics Park data to database
 func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error) {
+	log.Println("DBStorage SaveAllMetrics invoked")
 	if mvList == nil {
 		return errors.New(message[6])
 	}

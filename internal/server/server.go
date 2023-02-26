@@ -105,7 +105,7 @@ func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
 	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval))
 	defer ticker.Stop()
 
-DoitAgain:
+DoItAgain:
 	select {
 
 	case <-ticker.C:
@@ -117,7 +117,7 @@ DoitAgain:
 			}
 			if mvList == nil {
 				log.Println("read insufficient, internal storage empty")
-			} else if len((*mvList)) == 0 {
+			} else if len(*mvList) == 0 {
 				log.Println("internal storage is empty, nothing to save to file")
 			} else {
 				err = storageTo.SaveAllMetrics(ctx, mvList)
@@ -132,5 +132,5 @@ DoitAgain:
 		return
 
 	}
-	goto DoitAgain
+	goto DoItAgain
 }

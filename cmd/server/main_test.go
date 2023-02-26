@@ -2,14 +2,15 @@ package main_test
 
 import (
 	"context"
+	db "github.com/alphaonly/harvester/internal/server/storage/implementations/dbstorage"
+	fileStor "github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
+	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"testing"
 	"time"
 
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server"
 	"github.com/alphaonly/harvester/internal/server/handlers"
-	"github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,9 +39,14 @@ func TestRun(t *testing.T) {
 				sc := conf.NewServerConfiguration()
 				sc.UpdateFromEnvironment()
 				sc.UpdateFromFlags()
-				archive := filestorage.FileArchive{StoreFile: sc.StoreFile}
+				var storage stor.Storage
+				if sc.DatabaseDsn == "" {
+					storage = fileStor.FileArchive{StoreFile: sc.StoreFile}
+				} else {
+					storage = db.NewDBStorage(context.Background(), sc.DatabaseDsn)
+				}
 				handlers := &handlers.Handlers{}
-				server := server.New(sc, archive, handlers)
+				server := server.New(sc, storage, handlers)
 
 				err := server.Run(ctx)
 				if err != nil {

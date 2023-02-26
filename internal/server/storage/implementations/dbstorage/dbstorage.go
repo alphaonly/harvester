@@ -18,24 +18,24 @@ import (
 //		SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error)
 //	}
 
-const selectLineMetricsTable = `SELECT id,type,delta,value FROM public.metrics WHERE id=$1;`
-const selectAllMetricsTable = `SELECT id,type,delta,value FROM public.metrics;`
+const selectLineMetricsTable = `SELECT id,type,delta,value FROM public.metrics2 WHERE id=$1;`
+const selectAllMetricsTable = `SELECT id,type,delta,value FROM public.metrics2;`
 
 const createOrUpdateIfExistsMetricsTable = `
-	INSERT INTO public.metrics (id, type, delta,value) 
+	INSERT INTO public.metrics2 (id, type, delta,value) 
 	VALUES ($1, $2, $3, $4)
 	ON CONFLICT (id) DO UPDATE 
   	SET delta = $3, 
       	value = $4;`
 
-const createMetricsTable = `create table public.metrics
+const createMetricsTable = `create table public.metrics2
 	(	id varchar(40) not null primary key,
 		type integer not null,
-		delta integer,
+		delta bigint,
 		value double precision
 	);`
 
-const checkIfMetricsTableExists = `SELECT 'public.metrics'::regclass;`
+const checkIfMetricsTableExists = `SELECT 'public.metrics2'::regclass;`
 
 var message = []string{
 	0: "unable to connect to database",

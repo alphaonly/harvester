@@ -149,7 +149,7 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := r.Context()
-	metricsValue, err := h.MemKeeper.GetMetric(ctx, metricName)
+	metricsValue, err := h.MemKeeper.GetMetric(ctx, metricName, metricType)
 	if err != nil {
 		http.Error(w, "404 - not found", http.StatusNotFound)
 		w.WriteHeader(http.StatusNotFound)
@@ -207,7 +207,7 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 	}
 
 	ctx := r.Context()
-	metricsValue, err := h.MemKeeper.GetMetric(ctx, requestMetricsJSON.ID)
+	metricsValue, err := h.MemKeeper.GetMetric(ctx, requestMetricsJSON.ID, requestMetricsJSON.MType)
 	if err != nil {
 		http.Error(w, "404 - not found", http.StatusNotFound)
 		w.WriteHeader(http.StatusNotFound)
@@ -308,7 +308,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						http.Error(w, "value: "+metricValue+" not parsed", http.StatusBadRequest)
 						return
 					}
-					prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), metricName)
+					prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), metricName, metricType)
 					if err != nil || prevMetricValue == nil {
 						prevMetricValue = mVal.NewCounterValue()
 					}
@@ -569,7 +569,7 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.Respo
 			}
 			//читаем  для ответа
 			var f float64 = 0
-			gv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+			gv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID, mj.MType)
 			if err != nil {
 				log.Println("value not found")
 			} else {
@@ -582,7 +582,7 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.Respo
 			if mj.Delta != nil {
 				mjVal := *mj.Delta
 				//пишем если есть значение
-				prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+				prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), mj.ID, mj.MType)
 				if err != nil {
 					prevMetricValue = mVal.NewCounterValue()
 				}
@@ -596,7 +596,7 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.Respo
 			}
 			//читаем для ответа
 			var i int64 = 0
-			cv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+			cv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID, mj.MType)
 			if err != nil {
 				log.Println("server:value not found:" + mj.ID)
 			} else {

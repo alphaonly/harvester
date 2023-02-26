@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	db "github.com/alphaonly/harvester/internal/server/storage/implementations/dbstorage"
+	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"log"
 
 	conf "github.com/alphaonly/harvester/internal/configuration"
@@ -17,20 +19,25 @@ func main() {
 	configuration := conf.NewServerConfiguration()
 	configuration.UpdateFromEnvironment()
 	configuration.UpdateFromFlags()
-	fileStorage := fileStor.FileArchive{StoreFile: configuration.StoreFile}
-
-	handlers := &handlers.Handlers{
+	_handlers := &handlers.Handlers{
 		MemKeeper: mapstorage.New(),
 		Signer:    signchecker.NewSHA256(configuration.Key),
-		Conf: conf.ServerConfiguration{DatabaseDsn:configuration.DatabaseDsn},
-		
+		Conf:      conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
 	}
-	server := server.New(configuration, fileStorage, handlers)
+
+	var storage stor.Storage
+	if configuration.DatabaseDsn == "" {
+		storage = fileStor.FileArchive{StoreFile: configuration.StoreFile}
+	} else {
+		storage = db.NewDBStorage(context.Background(), configuration.DatabaseDsn)
+	}
+
+	_server := server.New(configuration, storage, _handlers)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := server.Run(ctx)
+	err := _server.Run(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

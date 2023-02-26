@@ -20,7 +20,7 @@ type FileArchive struct {
 	StoreFile string
 }
 
-func (fa FileArchive) GetMetric(ctx context.Context, name string) (mv mVal.MetricValue, err error) {
+func (fa FileArchive) GetMetric(ctx context.Context, name string, MType string) (mv mVal.MetricValue, err error) {
 	//Not supported by the implementation
 	return nil, errors.New("not supported")
 }

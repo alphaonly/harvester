@@ -33,9 +33,9 @@ func main() {
 	}
 
 	_handlers := &handlers.Handlers{
-		Keeper: InternalStorage,
-		Signer: signchecker.NewSHA256(configuration.Key),
-		Conf:   conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
+		Storage: InternalStorage,
+		Signer:  signchecker.NewSHA256(configuration.Key),
+		Conf:    conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
 	}
 
 	_server := server.New(configuration, ExternalStorage, _handlers)

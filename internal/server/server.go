@@ -31,7 +31,7 @@ func NewConfiguration(serverPort string) *Configuration {
 func New(configuration *conf.ServerConfiguration, ExStorage stor.Storage, handlers *handlers.Handlers) (server Server) {
 	return Server{
 		configuration:   configuration,
-		InternalStorage: handlers.Keeper,
+		InternalStorage: handlers.Storage,
 		ExternalStorage: ExStorage,
 		handlers:        handlers,
 	}
@@ -100,7 +100,7 @@ func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
 	if storageTo == nil {
 		return
 	}
-	if s.handlers.Keeper == storageTo {
+	if s.handlers.Storage == storageTo {
 		log.Fatal("a try to save to it is own")
 		return
 	}

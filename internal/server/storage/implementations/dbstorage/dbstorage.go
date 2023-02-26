@@ -18,6 +18,8 @@ import (
 //		SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error)
 //	}
 
+//-d=postgres://postgres:mypassword@localhost:5432/yandexxx
+
 const selectLineMetricsTable = `SELECT id,type,delta,value FROM public.metrics2 WHERE id=$1;`
 const selectAllMetricsTable = `SELECT id,type,delta,value FROM public.metrics2;`
 

@@ -19,20 +19,26 @@ func main() {
 	configuration := conf.NewServerConfiguration()
 	configuration.UpdateFromEnvironment()
 	configuration.UpdateFromFlags()
-	_handlers := &handlers.Handlers{
-		MemKeeper: mapstorage.New(),
-		Signer:    signchecker.NewSHA256(configuration.Key),
-		Conf:      conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
-	}
 
-	var storage stor.Storage
+	var (
+		ExternalStorage stor.Storage
+		InternalStorage stor.Storage
+	)
 	if configuration.DatabaseDsn == "" {
-		storage = fileStor.FileArchive{StoreFile: configuration.StoreFile}
+		ExternalStorage = fileStor.FileArchive{StoreFile: configuration.StoreFile}
+		InternalStorage = mapstorage.New()
 	} else {
-		storage = db.NewDBStorage(context.Background(), configuration.DatabaseDsn)
+		ExternalStorage = nil
+		InternalStorage = db.NewDBStorage(context.Background(), configuration.DatabaseDsn)
 	}
 
-	_server := server.New(configuration, storage, _handlers)
+	_handlers := &handlers.Handlers{
+		Keeper: InternalStorage,
+		Signer: signchecker.NewSHA256(configuration.Key),
+		Conf:   conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
+	}
+
+	_server := server.New(configuration, ExternalStorage, _handlers)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

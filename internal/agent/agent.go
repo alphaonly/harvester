@@ -3,7 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
-
+	"errors"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
 	sign "github.com/alphaonly/harvester/internal/signchecker"
@@ -102,7 +102,7 @@ func AddGaugeData(common sendData, val Gauge, name string, data map[*sendData]bo
 	sd := sendData{
 		url:  URL,
 		keys: common.keys,
-		// body: &empty, //need to transer something
+		// body: &empty, //need to tranfser something
 	}
 	data[&sd] = true
 
@@ -114,6 +114,45 @@ func logFatal(err error) {
 	}
 
 }
+
+func AddGaugeDataJSONToBatch(common *sendData, val Gauge, name string) {
+	if common.JSONBatchBody == nil {
+		common.JSONBatchBody = new([]schema.MetricsJSON)
+	}
+
+	v := float64(val)
+
+	mj := schema.MetricsJSON{
+		ID:    name,
+		MType: "gauge",
+		Value: &v,
+	}
+	//Вычисляем hash и помещаем в mj.Hash
+	err := common.signer.Sign(&mj)
+	logFatal(err)
+
+	*common.JSONBatchBody = append(*common.JSONBatchBody, mj)
+}
+
+func AddCounterDataJSONToBatch(common *sendData, val Counter, name string) {
+
+	if common.JSONBatchBody == nil {
+		common.JSONBatchBody = new([]schema.MetricsJSON)
+	}
+	v := int64(val)
+
+	mj := schema.MetricsJSON{
+		ID:    name,
+		MType: "counter",
+		Delta: &v,
+	}
+	//Вычисляем hash и помещаем в mj.Hash
+	err := common.signer.Sign(&mj)
+	logFatal(err)
+
+	*common.JSONBatchBody = append(*common.JSONBatchBody, mj)
+}
+
 func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendData]bool) {
 	v := float64(val)
 
@@ -129,7 +168,7 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 	sd := sendData{
 		url:      common.url,
 		keys:     common.keys,
-		JSONbody: &mj,
+		JSONBody: &mj,
 	}
 	data[&sd] = true
 
@@ -157,7 +196,7 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sen
 	sd := sendData{
 		url:      common.url,
 		keys:     common.keys,
-		JSONbody: &mj,
+		JSONBody: &mj,
 	}
 	data[&sd] = true
 
@@ -167,7 +206,8 @@ type HeaderKeys map[string]string
 type sendData struct {
 	url            *url.URL
 	keys           HeaderKeys
-	JSONbody       *schema.MetricsJSON
+	JSONBody       *schema.MetricsJSON
+	JSONBatchBody  *[]schema.MetricsJSON
 	compressedBody *[]byte
 	signer         sign.Signer
 }
@@ -179,9 +219,14 @@ func (sd sendData) SendData(client *resty.Client) error {
 	r := client.R().
 		SetHeaders(sd.keys)
 
-	if sd.JSONbody != nil {
-		r.SetBody(sd.JSONbody)
+	if sd.JSONBody != nil {
+		r.SetBody(sd.JSONBody)
+	} else if sd.JSONBatchBody != nil {
+		r.SetBody(sd.JSONBatchBody)
+	} else {
+		return errors.New("both bodies is nil")
 	}
+
 	resp, err := r.
 		Post(sd.url.String())
 	if err != nil {
@@ -257,7 +302,7 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 	// 			if err != nil {
 	// 				log.Fatalf("failed init compress writer: %v", err)
 	// 			}
-	// 			_, err = w.Write(*k.JSONbody)
+	// 			_, err = w.Write(*k.JSONBody)
 	// 			if err != nil {
 	// 				log.Fatalf("failed write data to compress temporary buffer: %v", err)
 	// 			}
@@ -267,24 +312,26 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 	// 				log.Fatalf("failed compress data: %v", err)
 	// 			}
 	// 			body := b.Bytes()
-	// 			k.JSONbody = &body
+	// 			k.JSONBody = &body
 	// 		}
 	// 	}
 	case "gzip":
 		{
+			var body any
 			for k := range data {
-				if k.JSONbody != nil {
-					b, err := json.Marshal(*k.JSONbody)
-					if err != nil {
-						log.Println("error:", err)
-					}
-
-					compressedBody, err := compression.GzipCompress(b)
-					if err != nil {
-						log.Fatal("Error body gzip compression")
-					}
-					k.compressedBody = compressedBody
+				if k.JSONBody != nil {
+					body = *k.JSONBody
+				} else if k.JSONBatchBody != nil {
+					body = *k.JSONBatchBody
+				} else {
+					logFatal(errors.New("agent:nothing to marshal as sendData bodies is nil"))
 				}
+
+				b, err := json.Marshal(body)
+				logFatal(err)
+
+				k.compressedBody, err = compression.GzipCompress(b)
+				logFatal(err)
 			}
 		}
 	}
@@ -309,9 +356,49 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 	}
 
 	switch a.Configuration.UseJSON {
-	case true:
-		{
 
+	case 2: //JSON Batch
+		{
+			keys["Content-Type"] = "application/json"
+			keys["Accept"] = "application/json"
+
+			data := &sendData{
+				url:    a.baseURL.JoinPath("updates"),
+				keys:   keys,
+				signer: a.Signer,
+			}
+
+			AddGaugeDataJSONToBatch(data, metrics.Alloc, "Alloc")
+			AddGaugeDataJSONToBatch(data, metrics.GCCPUFraction, "GCCPUFraction")
+			AddGaugeDataJSONToBatch(data, metrics.GCSys, "GCSys")
+			AddGaugeDataJSONToBatch(data, metrics.HeapAlloc, "HeapAlloc")
+			AddGaugeDataJSONToBatch(data, metrics.HeapIdle, "HeapIdle")
+			AddGaugeDataJSONToBatch(data, metrics.HeapInuse, "HeapInuse")
+			AddGaugeDataJSONToBatch(data, metrics.HeapObjects, "HeapObjects")
+			AddGaugeDataJSONToBatch(data, metrics.HeapReleased, "HeapReleased")
+			AddGaugeDataJSONToBatch(data, metrics.HeapSys, "HeapSys")
+			AddGaugeDataJSONToBatch(data, metrics.LastGC, "LastGC")
+			AddGaugeDataJSONToBatch(data, metrics.Lookups, "Lookups")
+			AddGaugeDataJSONToBatch(data, metrics.MCacheSys, "MCacheSys")
+			AddGaugeDataJSONToBatch(data, metrics.MSpanInuse, "MSpanInuse")
+			AddGaugeDataJSONToBatch(data, metrics.MSpanSys, "MSpanSys")
+			AddGaugeDataJSONToBatch(data, metrics.Mallocs, "Mallocs")
+			AddGaugeDataJSONToBatch(data, metrics.NextGC, "NextGC")
+			AddGaugeDataJSONToBatch(data, metrics.NumForcedGC, "NumForcedGC")
+			AddGaugeDataJSONToBatch(data, metrics.NumGC, "NumGC")
+			AddGaugeDataJSONToBatch(data, metrics.OtherSys, "OtherSys")
+			AddGaugeDataJSONToBatch(data, metrics.PauseTotalNs, "PauseTotalNs")
+			AddGaugeDataJSONToBatch(data, metrics.StackInuse, "StackInuse")
+			AddGaugeDataJSONToBatch(data, metrics.StackSys, "StackSys")
+			AddGaugeDataJSONToBatch(data, metrics.Sys, "Sys")
+			AddGaugeDataJSONToBatch(data, metrics.TotalAlloc, "TotalAlloc")
+			AddGaugeDataJSONToBatch(data, metrics.RandomValue, "RandomValue")
+			AddGaugeDataJSONToBatch(data, metrics.Frees, "Frees")
+			AddCounterDataJSONToBatch(data, metrics.PollCount, "PollCount")
+			m[data] = true
+		}
+	case 1: //JSON
+		{
 			keys["Content-Type"] = "application/json"
 			keys["Accept"] = "application/json"
 
@@ -363,7 +450,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			//AddCounterDataJSON(dataAPI, -1, "PollCount", m)
 			////log.Printf("sum:%v", value1+value2+value0)
 		}
-	default:
+	case 0:
 		{
 
 			keys["Content-Type"] = "plain/text"

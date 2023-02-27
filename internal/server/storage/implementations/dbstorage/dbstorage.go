@@ -9,6 +9,7 @@ import (
 	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/jackc/pgx/v5"
 	"log"
+	"time"
 )
 
 //	type Storage interface {
@@ -40,15 +41,18 @@ const createMetricsTable = `create table public.metrics2
 const checkIfMetricsTableExists = `SELECT 'public.metrics2'::regclass;`
 
 var message = []string{
-	0: "unable to connect to database",
-	1: "table metrics does not exists, a try to create:",
-	2: "server: db metrics table creation response text:",
-	3: "server: db metrics table existence check response text:",
-	4: "server: getMetrics: Unknown metric type value",
-	5: "server: NullValue type not valid",
-	6: "nil pointer in mvList",
-	7: "undefined type in type switch dbStorage",
-	8: "server sendBatch tag:",
+	0:  "unable to connect to database",
+	1:  "table metrics does not exists, a try to create:",
+	2:  "server: db metrics table creation response text:",
+	3:  "server: db metrics table existence check response text:",
+	4:  "server: getMetrics: Unknown metric type value",
+	5:  "server: NullValue type not valid",
+	6:  "nil pointer in mvList",
+	7:  "undefined type in type switch dbStorage",
+	8:  "server sendBatch tag:",
+	9:  "server: unable to rollback, error fatal",
+	10: "server: unable to commit, trying again",
+	11: "server: unable to prepare statement, fatal error",
 }
 
 type dbMetrics struct {
@@ -93,7 +97,7 @@ func NewDBStorage(ctx context.Context, dataBaseUrl string) storage.Storage {
 
 func logFatalf(mess string, err error) {
 	if err != nil {
-		log.Fatalf(mess+": "+" %v\n", err)
+		log.Fatalf(mess+": %v\n", err)
 	}
 }
 func (s *DBStorage) connectDb(ctx context.Context) (ok bool) {
@@ -252,6 +256,14 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 	}
 	mv := *mvList
 
+	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Prepare(ctx, "CreateOrUpdate", createOrUpdateIfExistsMetricsTable)
+	logFatalf(message[11], err)
+
 	batch := &pgx.Batch{}
 	for k, v := range mv {
 		var d dbMetrics
@@ -275,16 +287,27 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 		}
 
 		batch.Queue(createOrUpdateIfExistsMetricsTable, d.id, d._type, d.delta, d.value)
-
 	}
 
-	br := s.conn.SendBatch(ctx, batch)
-	tag, err := br.Exec()
-	if err != nil {
-		return err
+	br := tx.SendBatch(ctx, batch)
+	for range mv {
+		tag, err := br.Exec()
+		if err != nil {
+			logFatalf(message[9], tx.Rollback(ctx))
+			return err
+		}
+		log.Println(message[8] + tag.String())
 	}
+
 	defer br.Close()
-	log.Println(message[8] + tag.String())
 
+	for i := 0; i < 5; i++ {
+		time.Sleep(10 * time.Microsecond)
+		err := tx.Commit(ctx)
+		if err == nil {
+			break
+		}
+	}
+	logFatalf(message[10], err)
 	return nil
 }

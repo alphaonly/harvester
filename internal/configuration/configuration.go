@@ -13,7 +13,7 @@ import (
 )
 
 const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":""}`
-const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":true,"KEY":""}`
+const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":""}`
 
 type AgentConfiguration struct {
 	Address        string          `json:"ADDRESS,omitempty"`
@@ -21,7 +21,7 @@ type AgentConfiguration struct {
 	CompressType   string          `json:"COMPRESS_TYPE,omitempty"`
 	PollInterval   schema.Duration `json:"POLL_INTERVAL,omitempty"`
 	ReportInterval schema.Duration `json:"REPORT_INTERVAL,omitempty"`
-	UseJSON        bool            `json:"USE_JSON,omitempty"`
+	UseJSON        int             `json:"USE_JSON,omitempty"`
 	Key            string          `json:"KEY,omitempty"`
 	EnvChanged     map[string]bool
 }
@@ -78,7 +78,7 @@ func (c *AgentConfiguration) UpdateFromEnvironment() {
 	c.PollInterval = getEnv("POLL_INTERVAL", c.PollInterval, c.EnvChanged).(schema.Duration)
 	c.ReportInterval = getEnv("REPORT_INTERVAL", c.ReportInterval, c.EnvChanged).(schema.Duration)
 	c.Scheme = getEnv("SCHEME", c.Scheme, c.EnvChanged).(string)
-	c.UseJSON = getEnv("USE_JSON", c.UseJSON, c.EnvChanged).(bool)
+	c.UseJSON = getEnv("USE_JSON", c.UseJSON, c.EnvChanged).(int)
 	c.Key = getEnv("KEY", c.Key, c.EnvChanged).(string)
 }
 
@@ -99,7 +99,7 @@ func (c *AgentConfiguration) UpdateFromFlags() {
 		a = flag.String("a", dc.Address, "Domain name and :port")
 		p = flag.Duration("p", time.Duration(dc.PollInterval), "Poll interval")
 		r = flag.Duration("r", time.Duration(dc.ReportInterval), "Report interval")
-		j = flag.Bool("j", dc.UseJSON, "Use JSON true/false")
+		j = flag.Int("j", dc.UseJSON, "Use JSON 0-No JSON,1- JSON, 2-JSON Batch")
 		t = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
 		k = flag.String("k", dc.Key, "string key for hash signing")
 	)

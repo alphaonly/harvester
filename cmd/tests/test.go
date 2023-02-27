@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	metricvalueI "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 	db "github.com/alphaonly/harvester/internal/server/storage/implementations/dbstorage"
 	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
@@ -24,4 +25,7 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Println(mv)
+	ss := sql.Stmt{}
+	ss.Query()
+
 }

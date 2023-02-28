@@ -284,7 +284,10 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 			//Нужно прочитать есть ли значение метрики в базе и прибавить к текущему
 			var counter int64
 			if v := currentMetricsList[k]; v != nil {
+
 				counter = v.GetInternalValue().(int64)
+				log.Printf("previous counter value is %v",counter)
+				log.Printf("counter sum is written is %v",counter + value.GetInternalValue().(int64))
 			}
 
 			d = dbMetrics{

@@ -290,6 +290,9 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 	}
 
 	br := tx.SendBatch(ctx, batch)
+	
+	log.Print("saving data:")
+	log.Println(mv)
 	for range mv {
 		tag, err := br.Exec()
 		if err != nil {

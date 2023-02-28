@@ -454,11 +454,20 @@ func (h *Handlers) HandlePostMetricJSONBatch(next http.Handler) http.HandlerFunc
 		}
 		//2. JSON
 		var mjSlice []schema.MetricsJSON
+		log.Print("data to unmarshal:")
+		log.Println(bytesData)
 		err := json.Unmarshal(bytesData, &mjSlice)
 		if err != nil {
 			httpError(w, "unmarshal error:", http.StatusBadRequest)
 			return
 		}
+		log.Print("unmarshal slice data")
+		for _,v:= range mjSlice{
+
+			log.Printf("%v %v %v %v", v.ID,v.MType,v.Delta,v.Value)
+		}
+
+
 		//3. Валидация полученных данных
 		for _, v := range mjSlice {
 			if v.ID == "" {

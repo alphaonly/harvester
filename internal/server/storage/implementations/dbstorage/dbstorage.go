@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
+
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/jackc/pgx/v5"
-	"log"
-	"time"
 )
 
 //	type Storage interface {
@@ -53,6 +53,7 @@ var message = []string{
 	9:  "server: unable to rollback, error fatal",
 	10: "server: unable to commit, trying again",
 	11: "server: unable to prepare statement, fatal error",
+	12: "server: unable to get all metrics before saving them all, fatal error",
 }
 
 type dbMetrics struct {
@@ -254,18 +255,22 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 	if !s.connectDb(ctx) {
 		return errors.New(message[0])
 	}
-	mv := *mvList
+	mvL := *mvList
 
-	tx, err := s.conn.BeginTx(ctx, pgx.TxOptions{})
+	//Нужно прочитать все значения метрик counter для суммирования при записи
+	var currentMetricsList metricsjson.MetricsMapType = make(metricsjson.MetricsMapType)
+	data, err := s.GetAllMetrics(ctx)
 	if err != nil {
-		return err
+		return errors.New(message[12])
+	}
+	if data != nil {
+		currentMetricsList = *data
 	}
 
-	_, err = tx.Prepare(ctx, "CreateOrUpdate", createOrUpdateIfExistsMetricsTable)
 	logFatalf(message[11], err)
 
 	batch := &pgx.Batch{}
-	for k, v := range mv {
+	for k, v := range mvL {
 		var d dbMetrics
 		switch value := v.(type) {
 		case *mVal.GaugeValue:
@@ -276,41 +281,39 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 				delta: sql.NullInt64{},
 			}
 		case *mVal.CounterValue:
+			//Нужно прочитать есть ли значение метрики в базе и прибавить к текущему
+			var counter int64
+			if v := currentMetricsList[k]; v != nil {
+				counter = v.GetInternalValue().(int64)
+			}
+
 			d = dbMetrics{
 				id:    sql.NullString{String: k, Valid: true},
 				_type: sql.NullInt64{Int64: 1, Valid: true},
 				value: sql.NullFloat64{},
-				delta: sql.NullInt64{Int64: value.GetInternalValue().(int64), Valid: true},
+				delta: sql.NullInt64{Int64: value.GetInternalValue().(int64) + counter, Valid: true},
 			}
 		default:
 			return errors.New(message[7])
 		}
-
 		batch.Queue(createOrUpdateIfExistsMetricsTable, d.id, d._type, d.delta, d.value)
 	}
 
-	br := tx.SendBatch(ctx, batch)
-	
-	log.Print("saving data:")
-	log.Println(mv)
-	for range mv {
-		tag, err := br.Exec()
+	batchResults := s.conn.SendBatch(ctx, batch)
+
+	log.Println(mvL)
+	for range mvL {
+		tag, err := batchResults.Exec()
 		if err != nil {
-			logFatalf(message[9], tx.Rollback(ctx))
 			return err
 		}
 		log.Println(message[8] + tag.String())
 	}
 
-	defer br.Close()
+	defer batchResults.Close()
 
-	for i := 0; i < 5; i++ {
-		time.Sleep(10 * time.Microsecond)
-		err := tx.Commit(ctx)
-		if err == nil {
-			break
-		}
-	}
 	logFatalf(message[10], err)
+
+	log.Print("data saved")
 	return nil
 }

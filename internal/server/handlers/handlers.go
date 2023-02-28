@@ -460,15 +460,15 @@ func (h *Handlers) HandlePostMetricJSONBatch(next http.Handler) http.HandlerFunc
 			return
 		}
 		//3. Валидация полученных данных
-		for i, v := range mjSlice {
+		for _, v := range mjSlice {
 			if v.ID == "" {
-				httpError(w, "not parsed, empty metric name!"+v.ID+"batch index:"+string(i), http.StatusNotFound)
+				httpError(w, "not parsed, empty metric name!"+v.ID, http.StatusNotFound)
 				return
 			}
 			//4.Проверяем подпись по ключу, нормально если ключ пуст в случае /update
 			if v.Delta != nil || v.Value != nil {
 				if !h.Signer.IsValidSign(v) {
-					httpError(w, "sign is not confirmed error,batch index:"+string(i), http.StatusBadRequest)
+					httpError(w, "sign is not confirmed error,batch index:", http.StatusBadRequest)
 					log.Printf("server:sign is not confirmed error:%v", string(bytesData))
 					return
 				}

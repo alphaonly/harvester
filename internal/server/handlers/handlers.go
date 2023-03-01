@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+
+	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
+	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 
 	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/schema"
@@ -141,7 +142,6 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	if metricType == "" {
 		http.Error(w, metricType+"is not recognized type", http.StatusNotImplemented)
 		return
-
 	}
 
 	if h.Storage == nil {
@@ -453,20 +453,12 @@ func (h *Handlers) HandlePostMetricJSONBatch(next http.Handler) http.HandlerFunc
 			return
 		}
 		//2. JSON
-		var mjSlice []schema.MetricsJSON
-		log.Print("data to unmarshal:")
-		log.Println(bytesData)
+		var mjSlice schema.MetricsJSONSlice
 		err := json.Unmarshal(bytesData, &mjSlice)
 		if err != nil {
 			httpError(w, "unmarshal error:", http.StatusBadRequest)
 			return
 		}
-		log.Print("unmarshal slice data")
-		for _,v:= range mjSlice{
-
-			log.Printf("%v %v %v %v", v.ID,v.MType,v.Delta,v.Value)
-		}
-
 
 		//3. Валидация полученных данных
 		for _, v := range mjSlice {
@@ -474,33 +466,24 @@ func (h *Handlers) HandlePostMetricJSONBatch(next http.Handler) http.HandlerFunc
 				httpError(w, "not parsed, empty metric name!"+v.ID, http.StatusNotFound)
 				return
 			}
-			//4.Проверяем подпись по ключу, нормально если ключ пуст в случае /update
+			//3.1.Проверяем подпись по ключу, нормально если ключ пуст в случае /update
 			if v.Delta != nil || v.Value != nil {
 				if !h.Signer.IsValidSign(v) {
 					httpError(w, "sign is not confirmed error,batch index:", http.StatusBadRequest)
-					log.Printf("server:sign is not confirmed error:%v", string(bytesData))
 					return
 				}
 			}
 		}
-		//Сохраняем в базу от агента и ответ обратно
+		//3.2. Проверка на задвоеные метрики
+		err = mjSlice.EnhancedDistinct()
+		if err != nil {
+			httpError(w, "unable to distinct inbound slice", http.StatusBadRequest)
+			return
+		}
+		//4.Данные в хранилище
 		err = h.writeBatchToStorage(&mjSlice, w, r)
 		logFatal(err)
 
-		//Подписываем ответ если есть значение
-		//if !(mjSlice.Delta == nil && mjSlice.Value == nil) {
-		//	err = h.Signer.Sign(&mjSlice)
-		//	logFatal(err)
-		//	//перевод в json ответа
-		//}
-		//bytesData, err = json.Marshal(mjSlice)
-		//if err != nil || bytesData == nil {
-		//	httpError(w, " json response forming error", http.StatusInternalServerError)
-		//	return
-		//}
-		//Set Header keys
-		//w.Header().Set("Content-Type", "application/json")
-		//response
 		if next != nil {
 			//write handled body for further handle
 			ctx := context.WithValue(r.Context(), schema.PKey1, schema.PreviousBytes(bytesData))
@@ -693,7 +676,7 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.Respo
 	}
 	return nil
 }
-func (h *Handlers) writeBatchToStorage(mjSlice *[]schema.MetricsJSON, w http.ResponseWriter, r *http.Request) (err error) {
+func (h *Handlers) writeBatchToStorage(mjSlice *schema.MetricsJSONSlice, w http.ResponseWriter, r *http.Request) (err error) {
 	if mjSlice == nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return err

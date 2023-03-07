@@ -17,9 +17,11 @@ func main() {
 	defer cancel()
 
 	//Configuration parameters
-	ac := conf.NewAgentConfiguration()
-	ac.UpdateFromEnvironment()
-	ac.UpdateFromFlags()
+	 ac:=conf.NewAgentConf(conf.UpdateACFromEnvironment,conf.UpdateACFromFlags)
+
+	// ac := conf.NewAgentConfiguration()
+	// ac.UpdateFromEnvironment()
+	// ac.UpdateFromFlags()
 
 	//retsty http.Client
 	client := resty.New().SetRetryCount(10)

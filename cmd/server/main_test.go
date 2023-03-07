@@ -35,10 +35,10 @@ func TestRun(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			go func() {
-
-				sc := conf.NewServerConfiguration()
-				sc.UpdateFromEnvironment()
-				sc.UpdateFromFlags()
+				sc:= conf.NewServerConf(conf.UpdateSCFromEnvironment,conf.UpdateSCFromFlags)
+				// sc := conf.NewServerConfiguration()
+				// sc.UpdateFromEnvironment()
+				// sc.UpdateFromFlags()
 				var storage stor.Storage
 				if sc.DatabaseDsn == "" {
 					storage = fileStor.FileArchive{StoreFile: sc.StoreFile}

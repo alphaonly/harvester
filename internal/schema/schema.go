@@ -1,17 +1,9 @@
 package schema
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"time"
-
-	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
-
-	"io"
-	"log"
-	"net/http"
-	"net/url"
 )
 
 type PreviousBytes []byte
@@ -40,9 +32,9 @@ func (s *MetricsJSONSlice) EnhancedDistinct() error {
 			}
 		}
 	}
-	*s=MetricsJSONSlice{}
-	for _,v:= range m{
-		*s=append(*s,v)
+	*s = MetricsJSONSlice{}
+	for _, v := range m {
+		*s = append(*s, v)
 	}
 	return nil
 }
@@ -57,68 +49,6 @@ type MetricsJSON struct {
 
 func (m MetricsJSON) Equals(m2 MetricsJSON) bool {
 	return m.ID == m2.ID
-}
-
-func NewMetricJSON(name string, MType string, value interface{}) (ret MetricsJSON) {
-
-	j := MetricsJSON{}
-	if name == "" || MType == "" {
-		panic(errors.New("name or type is empty"))
-	}
-
-	j.ID = name
-	j.MType = MType
-
-	if value != nil {
-		switch MType {
-		case "agent.gauge", "gauge":
-			var val = float64(value.(mVal.Gauge))
-			j.Value = &val
-		case "agent.counter", "counter":
-			var val = int64(value.(mVal.Counter))
-			j.Delta = &val
-		default:
-			panic(errors.New("unknown type"))
-		}
-	}
-	return j
-}
-func GetMetricJSONWithPOST(baseURL *url.URL, name string, MType string) (mj MetricsJSON) {
-
-	metricsJSONRequest := NewMetricJSON(name, MType, nil)
-	data, err := json.Marshal(metricsJSONRequest)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	URL := (*baseURL).JoinPath("value")
-	request, err := http.NewRequest(http.MethodPost, URL.String(), bytes.NewBuffer(data))
-	if err != nil {
-		log.Fatal(err)
-	}
-	request.Header.Set("Content-Type", "application/json; charset=utf-8")
-	request.Header.Add("Accept", "application/json; charset=utf-8")
-
-	client := http.Client{}
-	if err != nil {
-		log.Fatal(err)
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		log.Fatal(err)
-	}
-	responseData, err := io.ReadAll(response.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var metricsJSONResponse MetricsJSON
-	err = json.Unmarshal(responseData, &metricsJSONResponse)
-	if err != nil {
-		log.Fatal(err)
-	}
-	response.Body.Close()
-	return metricsJSONResponse
-
 }
 
 type Duration time.Duration

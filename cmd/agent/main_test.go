@@ -26,9 +26,10 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	agentConf := C.NewAgentConfiguration()
-	agentConf.UpdateFromEnvironment()
-	agentConf.UpdateFromFlags()
+	agentConf:=C.NewAgentConf(C.UpdateACFromEnvironment,C.UpdateACFromFlags)
+	// agentConf := C.NewAgentConfiguration()
+	// agentConf.UpdateFromEnvironment()
+	// agentConf.UpdateFromFlags()
 
 	client := resty.New().SetRetryCount(10)
 	a := agent.NewAgent(agentConf, client)

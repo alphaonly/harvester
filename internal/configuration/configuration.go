@@ -37,7 +37,8 @@ type ServerConfiguration struct {
 	EnvChanged    map[string]bool
 }
 
-// func getInterval(string) time.Duration
+type AgentConfigurationOption func(*AgentConfiguration)
+type ServerConfigurationOption func(*ServerConfiguration)
 
 func UnMarshalServerDefaults(s string) ServerConfiguration {
 	sc := ServerConfiguration{}
@@ -64,6 +65,7 @@ func NewAgentConfiguration() *AgentConfiguration {
 	return &c
 
 }
+
 func NewServerConfiguration() *ServerConfiguration {
 	c := UnMarshalServerDefaults(ServerDefaultJSON)
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
@@ -72,7 +74,26 @@ func NewServerConfiguration() *ServerConfiguration {
 
 }
 
-func (c *AgentConfiguration) UpdateFromEnvironment() {
+func NewAgentConf(options...AgentConfigurationOption) *AgentConfiguration {
+	c:=new(AgentConfiguration)
+	*c = UnMarshalAgentDefaults(AgentDefaultJSON)
+	c.EnvChanged = make(map[string]bool)
+	for _,option:=range options{
+		option(c)
+	}
+	return c
+}
+func NewServerConf(options...ServerConfigurationOption) *ServerConfiguration {
+	c:=new(ServerConfiguration)
+	*c = UnMarshalServerDefaults(ServerDefaultJSON)
+	c.EnvChanged = make(map[string]bool)
+	for _,option:=range options{
+		option(c)
+	}
+	return c
+}
+
+func  UpdateACFromEnvironment(c *AgentConfiguration) {
 	c.Address = getEnv("ADDRESS", c.Address, c.EnvChanged).(string)
 	c.CompressType = getEnv("COMPRESS_TYPE", c.CompressType, c.EnvChanged).(string)
 	c.PollInterval = getEnv("POLL_INTERVAL", c.PollInterval, c.EnvChanged).(schema.Duration)
@@ -82,7 +103,7 @@ func (c *AgentConfiguration) UpdateFromEnvironment() {
 	c.Key = getEnv("KEY", c.Key, c.EnvChanged).(string)
 }
 
-func (c *ServerConfiguration) UpdateFromEnvironment() {
+func UpdateSCFromEnvironment(c *ServerConfiguration) {
 	c.Address = getEnv("ADDRESS", c.Address, c.EnvChanged).(string)
 	c.Restore = getEnv("RESTORE", c.Restore, c.EnvChanged).(bool)
 	c.StoreFile = getEnv("STORE_FILE", c.StoreFile, c.EnvChanged).(string)
@@ -93,7 +114,7 @@ func (c *ServerConfiguration) UpdateFromEnvironment() {
 	c.DatabaseDsn = getEnv("DATABASE_DSN", c.DatabaseDsn, c.EnvChanged).(string)
 }
 
-func (c *AgentConfiguration) UpdateFromFlags() {
+func  UpdateACFromFlags(c *AgentConfiguration) {
 	dc := NewAgentConfiguration()
 	var (
 		a = flag.String("a", dc.Address, "Domain name and :port")
@@ -139,7 +160,7 @@ func (c *AgentConfiguration) UpdateFromFlags() {
 
 }
 
-func (c *ServerConfiguration) UpdateFromFlags() {
+func  UpdateSCFromFlags(c *ServerConfiguration) {
 
 	dc := NewServerConfiguration()
 

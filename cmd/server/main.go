@@ -16,9 +16,9 @@ import (
 
 func main() {
 
-	configuration := conf.NewServerConfiguration()
-	configuration.UpdateFromEnvironment()
-	configuration.UpdateFromFlags()
+	configuration := conf.NewServerConf(conf.UpdateSCFromEnvironment,conf.UpdateSCFromFlags)
+	// configuration.UpdateFromEnvironment()
+	// configuration.UpdateFromFlags()
 
 	var (
 		ExternalStorage stor.Storage

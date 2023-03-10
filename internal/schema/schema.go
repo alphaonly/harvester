@@ -11,26 +11,29 @@ type ContextKey int
 
 const PKey1 ContextKey = 123455
 
+type duplicateChecker interface{
+	check(make(map[string]MetricsJSON))	
+}
+
 type MetricsJSONSlice []MetricsJSON
+func (s *MetricsJSONSlice)check(m map[string]MetricsJSON){
+
+}
 
 // Если двойные записи в counter - суммируем в одну, gauge - оставляем последнюю
 func (s *MetricsJSONSlice) EnhancedDistinct() error {
 	m := make(map[string]MetricsJSON)
 	for _, e := range *s {
-		switch e.MType {
-		case "gauge":
-			m[e.ID] = e
-		case "counter":
-			{
-				c, exists := m[e.ID]
-				if exists {
-					sum := int64(*e.Delta + *c.Delta)
-					m[e.ID] = MetricsJSON{e.ID, e.MType, &sum, e.Value, ""}
-					continue
-				}
-				m[e.ID] = e
+		
+		if e.MType == "counter"{
+			c, exists := m[e.ID]
+			if exists {
+				sum := int64(*e.Delta + *c.Delta)
+				m[e.ID] = MetricsJSON{e.ID, e.MType, &sum, e.Value, ""}
+				continue
 			}
 		}
+		m[e.ID] = e
 	}
 	*s = MetricsJSONSlice{}
 	for _, v := range m {

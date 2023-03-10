@@ -469,7 +469,7 @@ func (h *Handlers) HandlePostMetricJSONBatch(next http.Handler) http.HandlerFunc
 			//3.1.Проверяем подпись по ключу, нормально если ключ пуст в случае /update
 			if v.Delta != nil || v.Value != nil {
 				if !h.Signer.IsValidSign(v) {
-					httpError(w, "sign is not confirmed error,batch index:", http.StatusBadRequest)
+					httpError(w, "sign is not confirmed error", http.StatusBadRequest)
 					return
 				}
 			}

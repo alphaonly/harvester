@@ -29,7 +29,7 @@ func main() {
 	ss := sql.Stmt{}
 	_, err = ss.Query()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err) //
 	}
 
 }

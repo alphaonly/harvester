@@ -2,11 +2,12 @@ package main
 
 import (
 	"database/sql"
-	metricvalueI "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+	"log"
+
+	metricvalueI "github.com/alphaonly/harvester/internal/server/metricvaluei"
 	db "github.com/alphaonly/harvester/internal/server/storage/implementations/dbstorage"
 	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"golang.org/x/net/context"
-	"log"
 )
 
 func main() {
@@ -26,6 +27,9 @@ func main() {
 	}
 	log.Println(mv)
 	ss := sql.Stmt{}
-	ss.Query()
+	_, err = ss.Query()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }

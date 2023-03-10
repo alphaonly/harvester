@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/alphaonly/harvester/internal/schema"
-	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+	mVal "github.com/alphaonly/harvester/internal/server/metricvaluei"
 )
 
 type MetricsMapType map[string]mVal.MetricValue

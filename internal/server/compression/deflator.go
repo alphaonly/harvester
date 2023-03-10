@@ -42,7 +42,7 @@ func (d Deflator) CompressionHandler(next http.Handler) http.HandlerFunc {
 				return
 			}
 			//compressed response to requester
-			w.Write(compressedByteData)
+			_, err = w.Write(compressedByteData)
 			if err != nil {
 				log.Println("compressed data writing error")
 				http.Error(w, "response writing error", http.StatusInternalServerError)
@@ -69,7 +69,7 @@ func (d Deflator) WriteResponseBodyHandler() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusNotImplemented)
 			return
 		}
-		w.Write(byteData)
+		_, err = w.Write(byteData)
 		if err != nil {
 			log.Println("byteData writing error")
 			http.Error(w, "byteData writing error", http.StatusInternalServerError)
@@ -105,7 +105,7 @@ func (d Deflator) DeCompressionHandler(next http.Handler) http.HandlerFunc {
 				return
 			}
 			//decompressed response to requester
-			w.Write(decompressedByteData)
+			_, err = w.Write(decompressedByteData)
 			if err != nil {
 				log.Println("decompressed writing error")
 				http.Error(w, "decompressed writing error", http.StatusInternalServerError)

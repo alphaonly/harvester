@@ -7,7 +7,7 @@ import (
 	"log"
 
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+	mVal "github.com/alphaonly/harvester/internal/server/metricvaluei"
 	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/jackc/pgx/v5"
 )
@@ -64,16 +64,16 @@ type dbMetrics struct {
 }
 
 type DBStorage struct {
-	dataBaseUrl string
+	dataBaseURL string
 	conn        *pgx.Conn
 }
 
-func NewDBStorage(ctx context.Context, dataBaseUrl string) storage.Storage {
+func NewDBStorage(ctx context.Context, dataBaseURL string) storage.Storage {
 	//get params
-	s := DBStorage{dataBaseUrl: dataBaseUrl}
+	s := DBStorage{dataBaseURL: dataBaseURL}
 	//connect db
 	var err error
-	s.conn, err = pgx.Connect(ctx, s.dataBaseUrl)
+	s.conn, err = pgx.Connect(ctx, s.dataBaseURL)
 	if err != nil {
 		logFatalf(message[0], err)
 		return nil
@@ -101,16 +101,16 @@ func logFatalf(mess string, err error) {
 		log.Fatalf(mess+": %v\n", err)
 	}
 }
-func (s *DBStorage) connectDb(ctx context.Context) (ok bool) {
+func (s *DBStorage) connectDB(ctx context.Context) (ok bool) {
 	ok = false
 	var err error
 
 	if s.conn == nil {
-		s.conn, err = pgx.Connect(ctx, s.dataBaseUrl)
+		s.conn, err = pgx.Connect(ctx, s.dataBaseURL)
 	} else {
 		err = s.conn.Ping(ctx)
 		if err != nil {
-			s.conn, err = pgx.Connect(ctx, s.dataBaseUrl)
+			s.conn, err = pgx.Connect(ctx, s.dataBaseURL)
 		}
 	}
 	logFatalf(message[0], err)
@@ -120,7 +120,7 @@ func (s *DBStorage) connectDb(ctx context.Context) (ok bool) {
 }
 
 func (s DBStorage) GetMetric(ctx context.Context, name string, MType string) (mv mVal.MetricValue, err error) {
-	if !s.connectDb(ctx) {
+	if !s.connectDB(ctx) {
 		return nil, errors.New(message[0])
 	}
 	defer s.conn.Close(ctx)
@@ -168,7 +168,7 @@ func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricV
 		return errors.New(message[6])
 	}
 	m = *mv
-	if !s.connectDb(ctx) {
+	if !s.connectDB(ctx) {
 		return
 	}
 	var (
@@ -200,7 +200,7 @@ func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricV
 
 // GetAllMetrics Restore data from database to mem storage
 func (s DBStorage) GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error) {
-	if !s.connectDb(ctx) {
+	if !s.connectDB(ctx) {
 		return
 	}
 
@@ -252,13 +252,13 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 		return errors.New(message[6])
 	}
 
-	if !s.connectDb(ctx) {
+	if !s.connectDB(ctx) {
 		return errors.New(message[0])
 	}
 	mvL := *mvList
 
 	//Нужно прочитать все значения метрик counter для суммирования при записи
-	var currentMetricsList metricsjson.MetricsMapType = make(metricsjson.MetricsMapType)
+	var currentMetricsList = make(metricsjson.MetricsMapType)
 	data, err := s.GetAllMetrics(ctx)
 	if err != nil {
 		return errors.New(message[12])
@@ -286,8 +286,8 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 			if v := currentMetricsList[k]; v != nil {
 
 				counter = v.GetInternalValue().(int64)
-				log.Printf("previous counter value is %v",counter)
-				log.Printf("counter sum is written is %v",counter + value.GetInternalValue().(int64))
+				log.Printf("previous counter value is %v", counter)
+				log.Printf("counter sum is written is %v", counter+value.GetInternalValue().(int64))
 			}
 
 			d = dbMetrics{

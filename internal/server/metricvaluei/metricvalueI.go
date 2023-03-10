@@ -1,4 +1,4 @@
-package metricvalueI
+package metricvaluei
 
 import (
 	"encoding/json"

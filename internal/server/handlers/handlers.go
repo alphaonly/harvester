@@ -17,7 +17,7 @@ import (
 	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
-	MVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+	MVal "github.com/alphaonly/harvester/internal/server/metricvaluei"
 	"github.com/alphaonly/harvester/internal/signchecker"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -583,9 +583,9 @@ func (h *Handlers) NewRouter() chi.Router {
 		//handleList = h.HandleGetMetricFieldList
 
 		//The sequence for post JSON and respond compressed JSON if no value
-		postJsonAndGetCompressed = handlePost(compressPost(writePost()))
+		postJSONAndGetCompressed = handlePost(compressPost(writePost()))
 		//The sequence for post JSON and respond compressed JSON if no value receiving data in batch
-		postJsonAndGetCompressedBatch = handlePostBatch(compressPost(writePost()))
+		postJSONAndGetCompressedBatch = handlePostBatch(compressPost(writePost()))
 
 		//The sequence for get compressed metrics html list
 		//getListCompressed = handleList(compressList(writeList()))
@@ -601,12 +601,12 @@ func (h *Handlers) NewRouter() chi.Router {
 		r.Get("/ping/", h.HandlePing)
 		r.Get("/check/", h.HandleCheckHealth)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
-		r.Post("/value", postJsonAndGetCompressed)
-		r.Post("/value/", postJsonAndGetCompressed)
-		r.Post("/update", postJsonAndGetCompressed)
-		r.Post("/update/", postJsonAndGetCompressed)
-		r.Post("/updates", postJsonAndGetCompressedBatch)
-		r.Post("/updates/", postJsonAndGetCompressedBatch)
+		r.Post("/value", postJSONAndGetCompressed)
+		r.Post("/value/", postJSONAndGetCompressed)
+		r.Post("/update", postJSONAndGetCompressed)
+		r.Post("/update/", postJSONAndGetCompressed)
+		r.Post("/updates", postJSONAndGetCompressedBatch)
+		r.Post("/updates/", postJSONAndGetCompressedBatch)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
@@ -679,7 +679,7 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.Respo
 }
 func (h *Handlers) writeBatchToStorage(mjSlice *schema.MetricsJSONSlice, w http.ResponseWriter, r *http.Request) (err error) {
 	if mjSlice == nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "empty MJ slice", http.StatusInternalServerError)
 		return err
 	}
 	mvList := make(metricsjson.MetricsMapType)
@@ -689,7 +689,7 @@ func (h *Handlers) writeBatchToStorage(mjSlice *schema.MetricsJSONSlice, w http.
 		case "gauge":
 			{
 				if mj.Value == nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					http.Error(w, "gauge value is nil", http.StatusInternalServerError)
 					return err
 				}
 				//пишем если есть значение
@@ -698,7 +698,7 @@ func (h *Handlers) writeBatchToStorage(mjSlice *schema.MetricsJSONSlice, w http.
 		case "counter":
 			{
 				if mj.Delta == nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					http.Error(w, "counter value is nil", http.StatusInternalServerError)
 					return err
 				}
 				//пишем если есть значение
@@ -717,13 +717,12 @@ func (h *Handlers) writeBatchToStorage(mjSlice *schema.MetricsJSONSlice, w http.
 }
 
 func (h *Handlers) HandleCheckHealth(w http.ResponseWriter, r *http.Request) {
-   if r.Method== http.MethodGet{
-	
-	w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodGet {
 
-   }
+		w.WriteHeader(http.StatusOK)
+
+	}
 }
-
 
 func logFatal(err error) {
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	metricsJSON "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	metricvalueI "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+	metricvalueI "github.com/alphaonly/harvester/internal/server/metricvaluei"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 )
 

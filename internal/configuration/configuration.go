@@ -305,7 +305,7 @@ func getEnv(variableName string, variableValue VariableValue, changed map[string
 		changed[variableName] = false
 		return variableValue.Get()
 	}
-
+	variableValue.Set(stringVal)
 	changed[variableName] = true
 	log.Println("variable " + variableName + " presented in environment, value: " + stringVal)
 	

@@ -74,47 +74,48 @@ func NewServerConfiguration() *ServerConfiguration {
 
 }
 
-func NewAgentConf(options...AgentConfigurationOption) *AgentConfiguration {
-	c:=new(AgentConfiguration)
+func NewAgentConf(options ...AgentConfigurationOption) *AgentConfiguration {
+	c := new(AgentConfiguration)
 	*c = UnMarshalAgentDefaults(AgentDefaultJSON)
 	c.EnvChanged = make(map[string]bool)
-	for _,option:=range options{
+	for _, option := range options {
 		option(c)
 	}
 	return c
 }
-func NewServerConf(options...ServerConfigurationOption) *ServerConfiguration {
-	c:=new(ServerConfiguration)
+func NewServerConf(options ...ServerConfigurationOption) *ServerConfiguration {
+	c := new(ServerConfiguration)
 	*c = UnMarshalServerDefaults(ServerDefaultJSON)
 	c.EnvChanged = make(map[string]bool)
-	for _,option:=range options{
+	for _, option := range options {
 		option(c)
 	}
 	return c
 }
 
-func  UpdateACFromEnvironment(c *AgentConfiguration) {
-	c.Address = getEnv("ADDRESS", c.Address, c.EnvChanged).(string)
-	c.CompressType = getEnv("COMPRESS_TYPE", c.CompressType, c.EnvChanged).(string)
-	c.PollInterval = getEnv("POLL_INTERVAL", c.PollInterval, c.EnvChanged).(schema.Duration)
-	c.ReportInterval = getEnv("REPORT_INTERVAL", c.ReportInterval, c.EnvChanged).(schema.Duration)
-	c.Scheme = getEnv("SCHEME", c.Scheme, c.EnvChanged).(string)
-	c.UseJSON = getEnv("USE_JSON", c.UseJSON, c.EnvChanged).(int)
-	c.Key = getEnv("KEY", c.Key, c.EnvChanged).(string)
+func UpdateACFromEnvironment(c *AgentConfiguration) {
+
+	c.Address = getEnv("ADDRESS", &StrValue{c.Address}, c.EnvChanged).(string)
+	c.CompressType = getEnv("COMPRESS_TYPE", &StrValue{c.CompressType}, c.EnvChanged).(string)
+	c.PollInterval = getEnv("POLL_INTERVAL", &DurValue{c.PollInterval}, c.EnvChanged).(schema.Duration)
+	c.ReportInterval = getEnv("REPORT_INTERVAL", &DurValue{c.ReportInterval}, c.EnvChanged).(schema.Duration)
+	c.Scheme = getEnv("SCHEME", &StrValue{c.Scheme}, c.EnvChanged).(string)
+	c.UseJSON = getEnv("USE_JSON", &IntValue{c.UseJSON}, c.EnvChanged).(int)
+	c.Key = getEnv("KEY", &StrValue{c.Key}, c.EnvChanged).(string)
 }
 
 func UpdateSCFromEnvironment(c *ServerConfiguration) {
-	c.Address = getEnv("ADDRESS", c.Address, c.EnvChanged).(string)
-	c.Restore = getEnv("RESTORE", c.Restore, c.EnvChanged).(bool)
-	c.StoreFile = getEnv("STORE_FILE", c.StoreFile, c.EnvChanged).(string)
-	c.StoreInterval = getEnv("STORE_INTERVAL", c.StoreInterval, c.EnvChanged).(schema.Duration)
-	c.Key = getEnv("KEY", c.Key, c.EnvChanged).(string)
+	c.Address = getEnv("ADDRESS", &StrValue{c.Address}, c.EnvChanged).(string)
+	c.Restore = getEnv("RESTORE", &BoolValue{c.Restore}, c.EnvChanged).(bool)
+	c.StoreFile = getEnv("STORE_FILE", &StrValue{c.StoreFile}, c.EnvChanged).(string)
+	c.StoreInterval = getEnv("STORE_INTERVAL", &DurValue{c.StoreInterval}, c.EnvChanged).(schema.Duration)
+	c.Key = getEnv("KEY", &StrValue{c.Key}, c.EnvChanged).(string)
 	//PORT is derived from ADDRESS
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
-	c.DatabaseDsn = getEnv("DATABASE_DSN", c.DatabaseDsn, c.EnvChanged).(string)
+	c.DatabaseDsn = getEnv("DATABASE_DSN", &StrValue{c.DatabaseDsn}, c.EnvChanged).(string)
 }
 
-func  UpdateACFromFlags(c *AgentConfiguration) {
+func UpdateACFromFlags(c *AgentConfiguration) {
 	dc := NewAgentConfiguration()
 	var (
 		a = flag.String("a", dc.Address, "Domain name and :port")
@@ -160,7 +161,7 @@ func  UpdateACFromFlags(c *AgentConfiguration) {
 
 }
 
-func  UpdateSCFromFlags(c *ServerConfiguration) {
+func UpdateSCFromFlags(c *ServerConfiguration) {
 
 	dc := NewServerConfiguration()
 
@@ -204,9 +205,95 @@ func  UpdateSCFromFlags(c *ServerConfiguration) {
 	}
 }
 
-func getEnv(variableName string, variableValue interface{}, changed map[string]bool) (changedValue interface{}) {
-	var stringVal string
+type VariableValue interface {
+	Get() interface{}
+	Set(string)
+}
+type StrValue struct {
+	value string
+}
+
+func (v *StrValue) Get() interface{} {
+	return v.value
+}
+func NewStrValue(s string) VariableValue {
+	return &StrValue{value: s}
+}
+func (v *StrValue) Set(s string) {
+	v.value = s
+}
+
+type IntValue struct {
+	value int
+}
+
+func (v IntValue) Get() interface{} {
+	return v.value
+}
+func (v *IntValue) Set(s string) {
 	var err error
+	v.value, err = strconv.Atoi(s)
+	if err != nil {
+		log.Fatal("Int Parse error")
+	}
+}
+
+func NewIntValue(s string) VariableValue {
+	changedValue, err := strconv.Atoi(s)
+	if err != nil {
+		log.Fatal("Int64 Parse error")
+	}
+	return &IntValue{value: changedValue}
+}
+
+type BoolValue struct {
+	value bool
+}
+
+func (v BoolValue) Get() interface{} {
+	return v.value
+}
+func (v *BoolValue) Set(s string) {
+	var err error
+	v.value, err = strconv.ParseBool(s)
+	if err != nil {
+		log.Fatal("Bool Parse error")
+	}
+}
+func NewBoolValue(s string) VariableValue {
+	changedValue, err := strconv.ParseBool(s)
+	if err != nil {
+		log.Fatal("Bool Parse error")
+	}
+	return &BoolValue{value: changedValue}
+}
+
+type DurValue struct {
+	value schema.Duration
+}
+
+func (v DurValue) Get() interface{} {
+	return v.value
+}
+func (v *DurValue) Set(s string) {
+	var err error
+	interval, err := time.ParseDuration(s)
+	if err != nil {
+		log.Fatal("Duration Parse error")
+	}
+	v.value = schema.Duration(interval)
+}
+
+func NewDurValue(s string) VariableValue {
+	interval, err := time.ParseDuration(s)
+	if err != nil {
+		log.Fatal("Duration Parse error")
+	}
+	return &DurValue{value: schema.Duration(interval)}
+}
+
+func getEnv(variableName string, variableValue VariableValue, changed map[string]bool) (changedValue interface{}) {
+	var stringVal string
 
 	if variableValue == nil {
 		log.Fatal("nil pointer in getEnv")
@@ -214,42 +301,13 @@ func getEnv(variableName string, variableValue interface{}, changed map[string]b
 	var exists bool
 	stringVal, exists = os.LookupEnv(variableName)
 	if !exists {
-		log.Printf("variable "+variableName+" not presented in environment, remains default:%v", variableValue)
+		log.Printf("variable "+variableName+" not presented in environment, remains default:%v", variableValue.Get())
 		changed[variableName] = false
-		return variableValue
-	}
-	changed[variableName] = true
-	switch variableValue.(type) {
-	case string:
-		changedValue = stringVal
-	case int64:
-		{
-			changedValue, err = strconv.ParseInt(stringVal, 10, 64)
-			if err != nil {
-				log.Fatal("Int64 Parse error")
-			}
-		}
-	case bool:
-		{
-			changedValue, err = strconv.ParseBool(stringVal)
-			if err != nil {
-				log.Fatal("Bool Parse error")
-			}
-		}
-	case schema.Duration:
-		{
-			interval, err := time.ParseDuration(stringVal)
-			if err != nil {
-				log.Fatal("Duration Parse error")
-			}
-			changedValue = schema.Duration(interval)
-		}
-	default:
-		log.Fatal("unknown type getEnv")
-	}
-	if stringVal != "" {
-		log.Println("variable " + variableName + " presented in environment, value: " + stringVal)
+		return variableValue.Get()
 	}
 
-	return changedValue
+	changed[variableName] = true
+	log.Println("variable " + variableName + " presented in environment, value: " + stringVal)
+	
+	return variableValue.Get()
 }

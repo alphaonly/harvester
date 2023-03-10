@@ -599,6 +599,7 @@ func (h *Handlers) NewRouter() chi.Router {
 		r.Get("/", getListCompressed)
 		r.Get("/ping", h.HandlePing)
 		r.Get("/ping/", h.HandlePing)
+		r.Get("/check/", h.HandleCheckHealth)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		r.Post("/value", postJsonAndGetCompressed)
 		r.Post("/value/", postJsonAndGetCompressed)
@@ -714,6 +715,15 @@ func (h *Handlers) writeBatchToStorage(mjSlice *schema.MetricsJSONSlice, w http.
 
 	return err
 }
+
+func (h *Handlers) HandleCheckHealth(w http.ResponseWriter, r *http.Request) {
+   if r.Method== http.MethodGet{
+	
+	w.WriteHeader(http.StatusOK)
+
+   }
+}
+
 
 func logFatal(err error) {
 	if err != nil {

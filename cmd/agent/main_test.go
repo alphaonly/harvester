@@ -24,20 +24,22 @@ func TestUpdate(t *testing.T) {
 			value: agent.Metrics{},
 			want:  true,
 		},
+		{
+			name:  "test#2 - Negative: are there values?",
+			
+			want:  true,
+		},
 	}
 
 	agentConf:=C.NewAgentConf(C.UpdateACFromEnvironment,C.UpdateACFromFlags)
-	// agentConf := C.NewAgentConfiguration()
-	// agentConf.UpdateFromEnvironment()
-	// agentConf.UpdateFromFlags()
 
 	client := resty.New().SetRetryCount(10)
 	a := agent.NewAgent(agentConf, client)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(tst *testing.T) {
-			ctx := context.Background()
-			ctxMetrics, cancel := context.WithTimeout(ctx, time.Second*2)
+			
+			ctxMetrics, cancel := context.WithTimeout(context.Background(), time.Second*2)
 			defer cancel()
 			go a.Update(ctxMetrics, &tt.value)
 

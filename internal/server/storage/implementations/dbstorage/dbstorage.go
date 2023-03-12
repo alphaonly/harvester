@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
-	"time"
 )
 
 //	type Storage interface {
@@ -259,12 +258,6 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 	}
 	mv := *mvList
 
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.Prepare(ctx, "CreateOrUpdate", createOrUpdateIfExistsMetricsTable)
 	logFatalf(message[11], err)
 
 	batch := &pgx.Batch{}
@@ -292,25 +285,17 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 		batch.Queue(createOrUpdateIfExistsMetricsTable, d.id, d._type, d.delta, d.value)
 	}
 
-	br := tx.SendBatch(ctx, batch)
+	br := s.pool.SendBatch(ctx, batch)
 	for range mv {
 		tag, err := br.Exec()
 		if err != nil {
-			logFatalf(message[9], tx.Rollback(ctx))
+			logFatalf(message[9], err)
 			return err
 		}
 		log.Println(message[8] + tag.String())
 	}
-
 	defer br.Close()
 
-	for i := 0; i < 5; i++ {
-		time.Sleep(10 * time.Microsecond)
-		err := tx.Commit(ctx)
-		if err == nil {
-			break
-		}
-	}
 	logFatalf(message[10], err)
 	return nil
 }

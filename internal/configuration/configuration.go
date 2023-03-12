@@ -13,7 +13,7 @@ import (
 )
 
 const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":""}`
-const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":""}`
+const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1}`
 
 type AgentConfiguration struct {
 	Address        string          `json:"ADDRESS,omitempty"`
@@ -23,6 +23,7 @@ type AgentConfiguration struct {
 	ReportInterval schema.Duration `json:"REPORT_INTERVAL,omitempty"`
 	UseJSON        int             `json:"USE_JSON,omitempty"`
 	Key            string          `json:"KEY,omitempty"`
+	RateLimit      int             `json:"RATE_LIMIT,omitempty"`
 	EnvChanged     map[string]bool
 }
 
@@ -102,6 +103,7 @@ func UpdateACFromEnvironment(c *AgentConfiguration) {
 	c.Scheme = getEnv("SCHEME", &StrValue{c.Scheme}, c.EnvChanged).(string)
 	c.UseJSON = getEnv("USE_JSON", &IntValue{c.UseJSON}, c.EnvChanged).(int)
 	c.Key = getEnv("KEY", &StrValue{c.Key}, c.EnvChanged).(string)
+	c.RateLimit = getEnv("RATE_LIMIT", &IntValue{c.RateLimit}, c.EnvChanged).(int)
 }
 
 func UpdateSCFromEnvironment(c *ServerConfiguration) {
@@ -124,6 +126,7 @@ func UpdateACFromFlags(c *AgentConfiguration) {
 		j = flag.Int("j", dc.UseJSON, "Use JSON 0-No JSON,1- JSON, 2-JSON Batch")
 		t = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
 		k = flag.String("k", dc.Key, "string key for hash signing")
+		l = flag.Int("l", dc.RateLimit, "Number of parallel inbound requests ")
 	)
 
 	flag.Parse()
@@ -158,7 +161,10 @@ func UpdateACFromFlags(c *AgentConfiguration) {
 		c.Key = *k
 		log.Printf(message, "KEY", c.Key)
 	}
-
+	if !c.EnvChanged["RATE_LIMIT"] {
+		c.RateLimit = *l
+		log.Printf(message, "RATE_LIMIT", c.RateLimit)
+	}
 }
 
 func UpdateSCFromFlags(c *ServerConfiguration) {
@@ -308,6 +314,6 @@ func getEnv(variableName string, variableValue VariableValue, changed map[string
 	variableValue.Set(stringVal)
 	changed[variableName] = true
 	log.Println("variable " + variableName + " presented in environment, value: " + stringVal)
-	
+
 	return variableValue.Get()
 }

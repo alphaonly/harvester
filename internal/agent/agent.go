@@ -8,7 +8,8 @@ import (
 	"github.com/alphaonly/harvester/internal/server/compression"
 	sign "github.com/alphaonly/harvester/internal/signchecker"
 	"github.com/go-resty/resty/v2"
-
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 	"log"
 	"runtime"
 
@@ -55,6 +56,11 @@ type Metrics struct {
 	RandomValue   Gauge
 
 	PollCount Counter
+
+	//GOPSUtil
+	TotalMemory     Gauge
+	FreeMemory      Gauge
+	CPUutilization1 Gauge
 }
 
 type Agent struct {
@@ -283,6 +289,39 @@ repeatAgain:
 	case <-ctx.Done():
 		{
 			log.Println("Metrics reading cancelled by context")
+			return
+		}
+	}
+
+}
+
+func (a Agent) UpdateGOPS(ctx context.Context, metrics *Metrics) {
+
+	ticker := time.NewTicker(time.Duration(a.Configuration.PollInterval))
+	defer ticker.Stop()
+repeatAgain:
+	select {
+	case <-ticker.C:
+		{
+			v, err := mem.VirtualMemory()
+			if err != nil {
+				log.Println(err)
+				ctx.Done()
+			}
+			i, err := cpu.Info()
+			if err != nil {
+				log.Println(err)
+				ctx.Done()
+			}
+			metrics.TotalMemory = Gauge(v.Total)
+			metrics.FreeMemory = Gauge(v.Free)
+			metrics.CPUutilization1 = Gauge(i[0].CPU)
+
+			goto repeatAgain
+		}
+	case <-ctx.Done():
+		{
+			log.Println("context is done received, metrics reading cancelled by context")
 			return
 		}
 	}
@@ -528,6 +567,7 @@ func (a Agent) Run(ctx context.Context) {
 	metrics := Metrics{}
 
 	go a.Update(ctx, &metrics)
+	go a.UpdateGOPS(ctx, &metrics)
 	go a.Send(ctx, &metrics)
 
 }

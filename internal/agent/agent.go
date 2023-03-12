@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/alphaonly/harvester/internal/agent/workerpool"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
 	sign "github.com/alphaonly/harvester/internal/signchecker"
@@ -434,6 +436,11 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddGaugeDataJSONToBatch(data, metrics.RandomValue, "RandomValue")
 			AddGaugeDataJSONToBatch(data, metrics.Frees, "Frees")
 			AddCounterDataJSONToBatch(data, metrics.PollCount, "PollCount")
+
+			AddGaugeDataJSONToBatch(data, metrics.TotalMemory, "TotalMemory")
+			AddGaugeDataJSONToBatch(data, metrics.FreeMemory, "FreeMemory")
+			AddGaugeDataJSONToBatch(data, metrics.CPUutilization1, "CPUutilization1")
+
 			m[data] = true
 		}
 	case 1: //JSON
@@ -473,6 +480,11 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddGaugeDataJSON(data, metrics.TotalAlloc, "TotalAlloc", m)
 			AddGaugeDataJSON(data, metrics.RandomValue, "RandomValue", m)
 			AddCounterDataJSON(data, metrics.PollCount, "PollCount", m)
+
+			//GOPSUtil
+			AddGaugeDataJSON(data, metrics.TotalMemory, "TotalMemory", m)
+			AddGaugeDataJSON(data, metrics.FreeMemory, "FreeMemory", m)
+			AddGaugeDataJSON(data, metrics.CPUutilization1, "CPUutilization1", m)
 
 			//// value1, value2 := int64(rand.Int31()), int64(rand.Int31())
 			////// var value0 int64
@@ -527,6 +539,10 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddGaugeData(data, metrics.TotalAlloc, "TotalAlloc", m)
 			AddGaugeData(data, metrics.RandomValue, "RandomValue", m)
 			AddCounterData(data, metrics.PollCount, "PollCount", m)
+			//GOPSUtil
+			AddGaugeData(data, metrics.TotalMemory, "TotalMemory", m)
+			AddGaugeData(data, metrics.FreeMemory, "FreeMemory", m)
+			AddGaugeData(data, metrics.CPUutilization1, "CPUutilization1", m)
 		}
 	}
 
@@ -537,19 +553,39 @@ func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 	ticker := time.NewTicker(time.Duration(a.Configuration.ReportInterval))
 	defer ticker.Stop()
 
+	//Worker pool
+	wp := workerpool.NewWorkerPool(a.Configuration.RateLimit, ctx)
+	//worker pool function
+
+	var f workerpool.TypicalJobFunction = func(data any) workerpool.JobResult {
+		key := data.(*sendData)
+		err := key.SendData(a.Client)
+		if err != nil {
+			log.Println(err)
+			return workerpool.JobResult{Result: err.Error()}
+		}
+
+		return workerpool.JobResult{Result: "OK"}
+	}
+	wp.Start()
+
 repeatAgain:
 	select {
 	case <-ticker.C:
 		{
 			dataPackage := a.prepareData(metrics)
 			dataPackage = a.CompressData(dataPackage)
-
+			i := 0
 			for key := range dataPackage {
-				err := key.SendData(a.Client)
-				if err != nil {
-					log.Println(err)
-					return
-				}
+				i++
+				name := fmt.Sprintf("Send metric job %v", i)
+				wp.SendJob(workerpool.Job{Name: name, Data: key, Func: f})
+
+				//err := key.SendData(a.Client)
+				//if err != nil {
+				//	log.Println(err)
+				//	return
+				//}
 			}
 			goto repeatAgain
 		}

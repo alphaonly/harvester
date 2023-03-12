@@ -7,20 +7,24 @@ import (
 	"time"
 )
 
-type TypicalJobFunction func(name string) JobResult
+type TypicalJobFunction func(data any) JobResult
 type JobChannel chan Job
 type JobChannelR <-chan Job
 type ResultChannel chan JobResult
 
 type Job struct {
 	Name string
+	Data any
 	Func TypicalJobFunction
 }
 
 func (j Job) Execute() {
-	if j.Func != nil {
-		j.Func(j.Name)
+	if j.Func == nil || j.Data == nil {
+		log.Fatal("Job execute parameters is nil")
 	}
+	log.Printf("Executing job %v", j.Name)
+	result := j.Func(j.Data)
+	log.Printf("Executed job %v with result:%v", j.Name, result)
 }
 
 type WorkerPool struct {

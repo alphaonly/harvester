@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log"
-
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvaluei"
 	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"log"
+	"time"
 )
 
 //	type Storage interface {
@@ -53,7 +54,6 @@ var message = []string{
 	9:  "server: unable to rollback, error fatal",
 	10: "server: unable to commit, trying again",
 	11: "server: unable to prepare statement, fatal error",
-	12: "server: unable to get all metrics before saving them all, fatal error",
 }
 
 type dbMetrics struct {
@@ -64,28 +64,30 @@ type dbMetrics struct {
 }
 
 type DBStorage struct {
-	dataBaseURL string
-	conn        *pgx.Conn
+	dataBaseUrl string
+
+	pool *pgxpool.Pool
 }
 
-func NewDBStorage(ctx context.Context, dataBaseURL string) storage.Storage {
+func NewDBStorage(ctx context.Context, dataBaseUrl string) storage.Storage {
 	//get params
-	s := DBStorage{dataBaseURL: dataBaseURL}
+	s := DBStorage{dataBaseUrl: dataBaseUrl}
 	//connect db
 	var err error
-	s.conn, err = pgx.Connect(ctx, s.dataBaseURL)
+	//s.conn, err = pgx.Connect(ctx, s.dataBaseUrl)
+	s.pool, err = pgxpool.New(ctx, s.dataBaseUrl)
 	if err != nil {
 		logFatalf(message[0], err)
 		return nil
 	}
-	defer s.conn.Close(ctx)
+	defer s.pool.Close()
 
 	// check metrics table exists
-	resp, err := s.conn.Exec(context.Background(), checkIfMetricsTableExists)
+	resp, err := s.pool.Exec(context.Background(), checkIfMetricsTableExists)
 	if err != nil {
 		log.Println(message[1] + err.Error())
 		//create metrics Table
-		resp, err = s.conn.Exec(context.Background(), createMetricsTable)
+		resp, err = s.pool.Exec(context.Background(), createMetricsTable)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -101,16 +103,16 @@ func logFatalf(mess string, err error) {
 		log.Fatalf(mess+": %v\n", err)
 	}
 }
-func (s *DBStorage) connectDB(ctx context.Context) (ok bool) {
+func (s *DBStorage) connectDb(ctx context.Context) (ok bool) {
 	ok = false
 	var err error
 
-	if s.conn == nil {
-		s.conn, err = pgx.Connect(ctx, s.dataBaseURL)
+	if s.pool == nil {
+		s.pool, err = pgxpool.New(ctx, s.dataBaseUrl)
 	} else {
-		err = s.conn.Ping(ctx)
+		err = s.pool.Ping(ctx)
 		if err != nil {
-			s.conn, err = pgx.Connect(ctx, s.dataBaseURL)
+			s.pool, err = pgxpool.New(ctx, s.dataBaseUrl)
 		}
 	}
 	logFatalf(message[0], err)
@@ -120,10 +122,10 @@ func (s *DBStorage) connectDB(ctx context.Context) (ok bool) {
 }
 
 func (s DBStorage) GetMetric(ctx context.Context, name string, MType string) (mv mVal.MetricValue, err error) {
-	if !s.connectDB(ctx) {
+	if !s.connectDb(ctx) {
 		return nil, errors.New(message[0])
 	}
-	defer s.conn.Close(ctx)
+	defer s.pool.Close()
 
 	d := dbMetrics{id: sql.NullString{String: name, Valid: true}}
 
@@ -136,7 +138,7 @@ func (s DBStorage) GetMetric(ctx context.Context, name string, MType string) (mv
 		log.Fatalf(message[4])
 	}
 
-	row := s.conn.QueryRow(ctx, selectLineMetricsTable, &d.id)
+	row := s.pool.QueryRow(ctx, selectLineMetricsTable, &d.id)
 
 	err = row.Scan(&d.id, &d._type, &d.delta, &d.value)
 	if err != nil {
@@ -168,7 +170,7 @@ func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricV
 		return errors.New(message[6])
 	}
 	m = *mv
-	if !s.connectDB(ctx) {
+	if !s.connectDb(ctx) {
 		return
 	}
 	var (
@@ -191,7 +193,7 @@ func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricV
 	default:
 		return errors.New(message[7])
 	}
-	conn, err := s.conn.Exec(ctx, createOrUpdateIfExistsMetricsTable, name, _type, delta, value)
+	conn, err := s.pool.Exec(ctx, createOrUpdateIfExistsMetricsTable, name, _type, delta, value)
 	if err != nil {
 		log.Println(conn)
 	}
@@ -200,11 +202,11 @@ func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricV
 
 // GetAllMetrics Restore data from database to mem storage
 func (s DBStorage) GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error) {
-	if !s.connectDB(ctx) {
+	if !s.connectDb(ctx) {
 		return
 	}
 
-	rows, err := s.conn.Query(ctx, selectAllMetricsTable)
+	rows, err := s.pool.Query(ctx, selectAllMetricsTable)
 	if err != nil {
 		log.Printf("QueryRow failed: %v\n", err)
 		return nil, err
@@ -252,25 +254,21 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 		return errors.New(message[6])
 	}
 
-	if !s.connectDB(ctx) {
+	if !s.connectDb(ctx) {
 		return errors.New(message[0])
 	}
-	mvL := *mvList
+	mv := *mvList
 
-	//Нужно прочитать все значения метрик counter для суммирования при записи
-	var currentMetricsList = make(metricsjson.MetricsMapType)
-	data, err := s.GetAllMetrics(ctx)
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return errors.New(message[12])
-	}
-	if data != nil {
-		currentMetricsList = *data
+		return err
 	}
 
+	_, err = tx.Prepare(ctx, "CreateOrUpdate", createOrUpdateIfExistsMetricsTable)
 	logFatalf(message[11], err)
 
 	batch := &pgx.Batch{}
-	for k, v := range mvL {
+	for k, v := range mv {
 		var d dbMetrics
 		switch value := v.(type) {
 		case *mVal.GaugeValue:
@@ -281,42 +279,38 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 				delta: sql.NullInt64{},
 			}
 		case *mVal.CounterValue:
-			//Нужно прочитать есть ли значение метрики в базе и прибавить к текущему
-			var counter int64
-			if v := currentMetricsList[k]; v != nil {
-
-				counter = v.GetInternalValue().(int64)
-				log.Printf("previous counter value is %v", counter)
-				log.Printf("counter sum is written is %v", counter+value.GetInternalValue().(int64))
-			}
-
 			d = dbMetrics{
 				id:    sql.NullString{String: k, Valid: true},
 				_type: sql.NullInt64{Int64: 1, Valid: true},
 				value: sql.NullFloat64{},
-				delta: sql.NullInt64{Int64: value.GetInternalValue().(int64) + counter, Valid: true},
+				delta: sql.NullInt64{Int64: value.GetInternalValue().(int64), Valid: true},
 			}
 		default:
 			return errors.New(message[7])
 		}
+
 		batch.Queue(createOrUpdateIfExistsMetricsTable, d.id, d._type, d.delta, d.value)
 	}
 
-	batchResults := s.conn.SendBatch(ctx, batch)
-
-	log.Println(mvL)
-	for range mvL {
-		tag, err := batchResults.Exec()
+	br := tx.SendBatch(ctx, batch)
+	for range mv {
+		tag, err := br.Exec()
 		if err != nil {
+			logFatalf(message[9], tx.Rollback(ctx))
 			return err
 		}
 		log.Println(message[8] + tag.String())
 	}
 
-	defer batchResults.Close()
+	defer br.Close()
 
+	for i := 0; i < 5; i++ {
+		time.Sleep(10 * time.Microsecond)
+		err := tx.Commit(ctx)
+		if err == nil {
+			break
+		}
+	}
 	logFatalf(message[10], err)
-
-	log.Print("data saved")
 	return nil
 }

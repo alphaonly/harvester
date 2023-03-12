@@ -1,35 +1,31 @@
 package main
 
 import (
-	"database/sql"
+	"context"
+	"fmt"
+	"github.com/alphaonly/harvester/internal/agent/workerpool"
 	"log"
-
-	metricvalueI "github.com/alphaonly/harvester/internal/server/metricvaluei"
-	db "github.com/alphaonly/harvester/internal/server/storage/implementations/dbstorage"
-	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
-	"golang.org/x/net/context"
 )
 
+var f workerpool.TypicalJobFunction = func(data any) workerpool.JobResult {
+	s := data.(string)
+	log.Println("executing function:" + s)
+	return workerpool.JobResult{Result: "executed well"}
+}
+
 func main() {
+	ctx := context.Background()
+	wp := workerpool.NewWorkerPool(90, ctx)
+	wp.Start()
 
-	var s storage.Storage
-	var mv metricvalueI.MetricValue
+	for i := 0; i < 80; i++ {
+		n := fmt.Sprintf("job #%v", i)
 
-	mv = metricvalueI.NewInt(300)
-	dbURL := "postgres://postgres:mypassword@localhost:5432/yandex"
-	s = db.NewDBStorage(context.Background(), dbURL)
-	log.Print(s)
-
-	//err := s.SaveMetric(context.Background(), "Poll233Counter", &mv)
-	mv, err := s.GetMetric(context.Background(), "Poll233Counter", "counter")
-	if err != nil {
-		log.Fatal(err)
+		j := workerpool.Job{Name: n, Func: f}
+		//time.Sleep(1 * time.Second)
+		wp.SendJob(j)
 	}
-	log.Println(mv)
-	ss := sql.Stmt{}
-	_, err = ss.Query()
-	if err != nil {
-		log.Fatal(err) //
-	}
+	wp.WaitGroup.Wait()
 
+	log.Println("application is finished")
 }

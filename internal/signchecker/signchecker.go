@@ -95,7 +95,7 @@ func (c CheckerSHA256) counterHash(id string, delta *int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return h.Sum(nil), nil
+	return h.Sum(*new([]byte)), nil
 }
 func (c CheckerSHA256) gaugeHash(id string, value *float64) ([]byte, error) {
 	msg := gaugeHashMessage(id, value)
@@ -104,7 +104,8 @@ func (c CheckerSHA256) gaugeHash(id string, value *float64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return h.Sum(nil), nil
+
+	return h.Sum(*new([]byte)), nil
 }
 
 func (c CheckerSHA256) Hash(mj schema.MetricsJSON) (hash string, err error) {

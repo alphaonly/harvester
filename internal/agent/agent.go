@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/alphaonly/harvester/internal/agent/workerpool"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
@@ -557,16 +556,16 @@ func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 	wp := workerpool.NewWorkerPool(a.Configuration.RateLimit, ctx)
 	//worker pool function
 
-	var f workerpool.TypicalJobFunction = func(data any) workerpool.JobResult {
-		key := data.(*sendData)
-		err := key.SendData(a.Client)
-		if err != nil {
-			log.Println(err)
-			return workerpool.JobResult{Result: err.Error()}
-		}
-
-		return workerpool.JobResult{Result: "OK"}
-	}
+	//var f workerpool.TypicalJobFunction = func(data any) workerpool.JobResult {
+	//	key := data.(*sendData)
+	//	err := key.SendData(a.Client)
+	//	if err != nil {
+	//		log.Println(err)
+	//		return workerpool.JobResult{Result: err.Error()}
+	//	}
+	//
+	//	return workerpool.JobResult{Result: "OK"}
+	//}
 	wp.Start()
 
 repeatAgain:
@@ -578,14 +577,14 @@ repeatAgain:
 			i := 0
 			for key := range dataPackage {
 				i++
-				name := fmt.Sprintf("Send metric job %v", i)
-				wp.SendJob(workerpool.Job{Name: name, Data: key, Func: f})
+				//name := fmt.Sprintf("Send metric job %v", i)
+				//wp.SendJob(workerpool.Job{Name: name, Data: key, Func: f})
 
-				//err := key.SendData(a.Client)
-				//if err != nil {
-				//	log.Println(err)
-				//	return
-				//}
+				err := key.SendData(a.Client)
+				if err != nil {
+					log.Println(err)
+					return
+				}
 			}
 			goto repeatAgain
 		}

@@ -374,8 +374,10 @@ func (h *Handlers) getBody(w http.ResponseWriter, r *http.Request) (b []byte, ok
 	return bytesData, true
 }
 func httpError(w http.ResponseWriter, err string, status int) {
-	http.Error(w, err, status)
-	log.Println("server:" + err)
+	if err != "" {
+		http.Error(w, err, status)
+		log.Println("server:" + err)
+	}
 }
 
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
@@ -482,8 +484,9 @@ func (h *Handlers) HandlePostMetricJSONBatch(next http.Handler) http.HandlerFunc
 		}
 		//4.Данные в хранилище
 		err = h.writeBatchToStorage(&mjSlice, w, r)
-		logFatal(err)
-
+		if err != nil {
+			httpError(w, err.Error(), http.StatusTooManyRequests)
+		}
 		if next != nil {
 			//write handled body for further handle
 			ctx := context.WithValue(r.Context(), schema.PKey1, schema.PreviousBytes(bytesData))

@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/alphaonly/harvester/internal/agent/workerpool"
 	"log"
+	"time"
+
+	"github.com/alphaonly/harvester/internal/agent/workerpool"
 )
 
 var f workerpool.TypicalJobFunction = func(data any) workerpool.JobResult {
@@ -22,7 +24,7 @@ func main() {
 		n := fmt.Sprintf("job #%v", i)
 
 		j := workerpool.Job{Name: n, Func: f}
-		//time.Sleep(1 * time.Second)
+		time.Sleep(5 * time.Second)
 		wp.SendJob(j)
 	}
 	wp.WaitGroup.Wait()

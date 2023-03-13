@@ -101,7 +101,7 @@ func NewWorker(ctx context.Context, jobChannelR <-chan Job, number int, wg *sync
 func (w Worker) Start() {
 	log.Printf("worker #%v started ", w.number)
 
-	var deadLine, cancel = context.WithDeadline(w.context, time.Now().Add(time.Second*4))
+	var deadLine, cancel = context.WithDeadline(w.context, time.Now().Add(time.Second*20))
 
 forLabel:
 	for {

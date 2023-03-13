@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
+	"runtime"
+
 	"github.com/alphaonly/harvester/internal/agent/workerpool"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
@@ -11,8 +15,6 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
-	"log"
-	"runtime"
 
 	"strconv"
 	"time"
@@ -309,20 +311,20 @@ repeatAgain:
 				log.Println(err)
 				ctx.Done()
 			}
-			i, err := cpu.Info()
+			i, err := cpu.Times(true)
 			if err != nil {
 				log.Println(err)
 				ctx.Done()
 			}
 			metrics.TotalMemory = Gauge(v.Total)
 			metrics.FreeMemory = Gauge(v.Free)
-			metrics.CPUutilization1 = Gauge(i[0].CPU)
+			metrics.CPUutilization1 = Gauge(i[0].System)
 
 			goto repeatAgain
 		}
 	case <-ctx.Done():
 		{
-			log.Println("context is done received, metrics reading cancelled by context")
+			log.Println("context is done received, metrics reading cancelled by app context")
 			return
 		}
 	}
@@ -364,7 +366,7 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 				} else if k.JSONBatchBody != nil {
 					body = *k.JSONBatchBody
 				} else {
-					logFatal(errors.New("agent:nothing to marshal as sendData bodies is nil"))
+					logFatal(errors.New("agent:nothing to marshal as sendData bodies are nil"))
 				}
 
 				b, err := json.Marshal(body)
@@ -554,18 +556,17 @@ func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 
 	//Worker pool
 	wp := workerpool.NewWorkerPool(a.Configuration.RateLimit, ctx)
-	//worker pool function
+	// worker pool function
+	var f workerpool.TypicalJobFunction = func(data any) workerpool.JobResult {
+		key := data.(*sendData)
+		err := key.SendData(a.Client)
+		if err != nil {
+			log.Println(err)
+			return workerpool.JobResult{Result: err.Error()}
+		}
 
-	//var f workerpool.TypicalJobFunction = func(data any) workerpool.JobResult {
-	//	key := data.(*sendData)
-	//	err := key.SendData(a.Client)
-	//	if err != nil {
-	//		log.Println(err)
-	//		return workerpool.JobResult{Result: err.Error()}
-	//	}
-	//
-	//	return workerpool.JobResult{Result: "OK"}
-	//}
+		return workerpool.JobResult{Result: "OK"}
+	}
 	wp.Start()
 
 repeatAgain:
@@ -577,14 +578,14 @@ repeatAgain:
 			i := 0
 			for key := range dataPackage {
 				i++
-				//name := fmt.Sprintf("Send metric job %v", i)
-				//wp.SendJob(workerpool.Job{Name: name, Data: key, Func: f})
+				name := fmt.Sprintf("Send metric job %v", i)
+				wp.SendJob(workerpool.Job{Name: name, Data: key, Func: f})
 
-				err := key.SendData(a.Client)
-				if err != nil {
-					log.Println(err)
-					return
-				}
+				// err := key.SendData(a.Client)
+				// if err != nil {
+				// 	log.Println(err)
+				// 	return
+				// }
 			}
 			goto repeatAgain
 		}

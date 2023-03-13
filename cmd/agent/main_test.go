@@ -44,7 +44,9 @@ func TestUpdate(t *testing.T) {
 			go a.Update(ctxMetrics, &tt.value)
 
 			time.Sleep(time.Second * 3)
+			a.UpdateLocker.Lock()
 			fmt.Println(tt.value.PollCount)
+			a.UpdateLocker.Unlock()
 			if !assert.Equal(t, tt.want, tt.value.PollCount > 0) {
 				t.Error("UpdateMemStatsMetrics is not received form runtime values")
 			}

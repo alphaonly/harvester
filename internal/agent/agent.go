@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"sync"
 
 	"github.com/alphaonly/harvester/internal/agent/workerpool"
 	"github.com/alphaonly/harvester/internal/schema"
@@ -71,6 +72,7 @@ type Agent struct {
 	baseURL       url.URL
 	Client        *resty.Client
 	Signer        sign.Signer
+	UpdateLocker  *sync.RWMutex
 }
 
 func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
@@ -81,8 +83,9 @@ func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
 			Scheme: c.Scheme,
 			Host:   c.Address,
 		},
-		Client: client,
-		Signer: sign.NewSHA256(c.Key),
+		Client:       client,
+		Signer:       sign.NewSHA256(c.Key),
+		UpdateLocker: new(sync.RWMutex),
 	}
 }
 
@@ -258,6 +261,8 @@ repeatAgain:
 		{
 			runtime.ReadMemStats(&m)
 
+			a.UpdateLocker.Lock()
+			
 			metrics.Alloc = Gauge(m.Alloc)
 			metrics.BuckHashSys = Gauge(m.BuckHashSys)
 			metrics.Frees = Gauge(m.Frees)
@@ -287,6 +292,8 @@ repeatAgain:
 			metrics.TotalAlloc = Gauge(m.TotalAlloc)
 			metrics.RandomValue = Gauge(rand.Int63())
 			metrics.PollCount++
+			
+			a.UpdateLocker.Unlock()
 			goto repeatAgain
 		}
 	case <-ctx.Done():
@@ -316,9 +323,11 @@ repeatAgain:
 				log.Println(err)
 				ctx.Done()
 			}
+			a.UpdateLocker.Lock()
 			metrics.TotalMemory = Gauge(v.Total)
 			metrics.FreeMemory = Gauge(v.Free)
 			metrics.CPUutilization1 = Gauge(i[0].System)
+			a.UpdateLocker.Unlock()
 
 			goto repeatAgain
 		}
@@ -601,7 +610,6 @@ repeatAgain:
 func (a Agent) Run(ctx context.Context) {
 
 	metrics := Metrics{}
-
 	go a.Update(ctx, &metrics)
 	go a.UpdateGOPS(ctx, &metrics)
 	go a.Send(ctx, &metrics)

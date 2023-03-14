@@ -76,7 +76,7 @@ func NewServerConfiguration() *ServerConfiguration {
 }
 
 func NewAgentConf(options ...AgentConfigurationOption) *AgentConfiguration {
-	c:= UnMarshalAgentDefaults(AgentDefaultJSON)
+	c := UnMarshalAgentDefaults(AgentDefaultJSON)
 	c.EnvChanged = make(map[string]bool)
 	for _, option := range options {
 		option(&c)

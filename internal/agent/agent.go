@@ -262,7 +262,7 @@ repeatAgain:
 			runtime.ReadMemStats(&m)
 
 			a.UpdateLocker.Lock()
-			
+
 			metrics.Alloc = Gauge(m.Alloc)
 			metrics.BuckHashSys = Gauge(m.BuckHashSys)
 			metrics.Frees = Gauge(m.Frees)
@@ -292,7 +292,7 @@ repeatAgain:
 			metrics.TotalAlloc = Gauge(m.TotalAlloc)
 			metrics.RandomValue = Gauge(rand.Int63())
 			metrics.PollCount++
-			
+
 			a.UpdateLocker.Unlock()
 			goto repeatAgain
 		}
@@ -558,26 +558,31 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 
 	return m
 }
+
 func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 
 	ticker := time.NewTicker(time.Duration(a.Configuration.ReportInterval))
 	defer ticker.Stop()
 
 	//Worker pool
-	wp := workerpool.NewWorkerPool(a.Configuration.RateLimit, ctx)
-	// worker pool function
-	var f workerpool.TypicalJobFunction = func(data any) workerpool.JobResult {
-		key := data.(*sendData)
-		err := key.SendData(a.Client)
-		if err != nil {
-			log.Println(err)
-			return workerpool.JobResult{Result: err.Error()}
+	var f workerpool.TypicalJobFunction
+	var wp workerpool.WorkerPool
+
+	if a.Configuration.RateLimit > 0 {
+		f = func(data any) workerpool.JobResult {
+			key := data.(*sendData)
+			err := key.SendData(a.Client)
+			if err != nil {
+				log.Println(err)
+				return workerpool.JobResult{Result: err.Error()}
+			}
+
+			return workerpool.JobResult{Result: "OK"}
 		}
-
-		return workerpool.JobResult{Result: "OK"}
+		wp = workerpool.NewWorkerPool(a.Configuration.RateLimit, ctx)
+		// worker pool function
+		wp.Start()
 	}
-	wp.Start()
-
 repeatAgain:
 	select {
 	case <-ticker.C:
@@ -588,17 +593,23 @@ repeatAgain:
 			for key := range dataPackage {
 				i++
 				name := fmt.Sprintf("Send metric job %v", i)
-				wp.SendJob(workerpool.Job{Name: name, Data: key, Func: f})
-
-				// err := key.SendData(a.Client)
-				// if err != nil {
-				// 	log.Println(err)
-				// 	return
-				// }
+				switch a.Configuration.RateLimit {
+				case 0,1:
+					{
+						err := key.SendData(a.Client)
+						if err != nil {
+							log.Println(err)
+							return
+						}
+					}
+				default:
+					{
+						wp.SendJob(workerpool.Job{Name: name, Data: key, Func: f})
+					}
+				}
 			}
 			goto repeatAgain
 		}
-
 	case <-ctx.Done():
 		{
 			break

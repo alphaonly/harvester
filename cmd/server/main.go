@@ -39,12 +39,12 @@ func main() {
 		Conf:    conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
 	}
 
-	_server := server.New(configuration, externalStorage, handlers)
+	metricsServer := server.New(configuration, externalStorage, handlers)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := _server.Run(ctx)
+	err := metricsServer.Run(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

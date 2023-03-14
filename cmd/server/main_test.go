@@ -2,8 +2,6 @@ package main_test
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"testing"
 	"time"
 
@@ -22,33 +20,38 @@ func TestRun(t *testing.T) {
 
 	tests := []struct {
 		name string
-
+		URL  string
 		want string
 	}{
 		{
-			name: "test#1 - Positive: server works",
+			name: "test#1 - Positive: server accessible",
+			URL:  "http://localhost:8080/check/",
 			want: "200 OK",
+		},
+		{
+			name: "test#2 - Negative: server do not respond",
+			URL:  "http://localhost:8080/chek/",
+			want: "404 Not Found",
 		},
 	}
 
+	sc := conf.NewServerConf(conf.UpdateSCFromEnvironment, conf.UpdateSCFromFlags)
+	
 	for _, tt := range tests {
 
 		t.Run(tt.name, func(tst *testing.T) {
-
-			// var err error
-
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			//Up server for 3 seconds
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-
-			sc := conf.NewServerConf(conf.UpdateSCFromEnvironment, conf.UpdateSCFromFlags)
-
+		
 			var storage stor.Storage
 			if sc.DatabaseDsn == "" {
 				storage = fileStor.FileArchive{StoreFile: sc.StoreFile}
 			} else {
-				storage = db.NewDBStorage(context.Background(), sc.DatabaseDsn)
+				storage = db.NewDBStorage(ctx, sc.DatabaseDsn)
 			}
 			handlers := &handlers.Handlers{}
+
 			server := server.New(sc, storage, handlers)
 
 			go func() {
@@ -56,9 +59,11 @@ func TestRun(t *testing.T) {
 				if err != nil {
 					return
 				}
+
 			}()
 
-			time.Sleep(time.Second * 6)
+			//wait for server is up
+			time.Sleep(time.Second * 2)
 
 			keys := make(map[string]string)
 			keys["Content-Type"] = "plain/text"
@@ -68,15 +73,19 @@ func TestRun(t *testing.T) {
 
 			r := client.R().
 				SetHeaders(keys)
-			resp, err := r.Get("http://localhost:8080/check/")
+			resp, err := r.Get(tt.URL)
 			if err != nil {
-				log.Fatalf("send new request error:%v", err)
+				t.Logf("send new request error:%v", err)
 			}
-			fmt.Println(resp.Status())
+			t.Logf("get returned status:%v", resp.Status())
 			if !assert.Equal(t, tt.want, resp.Status()) {
-				t.Error("Server didn't respond well")
-			}
+				t.Error("Server responded unexpectedly")
 
+			}
+			err=server.Shutdown(ctx)
+			if err!=nil{
+				t.Fatal(err)
+			}
 		})
 	}
 

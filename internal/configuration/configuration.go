@@ -76,22 +76,20 @@ func NewServerConfiguration() *ServerConfiguration {
 }
 
 func NewAgentConf(options ...AgentConfigurationOption) *AgentConfiguration {
-	c := new(AgentConfiguration)
-	*c = UnMarshalAgentDefaults(AgentDefaultJSON)
+	c:= UnMarshalAgentDefaults(AgentDefaultJSON)
 	c.EnvChanged = make(map[string]bool)
 	for _, option := range options {
-		option(c)
+		option(&c)
 	}
-	return c
+	return &c
 }
 func NewServerConf(options ...ServerConfigurationOption) *ServerConfiguration {
-	c := new(ServerConfiguration)
-	*c = UnMarshalServerDefaults(ServerDefaultJSON)
+	c := UnMarshalServerDefaults(ServerDefaultJSON)
 	c.EnvChanged = make(map[string]bool)
 	for _, option := range options {
-		option(c)
+		option(&c)
 	}
-	return c
+	return &c
 }
 
 func UpdateACFromEnvironment(c *AgentConfiguration) {

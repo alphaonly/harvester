@@ -16,7 +16,7 @@ func main() {
 	defer cancel()
 	//Configuration parameters
 	ac := conf.NewAgentConf(conf.UpdateACFromEnvironment, conf.UpdateACFromFlags)
-
+	//resty client
 	client := resty.New().SetRetryCount(10)
 	//Run agent (with context)
 	agent.NewAgent(ac, client).Run(ctx)
@@ -24,16 +24,10 @@ func main() {
 	channel := make(chan os.Signal, 1)
 	signal.Notify(channel, os.Interrupt)
 
-forLabel:
-	for {
-		select {
-		case <-channel:
-			log.Print("Agent shutdown by os signal")
-			break forLabel
-		case <-ctx.Done():
-			log.Print("Agent shutdown by cancelled context")
-			break forLabel
-		}
+	select {
+	case <-channel:
+		log.Print("Agent shutdown by os signal")
+	case <-ctx.Done():
+		log.Print("Agent shutdown by cancelled context")
 	}
-
 }

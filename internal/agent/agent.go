@@ -565,12 +565,11 @@ func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 	defer ticker.Stop()
 
 	//Worker pool
-	var f workerpool.TypicalJobFunction
-	var wp workerpool.WorkerPool
+	var f workerpool.TypicalJobFunction[*sendData]
+	var wp workerpool.WorkerPool[*sendData]
 
 	if a.Configuration.RateLimit > 0 {
-		f = func(data any) workerpool.JobResult {
-			key := data.(*sendData)
+		f = func(key *sendData) workerpool.JobResult {
 			err := key.SendData(a.Client)
 			if err != nil {
 				log.Println(err)
@@ -579,9 +578,9 @@ func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 
 			return workerpool.JobResult{Result: "OK"}
 		}
-		wp = workerpool.NewWorkerPool(a.Configuration.RateLimit, ctx)
+		wp = workerpool.NewWorkerPool[*sendData](a.Configuration.RateLimit)
 		// worker pool function
-		wp.Start()
+		wp.Start(ctx)
 	}
 repeatAgain:
 	select {
@@ -604,7 +603,8 @@ repeatAgain:
 					}
 				default:
 					{
-						wp.SendJob(workerpool.Job{Name: name, Data: key, Func: f})
+						job:=workerpool.Job[*sendData]{Name: name, Data: key, Func: f}
+						wp.SendJob(ctx,job)
 					}
 				}
 			}

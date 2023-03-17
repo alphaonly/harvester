@@ -4,28 +4,31 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/alphaonly/harvester/internal/agent/workerpool"
 )
 
-var f workerpool.TypicalJobFunction = func(data any) workerpool.JobResult {
-	s := data.(string)
-	log.Println("executing function:" + s)
+type Confuguration struct {
+	WorkersNumber int
+}
+
+var testConf = Confuguration{WorkersNumber: 90}
+
+var f workerpool.TypicalJobFunction[string] = func(data string) workerpool.JobResult {
+
+	log.Println("executing function:" + data)
 	return workerpool.JobResult{Result: "executed well"}
 }
 
 func main() {
 	ctx := context.Background()
-	wp := workerpool.NewWorkerPool(90, ctx)
-	wp.Start()
+	wp := workerpool.NewWorkerPool[string](testConf.WorkersNumber)
+	wp.Start(ctx)
 
 	for i := 0; i < 80; i++ {
 		n := fmt.Sprintf("job #%v", i)
-
-		j := workerpool.Job{Name: n, Func: f}
-		time.Sleep(5 * time.Second)
-		wp.SendJob(j)
+		j := workerpool.Job[string]{Name: n, Func: f}
+		wp.SendJob(ctx, j)
 	}
 	wp.WaitGroup.Wait()
 

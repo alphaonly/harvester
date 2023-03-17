@@ -7,19 +7,29 @@ import (
 	"time"
 )
 
-type TypicalJobFunction func(data any) JobResult
-type JobChannel chan Job
-type JobChannelR <-chan Job
-type ResultChannel chan JobResult
-
-type Job struct {
-	Name string
-	Data any
-	Func TypicalJobFunction
+type Function[T any] struct {
+	Value T
+	F func(data T) JobResult
+}
+func (f *Function[T]) NewFunctionData(value T){
+	f.Value=value
 }
 
-func (j Job) Execute() {
-	if j.Func == nil || j.Data == nil {
+type TypicalJobFunction[T any] func(data T) JobResult
+type JobChannel[T any] chan Job[T]
+type JobChannelR[T any] <-chan Job[T]
+type ResultChannel chan JobResult
+
+type Job[T any] struct {
+	Name string
+	Data T
+	Func TypicalJobFunction[T]
+}
+
+func (j Job[T]) Execute() {
+	if j.Func == nil {
+		//|| j.Data == nil
+
 		log.Fatal("Job execute parameters is nil")
 	}
 	log.Printf("Executing job %v", j.Name)
@@ -27,31 +37,29 @@ func (j Job) Execute() {
 	log.Printf("Executed job %v with result:%v", j.Name, result)
 }
 
-type WorkerPool struct {
-	context       context.Context
+type WorkerPool[T any] struct {
 	Workers       int
-	JobChannel    JobChannel
+	JobChannel    JobChannel[T]
 	ResultChannel ResultChannel
 	WaitGroup     *sync.WaitGroup
 }
 
-func NewWorkerPool(workers int, ctx context.Context) WorkerPool {
-	return WorkerPool{
-		context:       ctx,
+func NewWorkerPool[T any](workers int) WorkerPool[T] {
+	return WorkerPool[T]{
 		Workers:       workers,
-		JobChannel:    make(JobChannel, workers),
+		JobChannel:    make(JobChannel[T], workers),
 		ResultChannel: make(ResultChannel, workers),
 		WaitGroup:     new(sync.WaitGroup),
 	}
 }
 
-func (wp WorkerPool) Start() {
+func (wp WorkerPool[T]) Start(ctx context.Context) {
 	wp.WaitGroup.Add(1)
 	go func() {
 		var w sync.WaitGroup
 		for i := 0; i < wp.Workers; i++ {
 			w.Add(1)
-			go NewWorker(wp.context, wp.JobChannel, i, &w).Start()
+			go NewWorker(wp.JobChannel, i, &w).Start(ctx)
 		}
 		w.Wait()
 		wp.WaitGroup.Done()
@@ -59,49 +67,45 @@ func (wp WorkerPool) Start() {
 	}()
 }
 
-func (wp WorkerPool) SendJob(job Job) {
-	ctxDeadLine, cancel := context.WithDeadline(wp.context, time.Now().Add(time.Second*5))
+func (wp WorkerPool[T]) SendJob(ctx context.Context, job Job[T]) {
+	ctxDeadLine, cancel := context.WithDeadline(ctx, time.Now().Add(time.Second*5))
 	defer cancel()
 
 	select {
-
 	case wp.JobChannel <- job:
 		{
-			log.Printf("Job %v is sent to the worker pool", job.Name)
+			log.Printf("Job %v has been sent to the worker pool", job.Name)
 		}
 	case <-ctxDeadLine.Done():
 		{
-			log.Println("unable to send job to the worker pool in five seconds")
+			log.Println("send job cancelled as it has been unable to send job to the worker pool for five seconds")
 		}
-	case <-wp.context.Done():
+	case <-ctx.Done():
 		{
-			log.Println("send job context cancelled")
+			log.Println("send job cancelled by application context")
 		}
 	}
-
 }
 
-type Worker struct {
+type Worker[T any] struct {
 	number      int
-	context     context.Context
-	jobChannelR JobChannelR
+	jobChannelR JobChannelR[T]
 	waitGroup   *sync.WaitGroup
 	result      JobResult
 }
 
-func NewWorker(ctx context.Context, jobChannelR <-chan Job, number int, wg *sync.WaitGroup) Worker {
-	return Worker{
+func NewWorker[T any](jobChannelR <-chan Job[T], number int, wg *sync.WaitGroup) Worker[T] {
+	return Worker[T]{
 		number:      number,
-		context:     ctx,
 		jobChannelR: jobChannelR,
 		waitGroup:   wg,
 	}
 }
 
-func (w Worker) Start() {
+func (w Worker[T]) Start(ctx context.Context) {
 	log.Printf("worker #%v started ", w.number)
 
-	var deadLine, cancel = context.WithDeadline(w.context, time.Now().Add(time.Second*20))
+	var deadLine, cancel = context.WithDeadline(ctx, time.Now().Add(time.Second*20))
 
 forLabel:
 	for {
@@ -111,17 +115,16 @@ forLabel:
 				log.Printf("job \"%v\" received by worker: %v", j.Name, w.number)
 				j.Execute()
 				log.Printf("job \"%v\" is done by worker: %v", j.Name, w.number)
-				deadLine, cancel = context.WithDeadline(w.context, time.Now().Add(time.Second*4))
+				deadLine, cancel = context.WithDeadline(ctx, time.Now().Add(time.Second*4))
 			}
-		case <-w.context.Done():
+		case <-ctx.Done():
 			{
 				log.Printf("worker#%v:application context is done", w.number)
 				break forLabel
-
 			}
 		case <-deadLine.Done():
 			{
-				log.Printf("worker#%v: finished as it has done nothing within 4 seconds", w.number)
+				log.Printf("worker#%v: finished as it has done nothing within 20 seconds", w.number)
 				break forLabel
 			}
 		}

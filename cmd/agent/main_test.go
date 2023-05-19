@@ -2,40 +2,45 @@ package main
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
-	"reflect"
 	"testing"
 	"time"
+
+	"github.com/alphaonly/harvester/internal/agent"
+	C "github.com/alphaonly/harvester/internal/configuration"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateMemStatsMetrics(t *testing.T) {
+func TestUpdate(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		value Metrics
+		value agent.Metrics
 		want  bool
 	}{
 		{
-			name: "test#1 - Positive: are there values?",
-			want: false,
+			name:  "test#1 - Positive: are there values?",
+			value: agent.Metrics{},
+			want:  false,
 		},
 	}
 
-	for _, tt := range tests {
+	ac := C.NewAgentConfiguration()
+	(*ac).Update()
 
+	a := agent.NewAgent(ac)
+
+	for _, tt := range tests {
 		t.Run(tt.name, func(tst *testing.T) {
 			ctx := context.Background()
-			//ctxMetrics, cancel := context.WithCancel(ctx)
 			ctxMetrics, cancel := context.WithTimeout(ctx, time.Second*3)
 			defer cancel()
-			go updateMemStatsMetrics(ctxMetrics, &tt.value)
+			go a.Update(ctxMetrics, &tt.value)
 
 			time.Sleep(time.Second * 4)
 
-			if !assert.Equal(t, tt.want, reflect.ValueOf(tt.value).IsZero()) {
-				t.Error("UpdateMemStatsMetrics doesn't form runtime values")
+			if !assert.Equal(t, tt.want, tt.value.PollCount > 0) {
+				t.Error("UpdateMemStatsMetrics is not received form runtime values")
 			}
-
 		})
 	}
 

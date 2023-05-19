@@ -2,75 +2,29 @@ package main
 
 import (
 	"context"
-	"github.com/alphaonly/harvester/cmd/server/handlers"
-	"github.com/alphaonly/harvester/cmd/server/storage"
 	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"time"
+
+	c "github.com/alphaonly/harvester/internal/configuration"
+	s "github.com/alphaonly/harvester/internal/server"
+	h "github.com/alphaonly/harvester/internal/server/handlers"
+	f "github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
+	m "github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 )
-
-const serverPort = ":8080"
-
-type Server struct {
-}
-
-func (s Server) run(ctx context.Context) error {
-
-	dataServer := storage.DataServer{}.New()
-
-	h := handlers.Handlers{}
-	h.SetDataServer(dataServer)
-
-	// маршрутизация запросов обработчику
-
-	http.HandleFunc("/update/", h.HandleMetric)
-
-	server := http.Server{
-		Addr: serverPort,
-	}
-	var err error
-
-	go func() {
-		err = http.ListenAndServe(serverPort, nil)
-	}()
-
-	// Setting up signal capturing
-	channelInt := make(chan os.Signal, 1)
-	signal.Notify(channelInt, os.Interrupt)
-
-	//<-channelInt
-
-	var (
-		ctx2   context.Context
-		cancel context.CancelFunc
-	)
-
-	ctx2, cancel = context.WithTimeout(context.Background(), time.Second*5)
-	select {
-	case <-channelInt:
-		{
-
-			cancel()
-		}
-	case <-ctx.Done():
-		{
-
-			cancel()
-		}
-	}
-
-	err = server.Shutdown(ctx2)
-
-	return err
-}
 
 func main() {
 
+	var (
+		configuration = (*c.NewServerConfiguration()).Update()
+		mapStorage    = m.New()
+		fileStorage   = f.New(configuration)
+		handlers      = h.New(mapStorage)
+		server        = s.New(configuration, mapStorage, fileStorage, handlers)
+	)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	err := Server{}.run(ctx)
+
+	err := server.Run(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

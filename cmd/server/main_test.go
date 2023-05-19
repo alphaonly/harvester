@@ -2,9 +2,16 @@ package main
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	c "github.com/alphaonly/harvester/internal/configuration"
+	s "github.com/alphaonly/harvester/internal/server"
+	h "github.com/alphaonly/harvester/internal/server/handlers"
+	"github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
+	m "github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRun(t *testing.T) {
@@ -28,8 +35,21 @@ func TestRun(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			go func() {
-				err = Server{}.run(ctx)
+				var (
+					configuration = (*c.NewServerConfiguration()).Update()
+					mapStorage    = m.New()
+					archive       = filestorage.New(configuration)
+					handlers      = h.New(mapStorage)
+
+					server = s.New(configuration, mapStorage, archive, handlers)
+				)
+				err := server.Run(ctx)
+				if err != nil {
+					return
+				}
 			}()
+
+			time.Sleep(time.Second * 10)
 
 			if !assert.Equal(t, tt.want, err) {
 				t.Error("Server doesn't run")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/alphaonly/harvester/internal/common"
 	db "github.com/alphaonly/harvester/internal/server/storage/implementations/dbstorage"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 
@@ -15,11 +16,16 @@ import (
 	"github.com/alphaonly/harvester/internal/signchecker"
 )
 
+var buildVersion string = "N/A"
+var buildDate string = "N/A"
+var buildCommit string = "N/A"
+
 func main() {
 
+	//Build tags
+	common.PrintBuildTags(buildVersion, buildDate, buildCommit)
+	//Server Configuration
 	configuration := conf.NewServerConf(conf.UpdateSCFromEnvironment, conf.UpdateSCFromFlags)
-	// configuration.UpdateFromEnvironment()
-	// configuration.UpdateFromFlags()
 
 	var (
 		externalStorage stor.Storage

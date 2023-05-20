@@ -2,40 +2,72 @@ package metricsjson
 
 import (
 	"encoding/json"
-	"strconv"
+	"errors"
 
-	"github.com/alphaonly/harvester/internal/server/metricvalue"
-	countervalue "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/CounterValue"
-	gaugevalue "github.com/alphaonly/harvester/internal/server/metricvalue/MetricValue/implementations/Gaugevalue"
+	"github.com/alphaonly/harvester/internal/schema"
+	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 )
 
-type MetricsJSON struct {
-	ID    string   `json:"id"`              // имя метрики
-	MType string   `json:"type"`            // параметр, пID    string   `json:"id"`              // имя метрикиринимающий значение gauge или counter
-	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
-	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
+type MetricsMapType map[string]mVal.MetricValue
+
+func (m MetricsMapType) MarshalJSON() ([]byte, error) {
+	mjArray := make([]schema.MetricsJSON, len(m))
+	i := 0
+	for k, v := range m {
+		switch value := v.(type) {
+		case *mVal.GaugeValue:
+			{
+				v := value.GetInternalValue().(float64)
+				mjArray[i] = schema.MetricsJSON{
+					ID:    k,
+					MType: "gauge",
+					Value: &v,
+				}
+			}
+		case *mVal.CounterValue:
+			{
+				v := value.GetInternalValue().(int64)
+				mjArray[i] = schema.MetricsJSON{
+					ID:    k,
+					MType: "counter",
+					Delta: &v,
+				}
+			}
+		default:
+			return nil, errors.New("undefined type in type switch metricValue")
+		}
+		i++
+	}
+	mBytes, err := json.Marshal(&mjArray)
+	if err != nil {
+		return nil, err
+	}
+
+	return mBytes, nil
 }
 
-type MetricsMapType map[string]metricvalue.MetricValue
-
 func (m MetricsMapType) UnmarshalJSON(b []byte) error {
-	data := make(map[string]json.RawMessage)
-	if err := json.Unmarshal(b, &data); err != nil {
+	var mjArray []schema.MetricsJSON
+	if err := json.Unmarshal(b, &mjArray); err != nil {
 		return err
 	}
-	for k, v := range data {
-		var dst metricvalue.MetricValue
-		// populate dst with an instance of the actual type you want to unmarshal into
-		if _, err := strconv.Atoi(string(v)); err != nil {
-			dst = &gaugevalue.GaugeValue{} // notice the dereference
-		} else {
-			dst = &countervalue.CounterValue{}
-		}
+	for _, v := range mjArray {
 
-		if err := json.Unmarshal(v, dst); err != nil {
-			return err
+		switch v.MType {
+		case "gauge":
+			if v.Value == nil {
+				return errors.New("v.Value null pointer")
+			}
+			m[v.ID] = mVal.NewFloat(*v.Value)
+		case "counter":
+			if v.Delta == nil {
+				return errors.New("v.delta null pointer")
+			}
+			m[v.ID] = mVal.NewInt(*v.Delta)
+		default:
+			return errors.New("unknown type in decoding metricsJSONArray")
 		}
-		m[k] = dst
 	}
+
 	return nil
 }

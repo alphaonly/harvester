@@ -4,22 +4,24 @@ import (
 	"context"
 	"log"
 
-	c "github.com/alphaonly/harvester/internal/configuration"
-	s "github.com/alphaonly/harvester/internal/server"
-	h "github.com/alphaonly/harvester/internal/server/handlers"
-	f "github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
-	m "github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+	conf "github.com/alphaonly/harvester/internal/configuration"
+	"github.com/alphaonly/harvester/internal/server"
+	"github.com/alphaonly/harvester/internal/server/handlers"
+	fileStor "github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
+	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+
 )
 
 func main() {
 
-	var (
-		configuration = (*c.NewServerConfiguration()).Update()
-		mapStorage    = m.New()
-		fileStorage   = f.New(configuration)
-		handlers      = h.New(mapStorage)
-		server        = s.New(configuration, mapStorage, fileStorage, handlers)
-	)
+	configuration := conf.NewServerConfiguration()
+	configuration.UpdateFromEnvironment()
+	configuration.UpdateFromFlags()
+
+	fileStorage := fileStor.FileArchive{StoreFile: configuration.StoreFile}
+	handlers := &handlers.Handlers{MemKeeper: mapstorage.New()}
+	server := server.New(configuration, fileStorage, handlers)
+
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

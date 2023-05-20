@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 
 	"github.com/alphaonly/harvester/internal/agent"
-	c "github.com/alphaonly/harvester/internal/configuration"
+
+	conf "github.com/alphaonly/harvester/internal/configuration"
+	"github.com/go-resty/resty/v2"
 )
 
 func main() {
@@ -16,11 +17,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ac := c.NewAgentConfiguration()
+	//Configuration parameters
+	ac := conf.NewAgentConfiguration()
+	ac.UpdateFromEnvironment()
+	ac.UpdateFromFlags()
 
-	(*ac).Update()
+	//retsty http.Client
+	client := resty.New().SetRetryCount(10)
 
-	agent.NewAgent(ac).Run(ctx, &http.Client{})
+	agent.NewAgent(ac, client).Run(ctx)
 
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)

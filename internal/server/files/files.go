@@ -3,29 +3,32 @@ package files
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 
-	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	"github.com/alphaonly/harvester/internal/server/metricvalue"
+	metricsJSON "github.com/alphaonly/harvester/internal/server/metricsJSON"
 )
 
 type Producer interface {
-	Write(*map[string]metricvalue.MetricValue) error
+	Write(*metricsJSON.MetricsMapType) error
 	Close() error
 }
 
 type Consumer interface {
-	Read() (*map[string]metricvalue.MetricValue, error)
+
+	Read() (*metricsJSON.MetricsMapType, error)
 	Close() error
 }
 
-type metricsProducer struct {
+type MetricsProducer struct {
+
 	file *os.File
 	buf  *bufio.Writer
 }
 
-func NewProducer(filename string) (*metricsProducer, error) {
+func NewProducer(filename string) (*MetricsProducer, error) {
+
 
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0777)
 	if err != nil {
@@ -33,23 +36,26 @@ func NewProducer(filename string) (*metricsProducer, error) {
 	}
 	buf := bufio.NewWriter(file)
 
-	return &metricsProducer{
+	return &MetricsProducer{
+
 		file: file,
 		buf:  buf,
 	}, nil
 }
 
-func (mp *metricsProducer) Write(metricsData *map[string]metricvalue.MetricValue) error {
+func (mp *MetricsProducer) Write(metricsData *metricsJSON.MetricsMapType) error {
 
-	// mj:= []metricsjson.MetricsJSON{}
+	m := metricsJSON.MetricsMapType(*metricsData)
 
-	mapJSON, err := json.Marshal(metricsData)
+	mapJSONBuf, err := json.Marshal(&m)
+
 	if err != nil {
 		log.Println("error:cannot marshal data")
 		return err
 	}
 
-	_, err = mp.buf.Write(mapJSON)
+	_, err = mp.buf.Write(mapJSONBuf)
+
 	if err != nil {
 		log.Println("error:cannot write file")
 		return err
@@ -61,7 +67,9 @@ func (mp *metricsProducer) Write(metricsData *map[string]metricvalue.MetricValue
 	}
 	return nil
 }
-func (mp *metricsProducer) Close() error {
+
+func (mp *MetricsProducer) Close() error {
+
 
 	return mp.file.Close()
 }
@@ -86,20 +94,18 @@ func NewConsumer(filename string) (*metricsConsumer, error) {
 	}, nil
 }
 
-func (mp *metricsConsumer) Read() (metricsData *map[string]metricvalue.MetricValue, err error) {
+func (mp *metricsConsumer) Read() (metricsData *metricsJSON.MetricsMapType, err error) {
 
-	mapJSON := make([]byte, 747)
-	_, er := mp.buf.Read(mapJSON)
-	if er != nil {
-		log.Printf("warning:cannot read file %v", mp.file.Name())
-		return nil, er
+	scanner := bufio.NewScanner(mp.buf)
+	var mapJSON []byte
+	for scanner.Scan() {
+		fmt.Println(scanner.Text())
+		mapJSON = scanner.Bytes()
 	}
 
-	// if metricsData == nil {
-	// 	m := make(map[string]interface{})
-	// 	// metricsData = &m
-	// }
-	m := make(metricsjson.MetricsMapType)
+	m := make(metricsJSON.MetricsMapType)
+
+
 	err = json.Unmarshal(mapJSON, &m)
 	if err != nil {
 		log.Println("error:cannot unmarshal data:" + err.Error())
@@ -107,12 +113,14 @@ func (mp *metricsConsumer) Read() (metricsData *map[string]metricvalue.MetricVal
 		return nil, err
 	}
 
-	return metricsData, nil
+	return &m, nil
+
 }
 func (mp *metricsConsumer) Close() error {
 
 	return mp.file.Close()
 }
 
-// var producer Producer = &metricsProducer{}
+
+// var producer Producer = &MetricsProducer{}
 // var consumer Consumer = &metricsConsumer{}

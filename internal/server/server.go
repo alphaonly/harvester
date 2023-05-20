@@ -8,9 +8,12 @@ import (
 	"os/signal"
 	"time"
 
-	C "github.com/alphaonly/harvester/internal/configuration"
+
+	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/handlers"
-	S "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+
 )
 
 type Configuration struct {
@@ -18,9 +21,10 @@ type Configuration struct {
 }
 
 type Server struct {
-	configuration *C.Configuration
-	memKeeper     *S.Storage
-	archive       *S.Storage
+	configuration *conf.ServerConfiguration
+	memKeeper     *mapstorage.MapStorage
+	archive       stor.Storage
+
 	handlers      *handlers.Handlers
 }
 
@@ -28,17 +32,19 @@ func NewConfiguration(serverPort string) *Configuration {
 	return &Configuration{serverPort: ":" + serverPort}
 }
 
-func New(configuration *C.Configuration, memKeeper *S.Storage, archive *S.Storage, handlers *handlers.Handlers) (server Server) {
+func New(configuration *conf.ServerConfiguration, archive stor.Storage, handlers *handlers.Handlers) (server Server) {
 	return Server{
 		configuration: configuration,
-		memKeeper:     memKeeper,
+		memKeeper:     handlers.MemKeeper,
+
 		archive:       archive,
 		handlers:      handlers,
 	}
 }
 
 func (s Server) ListenData(ctx context.Context) {
-	err := http.ListenAndServe(":"+(*s.configuration).Get("S_PORT"), s.handlers.NewRouter())
+	err := http.ListenAndServe(s.configuration.Port, s.handlers.NewRouter())
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,7 +55,7 @@ func (s Server) Run(ctx context.Context) error {
 	// маршрутизация запросов обработчику
 
 	server := http.Server{
-		Addr: ":" + (*s.configuration).Get("S_PORT"),
+		Addr: s.configuration.Address,
 	}
 
 	s.restoreData(ctx, s.archive)
@@ -57,31 +63,26 @@ func (s Server) Run(ctx context.Context) error {
 	go s.ListenData(ctx)
 	go s.ParkData(ctx, s.archive)
 
-	// Setting up signal capturing
-	channelInt := make(chan os.Signal, 1)
-	signal.Notify(channelInt, os.Interrupt)
+	osSignal := make(chan os.Signal, 1)
+	signal.Notify(osSignal, os.Interrupt)
 
-	ctx2, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	select {
-	case <-channelInt:
-		{
-			cancel()
-		}
-	case <-ctx.Done():
-		{
-			cancel()
-		}
-	}
+	<-osSignal
+	err := shutdown(ctx, server)
 
-	err := server.Shutdown(ctx2)
+	return err
+}
+func shutdown(ctx context.Context, server http.Server) error {
+	time.Sleep(time.Second * 2)
+	err := server.Shutdown(ctx)
 	log.Println("Server shutdown")
 	return err
 }
 
-func (s Server) restoreData(ctx context.Context, storageFrom *S.Storage) {
+func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 
-	if (*s.configuration).GetBool("RESTORE") {
-		mvList, err := (*storageFrom).GetAllMetrics(ctx)
+	if s.configuration.Restore {
+		mvList, err := storageFrom.GetAllMetrics(ctx)
+
 		if err != nil {
 			log.Println("cannot initially read metrics from file storage")
 			return
@@ -91,7 +92,8 @@ func (s Server) restoreData(ctx context.Context, storageFrom *S.Storage) {
 			return
 		}
 
-		err = (*s.memKeeper).SaveAllMetrics(ctx, mvList)
+		err = s.memKeeper.SaveAllMetrics(ctx, mvList)
+
 		if err != nil {
 			log.Fatal("cannot save metrics to internal storage")
 		}
@@ -100,14 +102,16 @@ func (s Server) restoreData(ctx context.Context, storageFrom *S.Storage) {
 
 }
 
-func (s Server) ParkData(ctx context.Context, storageTo *S.Storage) {
+func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
+
 
 	if s.handlers.MemKeeper == storageTo {
 		log.Fatal("a try to save to it is own")
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration((*s.configuration).GetInt("STORE_INTERVAL")) * (time.Second))
+	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval))
+
 	defer ticker.Stop()
 
 DoitAgain:
@@ -115,8 +119,8 @@ DoitAgain:
 
 	case <-ticker.C:
 		{
+			mvList, err := s.memKeeper.GetAllMetrics(ctx)
 
-			mvList, err := (*s.memKeeper).GetAllMetrics(ctx)
 			if err != nil {
 				log.Fatal("cannot read metrics from internal storage")
 			}
@@ -125,9 +129,10 @@ DoitAgain:
 			} else if len((*mvList)) == 0 {
 				log.Println("internal storage is empty, nothing to save to file")
 			} else {
-				err = (*storageTo).SaveAllMetrics(ctx, mvList)
+				err = storageTo.SaveAllMetrics(ctx, mvList)
 				if err != nil {
-					log.Fatal("cannot write metrics to file storage")
+					log.Fatal("cannot write metrics to file storage:" + err.Error())
+
 				}
 				log.Println("saved to file")
 			}

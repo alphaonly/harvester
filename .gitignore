@@ -12,14 +12,14 @@
 *.out
 
 # Binaries
-cmd/agent/main
 cmd/agent/agent
-cmd/server/main
 cmd/server/server
 /internal/server/server
 /internal/agent/agent
-/internal/agent/JSON
+
 /cmd/httplib/
+
+
 
 # Dependency directories (remove the comment below to include it)
 vendor/
@@ -29,5 +29,10 @@ vendor/
 .vscode
 
 #others
-cmd/tests/
+
 internal/server/storage/interfaces/archive.go
+internal/agent/agentjson/
+
+# tests
+/cmd/tests/
+

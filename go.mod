@@ -5,7 +5,6 @@ go 1.19
 require (
 	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-resty/resty/v2 v2.7.0
-	github.com/golang-collections/collections v0.0.0-20130729185459-604e922904d3
 	github.com/stretchr/testify v1.8.1
 )
 

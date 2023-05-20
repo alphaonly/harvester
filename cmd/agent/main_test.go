@@ -2,13 +2,17 @@ package main_test
 
 import (
 	"context"
+
 	"fmt"
+
 	"testing"
 	"time"
 
 	"github.com/alphaonly/harvester/internal/agent"
 	C "github.com/alphaonly/harvester/internal/configuration"
+
 	"github.com/go-resty/resty/v2"
+
 	"github.com/stretchr/testify/assert"
 )
 

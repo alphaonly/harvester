@@ -19,7 +19,7 @@ func CheckCounterGzipHandlers() {
 		return errRedirectBlocked
 	})
 	httpc := resty.New().
-		SetHostURL("http://127.0.0.1:8080").
+	SetBaseURL("http://127.0.0.1:8080").
 		SetRedirectPolicy(redirPolicy)
 
 	id := "GetSetZip" + strconv.Itoa(rand.Intn(256))

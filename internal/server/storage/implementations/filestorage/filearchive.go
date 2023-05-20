@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/alphaonly/harvester/internal/server/files"
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+	mVal "github.com/alphaonly/harvester/internal/server/metricvaluei"
 
 )
 

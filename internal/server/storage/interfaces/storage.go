@@ -4,7 +4,7 @@ import (
 	"context"
 
 	metricsJSON "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	metricValueInt "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+	metricValueInt "github.com/alphaonly/harvester/internal/server/metricvaluei"
 
 )
 

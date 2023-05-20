@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
+	"log"
+
 	db "github.com/alphaonly/harvester/internal/server/storage/implementations/dbstorage"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
-	"log"
 
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server"
@@ -18,35 +19,35 @@ import (
 
 func main() {
 
-	configuration := conf.NewServerConfiguration()
-	configuration.UpdateFromEnvironment()
-	configuration.UpdateFromFlags()
+	configuration := conf.NewServerConf(conf.UpdateSCFromEnvironment, conf.UpdateSCFromFlags)
+	// configuration.UpdateFromEnvironment()
+	// configuration.UpdateFromFlags()
 
 	var (
-		ExternalStorage stor.Storage
-		InternalStorage stor.Storage
+		externalStorage stor.Storage
+		internalStorage stor.Storage
 	)
-	if configuration.DatabaseDsn == "" {
-		ExternalStorage = fileStor.FileArchive{StoreFile: configuration.StoreFile}
-		InternalStorage = mapstorage.New()
-	} else {
-		ExternalStorage = nil
-		InternalStorage = db.NewDBStorage(context.Background(), configuration.DatabaseDsn)
+	externalStorage = fileStor.FileArchive{StoreFile: configuration.StoreFile}
+	internalStorage = mapstorage.New()
+
+	if configuration.DatabaseDsn != "" {
+		externalStorage = nil
+		internalStorage = db.NewDBStorage(context.Background(), configuration.DatabaseDsn)
 	}
 
-	_handlers := &handlers.Handlers{
-		Storage: InternalStorage,
+	handlers := &handlers.Handlers{
+		Storage: internalStorage,
 		Signer:  signchecker.NewSHA256(configuration.Key),
 		Conf:    conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
 	}
 
-	_server := server.New(configuration, ExternalStorage, _handlers)
+	metricsServer := server.New(configuration, externalStorage, handlers)
 
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := _server.Run(ctx)
+	err := metricsServer.Run(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

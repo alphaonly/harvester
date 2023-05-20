@@ -1,23 +1,46 @@
 package schema
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"time"
-
-	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
-
-	"io"
-	"log"
-	"net/http"
-	"net/url"
 )
 
 type PreviousBytes []byte
 type ContextKey int
 
 const PKey1 ContextKey = 123455
+
+type duplicateChecker interface{
+	check(make(map[string]MetricsJSON))	
+}
+
+type MetricsJSONSlice []MetricsJSON
+func (s *MetricsJSONSlice)check(m map[string]MetricsJSON){
+
+}
+
+// Если двойные записи в counter - суммируем в одну, gauge - оставляем последнюю
+func (s *MetricsJSONSlice) EnhancedDistinct() error {
+	m := make(map[string]MetricsJSON)
+	for _, e := range *s {
+		
+		if e.MType == "counter"{
+			c, exists := m[e.ID]
+			if exists {
+				sum := int64(*e.Delta + *c.Delta)
+				m[e.ID] = MetricsJSON{e.ID, e.MType, &sum, e.Value, ""}
+				continue
+			}
+		}
+		m[e.ID] = e
+	}
+	*s = MetricsJSONSlice{}
+	for _, v := range m {
+		*s = append(*s, v)
+	}
+	return nil
+}
 
 type MetricsJSON struct {
 	ID    string   `json:"id"`              // имя метрикИ
@@ -27,66 +50,8 @@ type MetricsJSON struct {
 	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
-func NewMetricJSON(name string, MType string, value interface{}) (ret MetricsJSON) {
-
-	j := MetricsJSON{}
-	if name == "" || MType == "" {
-		panic(errors.New("name or type is empty"))
-	}
-
-	j.ID = name
-	j.MType = MType
-
-	if value != nil {
-		switch MType {
-		case "agent.gauge", "gauge":
-			var val = float64(value.(mVal.Gauge))
-			j.Value = &val
-		case "agent.counter", "counter":
-			var val = int64(value.(mVal.Counter))
-			j.Delta = &val
-		default:
-			panic(errors.New("unknown type"))
-		}
-	}
-	return j
-}
-func GetMetricJSONWithPOST(baseURL *url.URL, name string, MType string) (mj MetricsJSON) {
-
-	metricsJSONRequest := NewMetricJSON(name, MType, nil)
-	data, err := json.Marshal(metricsJSONRequest)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	URL := (*baseURL).JoinPath("value")
-	request, err := http.NewRequest(http.MethodPost, URL.String(), bytes.NewBuffer(data))
-	if err != nil {
-		log.Fatal(err)
-	}
-	request.Header.Set("Content-Type", "application/json; charset=utf-8")
-	request.Header.Add("Accept", "application/json; charset=utf-8")
-
-	client := http.Client{}
-	if err != nil {
-		log.Fatal(err)
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		log.Fatal(err)
-	}
-	responseData, err := io.ReadAll(response.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var metricsJSONResponse MetricsJSON
-	err = json.Unmarshal(responseData, &metricsJSONResponse)
-	if err != nil {
-		log.Fatal(err)
-	}
-	response.Body.Close()
-	return metricsJSONResponse
-
+func (m MetricsJSON) Equals(m2 MetricsJSON) bool {
+	return m.ID == m2.ID
 }
 
 type Duration time.Duration

@@ -17,6 +17,7 @@ import (
 
 type Configuration struct {
 	serverPort string
+
 }
 
 type Server struct {
@@ -25,6 +26,7 @@ type Server struct {
 	InternalStorage stor.Storage
 	ExternalStorage stor.Storage
 	handlers        *handlers.Handlers
+	httpServer      *http.Server
 
 }
 
@@ -44,18 +46,20 @@ func New(configuration *conf.ServerConfiguration, ExStorage stor.Storage, handle
 }
 
 func (s Server) ListenData(ctx context.Context) {
-	err := http.ListenAndServe(s.configuration.Port, s.handlers.NewRouter())
+	// err := http.ListenAndServe(s.configuration.Port, s.handlers.NewRouter())
+	err := s.httpServer.ListenAndServe()
 
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
-func (s Server) Run(ctx context.Context) error {
+func (s *Server) Run(ctx context.Context) error {
 
 	// маршрутизация запросов обработчику
-	server := http.Server{
+	s.httpServer = &http.Server{
 		Addr: s.configuration.Address,
+		Handler:  s.handlers.NewRouter(),
 	}
 
 	s.restoreData(ctx, s.ExternalStorage)
@@ -67,13 +71,13 @@ func (s Server) Run(ctx context.Context) error {
 	signal.Notify(osSignal, os.Interrupt)
 
 	<-osSignal
-	err := shutdown(ctx, &server)
+	err := s.Shutdown(ctx)
 
 	return err
 }
-func shutdown(ctx context.Context, server *http.Server) error {
+func (s Server) Shutdown(ctx context.Context) error {
 	time.Sleep(time.Second * 2)
-	err := server.Shutdown(ctx)
+	err := s.httpServer.Shutdown(ctx)
 	log.Println("Server shutdown")
 	return err
 }

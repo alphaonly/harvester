@@ -5,17 +5,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
+	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
+	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+
 	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
-	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+	MVal "github.com/alphaonly/harvester/internal/server/metricvaluei"
 	"github.com/alphaonly/harvester/internal/signchecker"
 
 	"github.com/go-chi/chi/v5"
@@ -142,7 +144,6 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	if metricType == "" {
 		http.Error(w, metricType+"is not recognized type", http.StatusNotImplemented)
 		return
-
 	}
 
 	if h.Storage == nil {
@@ -293,7 +294,8 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusBadRequest)
 						return
 					}
-					var m mVal.MetricValue = mVal.NewFloat(float64Value)
+
+					var m MVal.MetricValue = MVal.NewFloat(float64Value)
 
 					err = h.Storage.SaveMetric(r.Context(), metricName, &m)
 					if err != nil {
@@ -312,9 +314,9 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 					prevMetricValue, err := h.Storage.GetMetric(r.Context(), metricName, metricType)
 
 					if err != nil || prevMetricValue == nil {
-						prevMetricValue = mVal.NewCounterValue()
+						prevMetricValue = MVal.NewCounterValue()
 					}
-					sum := mVal.NewInt(intValue).AddValue(prevMetricValue)
+					sum := MVal.NewInt(intValue).AddValue(prevMetricValue)
 					err = h.Storage.SaveMetric(r.Context(), metricName, &sum)
 					if err != nil {
 						http.Error(w, "value: "+metricValue+" not saved in memStorage", http.StatusInternalServerError)
@@ -374,8 +376,10 @@ func (h *Handlers) getBody(w http.ResponseWriter, r *http.Request) (b []byte, ok
 	return bytesData, true
 }
 func httpError(w http.ResponseWriter, err string, status int) {
-	http.Error(w, err, status)
-	log.Println("server:" + err)
+	if err != "" {
+		http.Error(w, err, status)
+		log.Println("server:" + err)
+	}
 }
 
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
@@ -440,6 +444,63 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
 	}
 }
+func (h *Handlers) HandlePostMetricJSONBatch(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("HandlePostMetricJSONBatch invoked")
+		//validation
+		if !h.handlePostMetricJSONValidate(w, r) {
+			return
+		}
+		//Handle
+		//1. get body
+		bytesData, ok := h.getBody(w, r)
+		if !ok {
+			return
+		}
+		//2. JSON
+		var mjSlice schema.MetricsJSONSlice
+		err := json.Unmarshal(bytesData, &mjSlice)
+		if err != nil {
+			httpError(w, "unmarshal error:", http.StatusBadRequest)
+			return
+		}
+
+		//3. Валидация полученных данных
+		for _, v := range mjSlice {
+			if v.ID == "" {
+				httpError(w, "not parsed, empty metric name!"+v.ID, http.StatusNotFound)
+				return
+			}
+			//3.1.Проверяем подпись по ключу, нормально если ключ пуст в случае /update
+			if v.Delta != nil || v.Value != nil {
+				if !h.Signer.IsValidSign(v) {
+					httpError(w, "sign is not confirmed error", http.StatusBadRequest)
+					return
+				}
+			}
+		}
+		//3.2. Проверка на задвоеные метрики
+		err = mjSlice.EnhancedDistinct()
+		if err != nil {
+			httpError(w, "unable to distinct inbound slice", http.StatusBadRequest)
+			return
+		}
+		//4.Данные в хранилище
+		err = h.writeBatchToStorage(&mjSlice, w, r)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusTooManyRequests)
+		}
+		if next != nil {
+			//write handled body for further handle
+			ctx := context.WithValue(r.Context(), schema.PKey1, schema.PreviousBytes(bytesData))
+			//call further handler with context parameters
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
+	}
+}
+
 func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
 	log.Println("HandlePostErrorPattern invoked")
 
@@ -522,11 +583,15 @@ func (h *Handlers) NewRouter() chi.Router {
 		compressPost = compression.GZipCompressionHandler
 		//compressList = compression.GZipCompressionHandler
 
-		handlePost = h.HandlePostMetricJSON
+		handlePost      = h.HandlePostMetricJSON
+		handlePostBatch = h.HandlePostMetricJSONBatch
+		//handleList = h.HandleGetMetricFieldList
 		//handleList = h.HandleGetMetricFieldList
 
 		//The sequence for post JSON and respond compressed JSON if no value
-		postJsonAndGetCompressed = handlePost(compressPost(writePost()))
+		postJSONAndGetCompressed = handlePost(compressPost(writePost()))
+		//The sequence for post JSON and respond compressed JSON if no value receiving data in batch
+		postJSONAndGetCompressedBatch = handlePostBatch(compressPost(writePost()))
 
 		//The sequence for get compressed metrics html list
 		//getListCompressed = handleList(compressList(writeList()))
@@ -540,11 +605,14 @@ func (h *Handlers) NewRouter() chi.Router {
 		r.Get("/", getListCompressed)
 		r.Get("/ping", h.HandlePing)
 		r.Get("/ping/", h.HandlePing)
+		r.Get("/check/", h.HandleCheckHealth)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
-		r.Post("/value", postJsonAndGetCompressed)
-		r.Post("/value/", postJsonAndGetCompressed)
-		r.Post("/update", postJsonAndGetCompressed)
-		r.Post("/update/", postJsonAndGetCompressed)
+		r.Post("/value", postJSONAndGetCompressed)
+		r.Post("/value/", postJSONAndGetCompressed)
+		r.Post("/update", postJSONAndGetCompressed)
+		r.Post("/update/", postJSONAndGetCompressed)
+		r.Post("/updates", postJSONAndGetCompressedBatch)
+		r.Post("/updates/", postJSONAndGetCompressedBatch)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 
 
@@ -563,7 +631,7 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.Respo
 			if mj.Value != nil {
 				mjVal := *mj.Value
 				//пишем если есть значение
-				mv := mVal.MetricValue(mVal.NewFloat(mjVal))
+				mv := MVal.MetricValue(MVal.NewFloat(mjVal))
 				err := h.Storage.SaveMetric(r.Context(), mj.ID, &mv)
 				if err != nil {
 					http.Error(w, "internal value add error", http.StatusInternalServerError)
@@ -587,9 +655,9 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.Respo
 				//пишем если есть значение
 				prevMetricValue, err := h.Storage.GetMetric(r.Context(), mj.ID, mj.MType)
 				if err != nil {
-					prevMetricValue = mVal.NewCounterValue()
+					prevMetricValue = MVal.NewCounterValue()
 				}
-				sum := mVal.NewInt(mjVal).AddValue(prevMetricValue)
+				sum := MVal.NewInt(mjVal).AddValue(prevMetricValue)
 				err = h.Storage.SaveMetric(r.Context(), mj.ID, &sum)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -616,6 +684,53 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.Respo
 	}
 	return nil
 }
+func (h *Handlers) writeBatchToStorage(mjSlice *schema.MetricsJSONSlice, w http.ResponseWriter, r *http.Request) (err error) {
+	if mjSlice == nil {
+		http.Error(w, "empty MJ slice", http.StatusInternalServerError)
+		return err
+	}
+	mvList := make(metricsjson.MetricsMapType)
+
+	for _, mj := range *mjSlice {
+		switch mj.MType {
+		case "gauge":
+			{
+				if mj.Value == nil {
+					http.Error(w, "gauge value is nil", http.StatusInternalServerError)
+					return err
+				}
+				//пишем если есть значение
+				mvList[mj.ID] = MVal.MetricValue(MVal.NewFloat(*mj.Value))
+			}
+		case "counter":
+			{
+				if mj.Delta == nil {
+					http.Error(w, "counter value is nil", http.StatusInternalServerError)
+					return err
+				}
+				//пишем если есть значение
+				mvList[mj.ID] = MVal.MetricValue(MVal.NewInt(*mj.Delta))
+			}
+		default:
+			mess := " not recognized type"
+			httpError(w, mj.MType+mess, http.StatusNotImplemented)
+			return errors.New(mj.MType + mess)
+		}
+	}
+
+	err = h.Storage.SaveAllMetrics(r.Context(), &mvList)
+
+	return err
+}
+
+func (h *Handlers) HandleCheckHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+
+		w.WriteHeader(http.StatusOK)
+
+	}
+}
+
 func logFatal(err error) {
 	if err != nil {
 		log.Fatal(err)

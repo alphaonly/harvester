@@ -4,11 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
+	"time"
+
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
-	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+	mVal "github.com/alphaonly/harvester/internal/server/metricvaluei"
 	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/jackc/pgx/v5"
-	"log"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 //	type Storage interface {
@@ -40,15 +43,21 @@ const createMetricsTable = `create table public.metrics2
 const checkIfMetricsTableExists = `SELECT 'public.metrics2'::regclass;`
 
 var message = []string{
-	0: "unable to connect to database",
-	1: "table metrics does not exists, a try to create:",
-	2: "server: db metrics table creation response text:",
-	3: "server: db metrics table existence check response text:",
-	4: "server: getMetrics: Unknown metric type value",
-	5: "server: NullValue type not valid",
-	6: "nil pointer in mvList",
-	7: "undefined type in type switch dbStorage",
-	8: "server sendBatch tag:",
+	0:  "DBStorage:unable to connect to database",
+	1:  "DBStorage:table metrics does not exists, a try to create:",
+	2:  "DBStorage:db metrics table creation response text:",
+	3:  "DBStorage:db metrics table existence check response text:",
+	4:  "DBStorage:getMetrics: Unknown metric type value",
+	5:  "DBStorage:NullValue type not valid",
+	6:  "DBStorage:nil pointer in mvList",
+	7:  "DBStorage:undefined type in type switch dbStorage",
+	8:  "DBStorage:sendBatch tag:",
+	9:  "DBStorage:unable to rollback, error fatal",
+	10: "DBStorage:unable to commit, trying again",
+	11: "DBStorage:unable to prepare statement, fatal error",
+	12: "DBStorage:unable to lease a connection , try again",
+	13: "DBStorage:createOrUpdateIfExistsMetricsTable exec error",	
+	14: "DBStorage:unable to lease a connection after a few tries",
 }
 
 type dbMetrics struct {
@@ -59,28 +68,28 @@ type dbMetrics struct {
 }
 
 type DBStorage struct {
-	dataBaseUrl string
-	conn        *pgx.Conn
+	dataBaseURL string
+	pool        *pgxpool.Pool
+	conn        *pgxpool.Conn
 }
 
-func NewDBStorage(ctx context.Context, dataBaseUrl string) storage.Storage {
+func NewDBStorage(ctx context.Context, dataBaseURL string) storage.Storage {
 	//get params
-	s := DBStorage{dataBaseUrl: dataBaseUrl}
+	s := DBStorage{dataBaseURL: dataBaseURL}
 	//connect db
 	var err error
-	s.conn, err = pgx.Connect(ctx, s.dataBaseUrl)
+	//s.conn, err = pgx.Connect(ctx, s.dataBaseURL)
+	s.pool, err = pgxpool.New(ctx, s.dataBaseURL)
 	if err != nil {
 		logFatalf(message[0], err)
 		return nil
 	}
-	defer s.conn.Close(ctx)
-
 	// check metrics table exists
-	resp, err := s.conn.Exec(context.Background(), checkIfMetricsTableExists)
+	resp, err := s.pool.Exec(context.Background(), checkIfMetricsTableExists)
 	if err != nil {
 		log.Println(message[1] + err.Error())
 		//create metrics Table
-		resp, err = s.conn.Exec(context.Background(), createMetricsTable)
+		resp, err = s.pool.Exec(context.Background(), createMetricsTable)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -93,32 +102,41 @@ func NewDBStorage(ctx context.Context, dataBaseUrl string) storage.Storage {
 
 func logFatalf(mess string, err error) {
 	if err != nil {
-		log.Fatalf(mess+": "+" %v\n", err)
+		log.Fatalf(mess+": %v\n", err)
 	}
 }
-func (s *DBStorage) connectDb(ctx context.Context) (ok bool) {
+func (s *DBStorage) connectDB(ctx context.Context) (ok bool) {
 	ok = false
 	var err error
 
-	if s.conn == nil {
-		s.conn, err = pgx.Connect(ctx, s.dataBaseUrl)
-	} else {
-		err = s.conn.Ping(ctx)
-		if err != nil {
-			s.conn, err = pgx.Connect(ctx, s.dataBaseUrl)
-		}
+	if s.pool == nil {
+		s.pool, err = pgxpool.New(ctx, s.dataBaseURL)
+		logFatalf(message[0], err)
 	}
-	logFatalf(message[0], err)
-	ok = true
+	for i := 0; i < 10; i++ {
+		s.conn, err = s.pool.Acquire(ctx)
+		if err != nil {
+			log.Println(message[12] + " " + err.Error())
+			time.Sleep(time.Millisecond * 200)
+			continue	
+		}
+		break
+	}
 
+	err = s.conn.Ping(ctx)
+	if err != nil {
+		logFatalf(message[0], err)
+	}
+
+	ok = true
 	return ok
 }
 
 func (s DBStorage) GetMetric(ctx context.Context, name string, MType string) (mv mVal.MetricValue, err error) {
-	if !s.connectDb(ctx) {
-		return nil, errors.New(message[0])
+	if !s.connectDB(ctx) {
+		return nil, errors.New(message[14])
 	}
-	defer s.conn.Close(ctx)
+	defer s.conn.Release()
 
 	d := dbMetrics{id: sql.NullString{String: name, Valid: true}}
 
@@ -163,9 +181,11 @@ func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricV
 		return errors.New(message[6])
 	}
 	m = *mv
-	if !s.connectDb(ctx) {
-		return
+	if !s.connectDB(ctx) {
+		return errors.New(message[14])
 	}
+	defer s.conn.Release()
+	
 	var (
 		_type int
 		delta int64
@@ -186,19 +206,18 @@ func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricV
 	default:
 		return errors.New(message[7])
 	}
-	conn, err := s.conn.Exec(ctx, createOrUpdateIfExistsMetricsTable, name, _type, delta, value)
-	if err != nil {
-		log.Println(conn)
-	}
+	tag, err := s.conn.Exec(ctx, createOrUpdateIfExistsMetricsTable, name, _type, delta, value)
+	logFatalf("",err)
+	log.Println(tag)
 	return err
 }
 
 // GetAllMetrics Restore data from database to mem storage
 func (s DBStorage) GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error) {
-	if !s.connectDb(ctx) {
-		return
+	if !s.connectDB(ctx) {
+		return nil,errors.New(message[14])
 	}
-
+	defer s.conn.Release()
 	rows, err := s.conn.Query(ctx, selectAllMetricsTable)
 	if err != nil {
 		log.Printf("QueryRow failed: %v\n", err)
@@ -246,10 +265,11 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 	if mvList == nil {
 		return errors.New(message[6])
 	}
-
-	if !s.connectDb(ctx) {
-		return errors.New(message[0])
+	if !s.connectDB(ctx) {
+		return errors.New(message[14])
 	}
+	defer s.conn.Release()
+
 	mv := *mvList
 
 	batch := &pgx.Batch{}
@@ -275,16 +295,18 @@ func (s DBStorage) SaveAllMetrics(ctx context.Context, mvList *metricsjson.Metri
 		}
 
 		batch.Queue(createOrUpdateIfExistsMetricsTable, d.id, d._type, d.delta, d.value)
-
 	}
 
 	br := s.conn.SendBatch(ctx, batch)
-	tag, err := br.Exec()
-	if err != nil {
-		return err
+	for range mv {
+		tag, err := br.Exec()
+		if err != nil {
+			logFatalf(message[9], err)
+			return err
+		}
+		log.Println(message[8] + tag.String())
 	}
 	defer br.Close()
-	log.Println(message[8] + tag.String())
 
 	return nil
 }

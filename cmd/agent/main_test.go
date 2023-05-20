@@ -24,29 +24,34 @@ func TestUpdate(t *testing.T) {
 		want  bool
 	}{
 		{
-			name:  "test#1 - Positive: are there values?",
+			name:  "test#1 - Positive:  there are values",
 			value: agent.Metrics{},
 			want:  true,
 		},
+		{
+			name:  "test#2 - Negative: there are not values",
+			want:  false,
+		},
 	}
 
-	agentConf := C.NewAgentConfiguration()
-	agentConf.UpdateFromEnvironment()
-	agentConf.UpdateFromFlags()
+	agentConf:=C.NewAgentConf(C.UpdateACFromEnvironment,C.UpdateACFromFlags)
 
 	client := resty.New().SetRetryCount(10)
 	a := agent.NewAgent(agentConf, client)
 
-
-	for _, tt := range tests {
+	for i, tt := range tests {
 		t.Run(tt.name, func(tst *testing.T) {
-			ctx := context.Background()
-			ctxMetrics, cancel := context.WithTimeout(ctx, time.Second*2)
+			
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*2)
 			defer cancel()
-			go a.Update(ctxMetrics, &tt.value)
-
+			if i!=1{
+				go a.Update(ctx, &tt.value)
+			}	
+			
 			time.Sleep(time.Second * 3)
+			a.UpdateLocker.Lock()
 			fmt.Println(tt.value.PollCount)
+			a.UpdateLocker.Unlock()
 			if !assert.Equal(t, tt.want, tt.value.PollCount > 0) {
 				t.Error("UpdateMemStatsMetrics is not received form runtime values")
 			}

@@ -44,7 +44,7 @@ func New() (storage *MapStorage) {
 // 	GetAllMetrics(ctx context.Context) (mvList *map[string]interfaces.MetricValue, err error)
 // }
 
-func (m MapStorage) GetMetric(ctx context.Context, name string) (mv metricvalueI.MetricValue, err error) {
+func (m MapStorage) GetMetric(ctx context.Context, name string, MType string) (mv metricvalueI.MetricValue, err error) {
 	_map := *m.metricsMap
 	if m.metricsMap == nil || len(_map) == 0 {
 		return nil, errors.New("404 - not found")

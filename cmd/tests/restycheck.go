@@ -12,7 +12,7 @@ import (
 
 // create HTTP client without redirects support
 
-func TestCounterGzipHandlers() {
+func CheckCounterGzipHandlers() {
 	// create HTTP client without redirects support
 	errRedirectBlocked := errors.New("HTTP redirect blocked")
 	redirPolicy := resty.RedirectPolicyFunc(func(_ *http.Request, _ []*http.Request) error {
@@ -40,8 +40,8 @@ func TestCounterGzipHandlers() {
 		log.Println(resp)
 	}
 }
-func main() {
+func ff2() {
 
-	TestCounterGzipHandlers()
+	CheckCounterGzipHandlers()
 
 }

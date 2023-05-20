@@ -36,4 +36,5 @@ internal/agent/agentjson/
 
 # tests
 /cmd/tests/
+/cmd/tests/restycheck.go
 

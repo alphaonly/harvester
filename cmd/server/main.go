@@ -9,7 +9,9 @@ import (
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	fileStor "github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+
 	"github.com/alphaonly/harvester/internal/signchecker"
+
 )
 
 func main() {
@@ -24,6 +26,7 @@ func main() {
 		Signer:    signchecker.NewSHA256(configuration.Key),
 	}
 	server := server.New(configuration, fileStorage, handlers)
+
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

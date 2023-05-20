@@ -8,10 +8,12 @@ import (
 	"os/signal"
 	"time"
 
+
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+
 )
 
 type Configuration struct {
@@ -22,6 +24,7 @@ type Server struct {
 	configuration *conf.ServerConfiguration
 	memKeeper     *mapstorage.MapStorage
 	archive       stor.Storage
+
 	handlers      *handlers.Handlers
 }
 
@@ -33,6 +36,7 @@ func New(configuration *conf.ServerConfiguration, archive stor.Storage, handlers
 	return Server{
 		configuration: configuration,
 		memKeeper:     handlers.MemKeeper,
+
 		archive:       archive,
 		handlers:      handlers,
 	}
@@ -40,6 +44,7 @@ func New(configuration *conf.ServerConfiguration, archive stor.Storage, handlers
 
 func (s Server) ListenData(ctx context.Context) {
 	err := http.ListenAndServe(s.configuration.Port, s.handlers.NewRouter())
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,6 +82,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 
 	if s.configuration.Restore {
 		mvList, err := storageFrom.GetAllMetrics(ctx)
+
 		if err != nil {
 			log.Println("cannot initially read metrics from file storage")
 			return
@@ -87,6 +93,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 		}
 
 		err = s.memKeeper.SaveAllMetrics(ctx, mvList)
+
 		if err != nil {
 			log.Fatal("cannot save metrics to internal storage")
 		}
@@ -97,12 +104,14 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 
 func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
 
+
 	if s.handlers.MemKeeper == storageTo {
 		log.Fatal("a try to save to it is own")
 		return
 	}
 
 	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval))
+
 	defer ticker.Stop()
 
 DoitAgain:
@@ -110,8 +119,8 @@ DoitAgain:
 
 	case <-ticker.C:
 		{
-
 			mvList, err := s.memKeeper.GetAllMetrics(ctx)
+
 			if err != nil {
 				log.Fatal("cannot read metrics from internal storage")
 			}
@@ -123,6 +132,7 @@ DoitAgain:
 				err = storageTo.SaveAllMetrics(ctx, mvList)
 				if err != nil {
 					log.Fatal("cannot write metrics to file storage:" + err.Error())
+
 				}
 				log.Println("saved to file")
 			}

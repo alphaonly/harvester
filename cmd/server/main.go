@@ -9,6 +9,7 @@ import (
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	fileStor "github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+
 )
 
 func main() {
@@ -20,6 +21,7 @@ func main() {
 	fileStorage := fileStor.FileArchive{StoreFile: configuration.StoreFile}
 	handlers := &handlers.Handlers{MemKeeper: mapstorage.New()}
 	server := server.New(configuration, fileStorage, handlers)
+
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

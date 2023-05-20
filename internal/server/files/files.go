@@ -16,16 +16,19 @@ type Producer interface {
 }
 
 type Consumer interface {
+
 	Read() (*metricsJSON.MetricsMapType, error)
 	Close() error
 }
 
 type MetricsProducer struct {
+
 	file *os.File
 	buf  *bufio.Writer
 }
 
 func NewProducer(filename string) (*MetricsProducer, error) {
+
 
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0777)
 	if err != nil {
@@ -34,6 +37,7 @@ func NewProducer(filename string) (*MetricsProducer, error) {
 	buf := bufio.NewWriter(file)
 
 	return &MetricsProducer{
+
 		file: file,
 		buf:  buf,
 	}, nil
@@ -44,12 +48,14 @@ func (mp *MetricsProducer) Write(metricsData *metricsJSON.MetricsMapType) error 
 	m := metricsJSON.MetricsMapType(*metricsData)
 
 	mapJSONBuf, err := json.Marshal(&m)
+
 	if err != nil {
 		log.Println("error:cannot marshal data")
 		return err
 	}
 
 	_, err = mp.buf.Write(mapJSONBuf)
+
 	if err != nil {
 		log.Println("error:cannot write file")
 		return err
@@ -61,7 +67,9 @@ func (mp *MetricsProducer) Write(metricsData *metricsJSON.MetricsMapType) error 
 	}
 	return nil
 }
+
 func (mp *MetricsProducer) Close() error {
+
 
 	return mp.file.Close()
 }
@@ -97,20 +105,22 @@ func (mp *metricsConsumer) Read() (metricsData *metricsJSON.MetricsMapType, err 
 
 	m := make(metricsJSON.MetricsMapType)
 
+
 	err = json.Unmarshal(mapJSON, &m)
 	if err != nil {
 		log.Println("error:cannot unmarshal data:" + err.Error())
 
 		return nil, err
-
 	}
 
 	return &m, nil
+
 }
 func (mp *metricsConsumer) Close() error {
 
 	return mp.file.Close()
 }
+
 
 // var producer Producer = &MetricsProducer{}
 // var consumer Consumer = &metricsConsumer{}

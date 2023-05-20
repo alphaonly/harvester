@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/alphaonly/harvester/internal/agent"
+
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/go-resty/resty/v2"
 )

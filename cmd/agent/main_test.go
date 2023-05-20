@@ -2,13 +2,17 @@ package main_test
 
 import (
 	"context"
+
 	"fmt"
+
 	"testing"
 	"time"
 
 	"github.com/alphaonly/harvester/internal/agent"
 	C "github.com/alphaonly/harvester/internal/configuration"
+
 	"github.com/go-resty/resty/v2"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,6 +36,7 @@ func TestUpdate(t *testing.T) {
 
 	client := resty.New().SetRetryCount(10)
 	a := agent.NewAgent(agentConf, client)
+
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(tst *testing.T) {

@@ -13,6 +13,7 @@ import (
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 )
 
+
 func TestHandleMetric(t *testing.T) {
 
 	type want struct {
@@ -34,6 +35,7 @@ func TestHandleMetric(t *testing.T) {
 	urlPrefix := ""
 	//Check Url Ok
 	urlStr := urlPrefix + "/update/gauge/Alloc/2.36912E+05"
+
 	r1 := requestParams{method: http.MethodPost, url: urlStr,
 		want: want{code: http.StatusOK, response: `{"status":"ok"}`, contentType: contentType}}
 
@@ -100,8 +102,8 @@ func TestHandleMetric(t *testing.T) {
 	fmt.Println("start!")
 
 	s := mapstorage.New()
-	h := Handlers{MemKeeper: s}
 
+	h := Handlers{MemKeeper: s}
 	r := h.NewRouter()
 
 	ts := httptest.NewServer(r)

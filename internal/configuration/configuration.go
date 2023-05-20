@@ -1,5 +1,6 @@
 package configuration
 
+
 import (
 	"encoding/json"
 	"flag"
@@ -211,4 +212,5 @@ func getEnv(variableName string, variableValue interface{}, changed map[string]b
 	}
 
 	return changedValue
+
 }

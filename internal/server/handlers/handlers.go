@@ -17,6 +17,7 @@ import (
 	"github.com/alphaonly/harvester/internal/server/compression"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 	"github.com/alphaonly/harvester/internal/signchecker"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 )
@@ -123,6 +124,7 @@ func (h *Handlers) HandleGetMetricFieldList(next http.Handler) http.HandlerFunc 
 		log.Fatal(" HandleGetMetricFieldList requires next handler not nil")
 	}
 }
+
 func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
@@ -149,7 +151,9 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := r.Context()
+
 	metricsValue, err := h.Storage.GetMetric(ctx, metricName, metricType)
+
 	if err != nil {
 		http.Error(w, "404 - not found", http.StatusNotFound)
 		w.WriteHeader(http.StatusNotFound)
@@ -157,7 +161,6 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	}
 
 	metricValue := metricsValue.GetString()
-
 	_, err = w.Write([]byte(metricValue))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -181,7 +184,6 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 	}
 
 	var requestMetricsJSON schema.MetricsJSON
-
 	err = json.Unmarshal(requestByteData, &requestMetricsJSON)
 	if err != nil {
 		http.Error(w, "Error json-marshal request data", http.StatusBadRequest)
@@ -225,6 +227,7 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 	case "counter":
 		{
 			v := metricsValue.GetInternalValue().(int64)
+
 			responseMetricsJSON.Delta = &v
 		}
 	default:
@@ -246,10 +249,10 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-
 }
 func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 	log.Println("HandlePostMetric invoked")
+
 
 	metricType := chi.URLParam(r, "TYPE")
 	metricName := chi.URLParam(r, "NAME")
@@ -290,7 +293,6 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusBadRequest)
 						return
 					}
-
 					var m mVal.MetricValue = mVal.NewFloat(float64Value)
 
 					err = h.Storage.SaveMetric(r.Context(), metricName, &m)
@@ -302,13 +304,13 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 				}
 			case "counter":
 				{
-
 					intValue, err := strconv.ParseInt(metricValue, 10, 64)
 					if err != nil {
 						http.Error(w, "value: "+metricValue+" not parsed", http.StatusBadRequest)
 						return
 					}
 					prevMetricValue, err := h.Storage.GetMetric(r.Context(), metricName, metricType)
+
 					if err != nil || prevMetricValue == nil {
 						prevMetricValue = mVal.NewCounterValue()
 					}
@@ -319,7 +321,6 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						return
 
 					}
-
 				}
 			default:
 				http.Error(w, metricType+" not recognized type", http.StatusNotImplemented)
@@ -408,6 +409,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 				httpError(w, "sign is not confirmed error", http.StatusBadRequest)
 				log.Printf("server:sign is not confirmed error:%v", string(bytesData))
 				return
+
 			}
 		}
 		//Сохраняем в базу от агента и ответ обратно
@@ -544,6 +546,7 @@ func (h *Handlers) NewRouter() chi.Router {
 		r.Post("/update", postJsonAndGetCompressed)
 		r.Post("/update/", postJsonAndGetCompressed)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
+
 
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
 		r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)

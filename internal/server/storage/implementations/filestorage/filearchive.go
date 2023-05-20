@@ -3,10 +3,10 @@ package filestorage
 import (
 	"context"
 	"errors"
-
 	"github.com/alphaonly/harvester/internal/server/files"
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
+
 )
 
 // type Storage interface {
@@ -41,6 +41,7 @@ func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.Me
 	if err != nil {
 		emptyMap := make(metricsjson.MetricsMapType)
 
+
 		return &emptyMap, err
 	}
 	return mvList, nil
@@ -49,6 +50,7 @@ func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.Me
 // Park data to temp dir
 func (fa FileArchive) SaveAllMetrics(ctx context.Context, mvList *metricsjson.MetricsMapType) (err error) {
 	producer, err := files.NewProducer(fa.StoreFile)
+
 	if err != nil {
 		return err
 	}

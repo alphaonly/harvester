@@ -66,9 +66,11 @@ type Agent struct {
 
 func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
 
+
 	return Agent{
 		Configuration: c,
 		baseURL: url.URL{
+
 			Scheme: c.Scheme,
 			Host:   c.Address,
 		},
@@ -191,12 +193,15 @@ func (sd sendData) SendData(client *resty.Client) error {
 	log.Printf("agent:response body from server:%v", string(resp.Body()))
 	log.Printf("Content-Encoding:%v", resp.Header().Get("Content-Encoding"))
 
+
 	return err
 }
 
 func (a Agent) Update(ctx context.Context, metrics *Metrics) {
 	var m runtime.MemStats
+
 	ticker := time.NewTicker(time.Duration(a.Configuration.PollInterval))
+
 	defer ticker.Stop()
 repeatAgain:
 	select {
@@ -233,6 +238,7 @@ repeatAgain:
 			metrics.TotalAlloc = Gauge(m.TotalAlloc)
 			metrics.RandomValue = Gauge(rand.Int63())
 			metrics.PollCount++
+
 			goto repeatAgain
 		}
 	case <-ctx.Done():
@@ -402,13 +408,16 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddGaugeData(data, metrics.RandomValue, "RandomValue", m)
 			AddCounterData(data, metrics.PollCount, "PollCount", m)
 		}
+
 	}
 
 	return m
 }
+
 func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 
 	ticker := time.NewTicker(time.Duration(a.Configuration.ReportInterval))
+
 	defer ticker.Stop()
 
 repeatAgain:
@@ -420,6 +429,7 @@ repeatAgain:
 
 			for key := range dataPackage {
 				err := key.SendData(a.Client)
+
 				if err != nil {
 					log.Println(err)
 					return
@@ -437,6 +447,7 @@ repeatAgain:
 }
 
 func (a Agent) Run(ctx context.Context) {
+
 
 	metrics := Metrics{}
 

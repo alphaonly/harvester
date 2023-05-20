@@ -11,7 +11,9 @@ import (
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	fileStor "github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+
 	"github.com/alphaonly/harvester/internal/signchecker"
+
 )
 
 func main() {
@@ -39,6 +41,7 @@ func main() {
 	}
 
 	_server := server.New(configuration, ExternalStorage, _handlers)
+
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

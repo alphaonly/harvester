@@ -8,9 +8,11 @@ import (
 	"os/signal"
 	"time"
 
+
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+
 )
 
 type Configuration struct {
@@ -18,10 +20,12 @@ type Configuration struct {
 }
 
 type Server struct {
+
 	configuration   *conf.ServerConfiguration
 	InternalStorage stor.Storage
 	ExternalStorage stor.Storage
 	handlers        *handlers.Handlers
+
 }
 
 func NewConfiguration(serverPort string) *Configuration {
@@ -30,15 +34,18 @@ func NewConfiguration(serverPort string) *Configuration {
 
 func New(configuration *conf.ServerConfiguration, ExStorage stor.Storage, handlers *handlers.Handlers) (server Server) {
 	return Server{
+
 		configuration:   configuration,
 		InternalStorage: handlers.Storage,
 		ExternalStorage: ExStorage,
 		handlers:        handlers,
+
 	}
 }
 
 func (s Server) ListenData(ctx context.Context) {
 	err := http.ListenAndServe(s.configuration.Port, s.handlers.NewRouter())
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -78,6 +85,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 	}
 	if s.configuration.Restore {
 		mvList, err := storageFrom.GetAllMetrics(ctx)
+
 		if err != nil {
 			log.Println("cannot initially read metrics from file storage")
 			return
@@ -86,6 +94,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 			log.Println("file storage is empty, nothing to recover")
 			return
 		}
+
 
 		err = s.InternalStorage.SaveAllMetrics(ctx, mvList)
 		if err != nil {
@@ -97,6 +106,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 }
 
 func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
+
 	if storageTo == nil {
 		return
 	}
@@ -106,6 +116,7 @@ func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
 	}
 
 	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval))
+
 	defer ticker.Stop()
 
 DoItAgain:
@@ -113,8 +124,8 @@ DoItAgain:
 
 	case <-ticker.C:
 		{
-
 			mvList, err := s.InternalStorage.GetAllMetrics(ctx)
+
 			if err != nil {
 				log.Fatal("cannot read metrics from internal storage")
 			}
@@ -126,6 +137,7 @@ DoItAgain:
 				err = storageTo.SaveAllMetrics(ctx, mvList)
 				if err != nil {
 					log.Fatal("cannot write metrics to file storage:" + err.Error())
+
 				}
 				log.Println("saved to file")
 			}

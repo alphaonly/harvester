@@ -13,8 +13,8 @@ import (
 	"github.com/alphaonly/harvester/internal/schema"
 )
 
-const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true}`
-const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":true}`
+const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":""}`
+const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":true,"KEY":""}`
 
 type AgentConfiguration struct {
 	Address        string          `json:"ADDRESS,omitempty"`
@@ -23,6 +23,7 @@ type AgentConfiguration struct {
 	PollInterval   schema.Duration `json:"POLL_INTERVAL,omitempty"`
 	ReportInterval schema.Duration `json:"REPORT_INTERVAL,omitempty"`
 	UseJSON        bool            `json:"USE_JSON,omitempty"`
+	Key            string          `json:"KEY,omitempty"`
 	EnvChanged     map[string]bool
 }
 
@@ -32,6 +33,8 @@ type ServerConfiguration struct {
 	StoreFile     string          `json:"STORE_FILE,omitempty"`
 	Restore       bool            `json:"RESTORE,omitempty"`
 	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
+	Key           string          `json:"KEY,omitempty"`
+	DatabaseDsn   string          `json:"DATABASE_DSN,omitempty"`
 	EnvChanged    map[string]bool
 }
 
@@ -77,6 +80,7 @@ func (c *AgentConfiguration) UpdateFromEnvironment() {
 	c.ReportInterval = getEnv("REPORT_INTERVAL", c.ReportInterval, c.EnvChanged).(schema.Duration)
 	c.Scheme = getEnv("SCHEME", c.Scheme, c.EnvChanged).(string)
 	c.UseJSON = getEnv("USE_JSON", c.UseJSON, c.EnvChanged).(bool)
+	c.Key = getEnv("KEY", c.Key, c.EnvChanged).(string)
 }
 
 func (c *ServerConfiguration) UpdateFromEnvironment() {
@@ -84,9 +88,10 @@ func (c *ServerConfiguration) UpdateFromEnvironment() {
 	c.Restore = getEnv("RESTORE", c.Restore, c.EnvChanged).(bool)
 	c.StoreFile = getEnv("STORE_FILE", c.StoreFile, c.EnvChanged).(string)
 	c.StoreInterval = getEnv("STORE_INTERVAL", c.StoreInterval, c.EnvChanged).(schema.Duration)
-
+	c.Key = getEnv("KEY", c.Key, c.EnvChanged).(string)
 	//PORT is derived from ADDRESS
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
+	c.DatabaseDsn = getEnv("DATABASE_DSN", c.Key, c.EnvChanged).(string)
 }
 
 func (c *AgentConfiguration) UpdateFromFlags() {
@@ -97,6 +102,7 @@ func (c *AgentConfiguration) UpdateFromFlags() {
 		r = flag.Duration("r", time.Duration(dc.ReportInterval), "Report interval")
 		j = flag.Bool("j", dc.UseJSON, "Use JSON true/false")
 		t = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
+		k = flag.String("k", dc.Key, "string key for hash signing")
 	)
 
 	flag.Parse()
@@ -127,6 +133,10 @@ func (c *AgentConfiguration) UpdateFromFlags() {
 		c.CompressType = *t
 		log.Printf(message, "COMPRESS_TYPE", c.CompressType)
 	}
+	if !c.EnvChanged["KEY"] {
+		c.Key = *k
+		log.Printf(message, "KEY", c.Key)
+	}
 
 }
 
@@ -139,11 +149,13 @@ func (c *ServerConfiguration) UpdateFromFlags() {
 		i = flag.Duration("i", time.Duration(dc.StoreInterval), "Store interval")
 		f = flag.String("f", dc.StoreFile, "Store file full path")
 		r = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
+		k = flag.String("k", dc.Key, "string key for hash signing")
+		d = flag.String("d", dc.DatabaseDsn, "database destination string")
 	)
 	flag.Parse()
 
 	message := "variable %v  updated from flags, value %v"
-	//Если значение из переменных равно значению по умолчанию, тогда берем из flags
+	//Если значение из переменных равно значению по умолчанию, тогда берем из flagS
 	if !c.EnvChanged["ADDRESS"] {
 		c.Address = *a
 		c.Port = ":" + strings.Split(c.Address, ":")[1]
@@ -161,6 +173,14 @@ func (c *ServerConfiguration) UpdateFromFlags() {
 	if !c.EnvChanged["RESTORE"] {
 		c.Restore = *r
 		log.Printf(message, "RESTORE", c.Restore)
+	}
+	if !c.EnvChanged["KEY"] {
+		c.Key = *k
+		log.Printf(message, "KEY", c.Key)
+	}
+	if !c.EnvChanged["DATABASE_DSN"] {
+		c.DatabaseDsn = *d
+		log.Printf(message, "DATABASE_DSN", c.DatabaseDsn)
 	}
 }
 

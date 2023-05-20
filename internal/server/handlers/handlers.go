@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -14,15 +16,18 @@ import (
 	"github.com/alphaonly/harvester/internal/server/compression"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvalueInt"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+	"github.com/alphaonly/harvester/internal/signchecker"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 type Handlers struct {
 	MemKeeper *mapstorage.MapStorage
+	Signer    signchecker.Signer
 }
 
-func (h *Handlers) HandleGetMetricFieldListXXX(next http.Handler) http.HandlerFunc {
+func (h *Handlers) HandleGetMetricFieldListSimple(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
@@ -74,7 +79,6 @@ func (h *Handlers) HandleGetMetricFieldListXXX(next http.Handler) http.HandlerFu
 		log.Fatal(" HandleGetMetricFieldList requires next handler nil")
 	}
 }
-
 func (h *Handlers) HandleGetMetricFieldList(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -119,12 +123,7 @@ func (h *Handlers) HandleGetMetricFieldList(next http.Handler) http.HandlerFunc 
 		log.Fatal(" HandleGetMetricFieldList requires next handler not nil")
 	}
 }
-func logFatal(err error) {
-	if err != nil {
-		log.Fatal(err)
-	}
 
-}
 func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
@@ -169,7 +168,6 @@ func (h *Handlers) HandleGetMetricValue(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "plain/text")
 
 }
-
 func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
@@ -250,7 +248,6 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 }
-
 func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 	log.Println("HandlePostMetric invoked")
 
@@ -337,6 +334,129 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func (h *Handlers) handlePostMetricJSONValidate(w http.ResponseWriter, r *http.Request) (ok bool) {
+	if h.MemKeeper == nil {
+		http.Error(w, "storage not initiated", http.StatusInternalServerError)
+		return false
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
+		return false
+	}
+	return true
+}
+
+func (h *Handlers) getBody(w http.ResponseWriter, r *http.Request) (b []byte, ok bool) {
+
+	var bytesData []byte
+	var err error
+	var prev schema.PreviousBytes
+
+	if p := r.Context().Value(schema.PKey1); p != nil {
+		prev = p.(schema.PreviousBytes)
+	}
+	if prev != nil {
+		//body from previous handler
+		bytesData = prev
+		log.Printf("got body from previous handler:%v", string(bytesData))
+	} else {
+		//body from request if there is no previous handler
+		bytesData, err = io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
+			return nil, false
+		}
+		log.Printf("got body from request:%v", string(bytesData))
+	}
+	log.Printf("Server:json body received:" + string(bytesData))
+	return bytesData, true
+}
+func httpError(w http.ResponseWriter, err string, status int) {
+	http.Error(w, err, status)
+	log.Println("server:" + err)
+}
+
+func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("HandlePostMetricJSON invoked")
+		//validation
+		if !h.handlePostMetricJSONValidate(w, r) {
+			return
+		}
+		//Handle
+		//1. get body
+		bytesData, ok := h.getBody(w, r)
+		if !ok {
+			return
+		}
+		//2. JSON
+		var mj schema.MetricsJSON
+		err := json.Unmarshal(bytesData, &mj)
+		if err != nil {
+			httpError(w, "unmarshal error:", http.StatusBadRequest)
+			return
+		}
+		//3. Валидация полученных данных
+		if mj.ID == "" {
+			httpError(w, "not parsed, empty metric name!"+mj.ID, http.StatusNotFound)
+			return
+		}
+		//4.Проверяем подпись по ключу, нормально если ключ пуст в случае /update
+		if mj.Delta != nil || mj.Value != nil {
+			if !h.Signer.IsValidSign(mj) {
+				httpError(w, "sign is not confirmed error", http.StatusBadRequest)
+				log.Printf("server:sign is not confirmed error:%v", string(bytesData))
+				return
+
+			}
+		}
+		//Сохраняем в базу от агента и ответ обратно
+		err = h.writeToStorageAndRespond(&mj, w, r)
+		logFatal(err)
+
+		//Подписываем ответ если есть значение
+		if !(mj.Delta == nil && mj.Value == nil) {
+			err = h.Signer.Sign(&mj)
+			logFatal(err)
+			//перевод в json ответа
+		}
+		bytesData, err = json.Marshal(mj)
+		if err != nil || bytesData == nil {
+			httpError(w, " json response forming error", http.StatusInternalServerError)
+			return
+		}
+		//Set Header keys
+		w.Header().Set("Content-Type", "application/json")
+		//response
+		if next != nil {
+			//write handled body for further handle
+			ctx := context.WithValue(r.Context(), schema.PKey1, schema.PreviousBytes(bytesData))
+			//call further handler with context parameters
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
+	}
+}
+func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
+	log.Println("Chi routing error, unknown route to get handler")
+	log.Println("HandlePostErrorPattern invoked")
+	err := r.Body.Close()
+	if err != nil {
+		return
+	}
+}
+func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.Request) {
+
+	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
+	log.Println("Chi routing error, unknown route to get handler")
+	log.Println("HandlePostErrorPatternNoName invoked")
+	err := r.Body.Close()
+	if err != nil {
+		return
+	}
+}
 func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("WriteResponseBodyHandler invoked")
@@ -384,148 +504,18 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 
 }
 
-func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("HandlePostMetricJSON invoked")
-		log.Printf("requsest Content-Encoding:%v", r.Header.Get("Content-Encoding"))
-		//validation
-		if h.MemKeeper == nil {
-			http.Error(w, "storage not initiated", http.StatusInternalServerError)
-			return
-		}
-		if r.Method != http.MethodPost {
-			http.Error(w, "Only POST is allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		var bytesData []byte
-		var err error
-		var prev schema.PreviousBytes
-
-		if p := r.Context().Value(schema.PKey1); p != nil {
-			prev = p.(schema.PreviousBytes)
-		}
-
-		if prev != nil {
-			//body from previous handler
-			bytesData = prev
-			log.Printf("got body from previous handler:%v", string(bytesData))
-		} else {
-			//body from request if there is no previous handler
-			bytesData, err = io.ReadAll(r.Body)
-			if err != nil {
-				http.Error(w, "unrecognized request body:"+err.Error(), http.StatusBadRequest)
-				return
-			}
-			log.Printf("got body from request:%v", string(bytesData))
-		}
-		log.Printf("Server:json received:" + string(bytesData))
-		var mj schema.MetricsJSON
-		err = json.Unmarshal(bytesData, &mj)
-		if err != nil {
-			http.Error(w, "unmarshal error:", http.StatusBadRequest)
-			log.Println("unmarshal error:" + err.Error())
-			return
-		}
-		if mj.ID == "" {
-			http.Error(w, "not parsed, empty metric name!"+mj.ID, http.StatusNotFound)
-			log.Println("Error not parsed, empty metric name: 404")
-			return
-		}
-		//запрос пост в базу от агента
-		switch mj.MType {
-		case "gauge":
-			{
-				if mj.Value != nil {
-					mjVal := *mj.Value
-					//пишем если есть значение
-					mv := mVal.MetricValue(mVal.NewFloat(mjVal))
-					err := h.MemKeeper.SaveMetric(r.Context(), mj.ID, &mv)
-
-					if err != nil {
-						http.Error(w, "internal value add error", http.StatusInternalServerError)
-						return
-					}
-
-				}
-				//читаем  для ответа
-				var f float64 = 0
-				gv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
-				if err != nil {
-					log.Println("value not found")
-				} else {
-					f = gv.GetInternalValue().(float64)
-				}
-				mj.Value = &f
-			}
-		case "counter":
-			{
-				if mj.Delta != nil {
-					mjVal := *mj.Delta
-					//пишем если есть значение
-					prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
-					if err != nil {
-						prevMetricValue = mVal.NewCounterValue()
-					}
-					sum := mVal.NewInt(mjVal).AddValue(prevMetricValue)
-					err = h.MemKeeper.SaveMetric(r.Context(), mj.ID, &sum)
-					if err != nil {
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-						w.WriteHeader(http.StatusInternalServerError)
-					}
-				}
-				//читаем для ответа
-				var i int64 = 0
-				cv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
-				if err != nil {
-					log.Println("value not found")
-				} else {
-					i = cv.GetInternalValue().(int64)
-				}
-				mj.Delta = &i
-			}
-		default:
-			http.Error(w, mj.MType+" not recognized type", http.StatusNotImplemented)
-			return
-		}
-		//перевод в json ответа
-		bytesData, err = json.Marshal(mj)
-		if err != nil || bytesData == nil {
-			http.Error(w, " json response forming error", http.StatusInternalServerError)
-			return
-		}
-		//Set Header keys
-		w.Header().Set("Content-Type", "application/json")
-		//response
-		if next != nil {
-			//write handled body for further handle
-			prev = bytesData
-			ctx := context.WithValue(r.Context(), schema.PKey1, prev)
-			//call further handler with context parameters
-			next.ServeHTTP(w, r.WithContext(ctx))
-			return
-		}
-		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
-	}
-}
-
-func (h *Handlers) HandlePostErrorPattern(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
-	log.Println("Chi routing error, unknown route to get handler")
-	log.Println("HandlePostErrorPattern invoked")
-	err := r.Body.Close()
+func (h *Handlers) HandlePing(w http.ResponseWriter, r *http.Request) {
+	log.Println("HandlePing invoked")
+	conn, err := pgx.Connect(r.Context(), os.Getenv("DATABASE_DSN"))
 	if err != nil {
+		httpError(w, "server: ping handler: Unable to connect to database:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-}
-func (h *Handlers) HandlePostErrorPatternNoName(w http.ResponseWriter, r *http.Request) {
-
-	http.Error(w, "Unknown request,HandlePostErrorPattern invoked", http.StatusNotFound)
-	log.Println("Chi routing error, unknown route to get handler")
-	log.Println("HandlePostErrorPatternNoName invoked")
-	err := r.Body.Close()
-	if err != nil {
-		return
-	}
+	defer conn.Close(context.Background())
+	log.Println("server: ping handler: connection established, 200 OK ")
+	w.Write([]byte("200 OK"))
+	w.
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handlers) NewRouter() chi.Router {
@@ -545,12 +535,15 @@ func (h *Handlers) NewRouter() chi.Router {
 
 		//The sequence for get compressed metrics html list
 		//getListCompressed = handleList(compressList(writeList()))
-		getListCompressed = h.HandleGetMetricFieldListXXX(nil)
+		getListCompressed = h.HandleGetMetricFieldListSimple(nil)
 	)
 	r := chi.NewRouter()
 	//
+
+	// var p PingHandler
 	r.Route("/", func(r chi.Router) {
 		r.Get("/", getListCompressed)
+		r.Get("/ping", h.HandlePing)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		r.Post("/value", postJsonAndGetCompressed)
 		r.Post("/value/", postJsonAndGetCompressed)
@@ -565,4 +558,68 @@ func (h *Handlers) NewRouter() chi.Router {
 	})
 
 	return r
+}
+
+func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.ResponseWriter, r *http.Request) (err error) {
+	switch mj.MType {
+	case "gauge":
+		{
+			if mj.Value != nil {
+				mjVal := *mj.Value
+				//пишем если есть значение
+				mv := mVal.MetricValue(mVal.NewFloat(mjVal))
+				err := h.MemKeeper.SaveMetric(r.Context(), mj.ID, &mv)
+				if err != nil {
+					http.Error(w, "internal value add error", http.StatusInternalServerError)
+					return err
+				}
+			}
+			//читаем  для ответа
+			var f float64 = 0
+			gv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+			if err != nil {
+				log.Println("value not found")
+			} else {
+				f = gv.GetInternalValue().(float64)
+			}
+			mj.Value = &f
+		}
+	case "counter":
+		{
+			if mj.Delta != nil {
+				mjVal := *mj.Delta
+				//пишем если есть значение
+				prevMetricValue, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+				if err != nil {
+					prevMetricValue = mVal.NewCounterValue()
+				}
+				sum := mVal.NewInt(mjVal).AddValue(prevMetricValue)
+				err = h.MemKeeper.SaveMetric(r.Context(), mj.ID, &sum)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					w.WriteHeader(http.StatusInternalServerError)
+					return err
+				}
+			}
+			//читаем для ответа
+			var i int64 = 0
+			cv, err := h.MemKeeper.GetMetric(r.Context(), mj.ID)
+			if err != nil {
+				log.Println("server:value not found:" + mj.ID)
+			} else {
+				i = cv.GetInternalValue().(int64)
+			}
+			mj.Delta = &i
+		}
+	default:
+		mess := " not recognized type"
+		http.Error(w, mj.MType+mess, http.StatusNotImplemented)
+		return errors.New(mj.MType + mess)
+	}
+	return nil
+}
+func logFatal(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }

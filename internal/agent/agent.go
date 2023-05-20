@@ -3,8 +3,10 @@ package agent
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
+	sign "github.com/alphaonly/harvester/internal/signchecker"
 	"github.com/go-resty/resty/v2"
 
 	"log"
@@ -59,6 +61,7 @@ type Agent struct {
 	Configuration *conf.AgentConfiguration
 	baseURL       url.URL
 	Client        *resty.Client
+	Signer        sign.Signer
 }
 
 func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
@@ -72,6 +75,7 @@ func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
 			Host:   c.Address,
 		},
 		Client: client,
+		Signer: sign.NewSHA256(c.Key),
 	}
 }
 
@@ -81,11 +85,9 @@ func AddCounterData(common sendData, val Counter, name string, data map[*sendDat
 		JoinPath(name).
 		JoinPath(strconv.FormatUint(uint64(val), 10)) //value float
 
-	// empty := bytes.NewBufferString(URL.String()).Bytes()
 	sd := sendData{
 		url:  URL,
 		keys: common.keys,
-		// body: &empty, //need to transfer something
 	}
 	data[&sd] = true
 
@@ -108,13 +110,23 @@ func AddGaugeData(common sendData, val Gauge, name string, data map[*sendData]bo
 
 }
 
+func logFatal(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+
+}
 func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendData]bool) {
 	v := float64(val)
+
 	mj := schema.MetricsJSON{
 		ID:    name,
 		MType: "gauge",
 		Value: &v,
 	}
+	//Вычисляем hash и помещаем в mj.Hash
+	err := common.signer.Sign(&mj)
+	logFatal(err)
 
 	sd := sendData{
 		url:      common.url,
@@ -126,21 +138,23 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 }
 func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sendData]bool) {
 	v := int64(val)
-	var mj schema.MetricsJSON
 
-	mj = schema.MetricsJSON{
+	mj := schema.MetricsJSON{
 		ID:    name,
 		MType: "counter",
 		Delta: &v,
 	}
-
 	if val == -1 {
-		log.Println("Check API without value")
+		//API /value check
 		mj = schema.MetricsJSON{
 			ID:    name,
 			MType: "counter",
 		}
 	}
+
+	//Вычисляем hash и помещаем в mj.Hash
+	err := common.signer.Sign(&mj)
+	logFatal(err)
 
 	sd := sendData{
 		url:      common.url,
@@ -157,6 +171,7 @@ type sendData struct {
 	keys           HeaderKeys
 	JSONbody       *schema.MetricsJSON
 	compressedBody *[]byte
+	signer         sign.Signer
 }
 
 func (sd sendData) SendData(client *resty.Client) error {
@@ -307,8 +322,9 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			keys["Accept"] = "application/json"
 
 			data := sendData{
-				url:  a.baseURL.JoinPath("update"),
-				keys: keys,
+				url:    a.baseURL.JoinPath("update"),
+				keys:   keys,
+				signer: a.Signer,
 			}
 			AddGaugeDataJSON(data, metrics.Alloc, "Alloc", m)
 			AddGaugeDataJSON(data, metrics.Frees, "Frees", m)
@@ -339,18 +355,19 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddCounterDataJSON(data, metrics.PollCount, "PollCount", m)
 
 			//// value1, value2 := int64(rand.Int31()), int64(rand.Int31())
-			//// var value0 int64
-			//// value1, value2 := int64(1), int64(2)
-			//// // //check api no value POST with expected response
+			////// var value0 int64
+			////// value1, value2 := int64(1), int64(2)
+			////// // //check api no value POST with expected response
 			//baseURL := url.URL{Scheme: a.Configuration.Scheme, Host: a.Configuration.Address}
 			//dataAPI := sendData{
-			//	url:  baseURL.JoinPath("value"),
-			//	keys: keys,
+			//	url:    baseURL.JoinPath("value"),
+			//	keys:   keys,
+			//	signer: a.Signer,
 			//}
-			//// AddCounterDataJSON(dataAPI, Counter(value1), "SetGet12344", m)
-			//// AddCounterDataJSON(dataAPI, Counter(value2), "SetGet12344", m)
-			//AddCounterDataJSON(dataAPI, -1, "SetGet12344", m)
-			//// log.Printf("sum:%v", value1+value2+value0)
+			////AddCounterDataJSON(dataAPI, Counter(value1), "SetGet12344", m)
+			////AddCounterDataJSON(dataAPI, Counter(value2), "SetGet12344", m)
+			//AddCounterDataJSON(dataAPI, -1, "PollCount", m)
+			////log.Printf("sum:%v", value1+value2+value0)
 		}
 	default:
 		{

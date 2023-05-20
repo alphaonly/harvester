@@ -20,10 +20,11 @@ type ContextKey int
 const PKey1 ContextKey = 123455
 
 type MetricsJSON struct {
-	ID    string   `json:"id"`              // имя метрики
+	ID    string   `json:"id"`              // имя метрикИ
 	MType string   `json:"type"`            // параметр, пID    string   `json:"id"`              // имя метрикиринимающий значение gauge или counter
 	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
 	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
+	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
 func NewMetricJSON(name string, MType string, value interface{}) (ret MetricsJSON) {

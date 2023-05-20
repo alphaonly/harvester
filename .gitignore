@@ -20,6 +20,7 @@ cmd/server/server
 /cmd/httplib/
 
 
+devopstest-windows-amd64.exe
 
 # Dependency directories (remove the comment below to include it)
 vendor/

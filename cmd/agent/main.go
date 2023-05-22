@@ -8,6 +8,7 @@ import (
 
 	"github.com/alphaonly/harvester/internal/agent"
 	"github.com/alphaonly/harvester/internal/common"
+
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/go-resty/resty/v2"
 )

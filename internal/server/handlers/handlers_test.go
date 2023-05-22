@@ -105,7 +105,6 @@ func TestHandleMetric(t *testing.T) {
 	h := Handlers{Storage: s}
 
 
-	h := Handlers{MemKeeper: s}
 	r := h.NewRouter()
 
 	ts := httptest.NewServer(r)

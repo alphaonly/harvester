@@ -547,6 +547,10 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			w.Header().Set("Content-Encoding", "gzip")
 		}
+		if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+			w.Header().Add("Content-Type", "application/json")
+		}
+		//"Content-Type""application/json"
 		//Set Response Header
 		w.WriteHeader(http.StatusOK)
 		//write Response Body

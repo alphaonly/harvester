@@ -1,6 +1,5 @@
 package configuration
 
-
 import (
 	"encoding/json"
 	"flag"
@@ -312,9 +311,7 @@ func getEnv(variableName string, variableValue VariableValue, changed map[string
 	}
 	variableValue.Set(stringVal)
 	changed[variableName] = true
-	
-  log.Println("variable " + variableName + " presented in environment, value: " + stringVal)
+	log.Println("variable " + variableName + " presented in environment, value: " + stringVal)
 
 	return variableValue.Get()
-
 }

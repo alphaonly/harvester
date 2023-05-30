@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/alphaonly/harvester/internal/common"
+	"github.com/alphaonly/harvester/internal/server/crypto"
 	db "github.com/alphaonly/harvester/internal/server/storage/implementations/dbstorage"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 
 	"github.com/alphaonly/harvester/internal/signchecker"
-
 )
 
 var buildVersion string = "N/A"
@@ -47,13 +47,14 @@ func main() {
 		Conf:    conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
 	}
 
-	metricsServer := server.New(configuration, externalStorage, handlers)
 
+	certificate := crypto.NewRSA(9669,configuration)
+	Server := server.New(configuration, externalStorage, handlers, certificate)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err := metricsServer.Run(ctx)
+	err := Server.Run(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -7,7 +7,10 @@ import (
 	"os/signal"
 
 	"github.com/alphaonly/harvester/internal/agent"
+	acrypto "github.com/alphaonly/harvester/internal/agent/crypto"
 	"github.com/alphaonly/harvester/internal/common"
+	"github.com/alphaonly/harvester/internal/common/crypto"
+	"github.com/alphaonly/harvester/internal/common/logging"
 
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/go-resty/resty/v2"
@@ -27,8 +30,15 @@ func main() {
 	ac := conf.NewAgentConf(conf.UpdateACFromEnvironment, conf.UpdateACFromFlags)
 	//resty client
 	client := resty.New().SetRetryCount(10)
-	//Run agent (with context)
-	agent.NewAgent(ac, client).Run(ctx)
+
+	//check file for rsa
+	buf, err := acrypto.CheckCertificateFile(ac)
+	logging.LogFatal(err)
+	//get rsa private key
+	rsa, err := acrypto.NewRSA().Receive(crypto.Public(), buf)
+	logging.LogFatal(err)
+	//Run agent
+	agent.NewAgent(ac, client, rsa).Run(ctx)
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)
 	signal.Notify(channel, os.Interrupt)

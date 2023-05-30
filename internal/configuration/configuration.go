@@ -12,8 +12,8 @@ import (
 	"github.com/alphaonly/harvester/internal/schema"
 )
 
-const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":""}`
-const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1}`
+const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":"","CRYPTO_KEY":"","ENABLE_HTTPS":false}`
+const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":""}`
 
 type AgentConfiguration struct {
 	Address        string          `json:"ADDRESS,omitempty"`
@@ -24,6 +24,7 @@ type AgentConfiguration struct {
 	UseJSON        int             `json:"USE_JSON,omitempty"`
 	Key            string          `json:"KEY,omitempty"`
 	RateLimit      int             `json:"RATE_LIMIT,omitempty"`
+	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"`
 	EnvChanged     map[string]bool
 }
 
@@ -35,6 +36,8 @@ type ServerConfiguration struct {
 	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
 	Key           string          `json:"KEY,omitempty"`
 	DatabaseDsn   string          `json:"DATABASE_DSN,omitempty"`
+	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"`
+	EnableHTTPS   bool            `json:"ENABLE_HTTPS,omitempty"`
 	EnvChanged    map[string]bool
 }
 
@@ -102,6 +105,7 @@ func UpdateACFromEnvironment(c *AgentConfiguration) {
 	c.UseJSON = getEnv("USE_JSON", &IntValue{c.UseJSON}, c.EnvChanged).(int)
 	c.Key = getEnv("KEY", &StrValue{c.Key}, c.EnvChanged).(string)
 	c.RateLimit = getEnv("RATE_LIMIT", &IntValue{c.RateLimit}, c.EnvChanged).(int)
+	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
 }
 
 func UpdateSCFromEnvironment(c *ServerConfiguration) {
@@ -113,6 +117,8 @@ func UpdateSCFromEnvironment(c *ServerConfiguration) {
 	//PORT is derived from ADDRESS
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
 	c.DatabaseDsn = getEnv("DATABASE_DSN", &StrValue{c.DatabaseDsn}, c.EnvChanged).(string)
+	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
+	c.EnableHTTPS = getEnv("ENABLE_HTTPS", &BoolValue{c.EnableHTTPS}, c.EnvChanged).(bool)
 }
 
 func UpdateACFromFlags(c *AgentConfiguration) {
@@ -125,6 +131,7 @@ func UpdateACFromFlags(c *AgentConfiguration) {
 		t = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
 		k = flag.String("k", dc.Key, "string key for hash signing")
 		l = flag.Int("l", dc.RateLimit, "Number of parallel inbound requests ")
+		cr = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a public key file ")
 	)
 
 	flag.Parse()
@@ -163,6 +170,10 @@ func UpdateACFromFlags(c *AgentConfiguration) {
 		c.RateLimit = *l
 		log.Printf(message, "RATE_LIMIT", c.RateLimit)
 	}
+	if !c.EnvChanged["CRYPTO_KEY"] {
+		c.CryptoKey = *cr
+		log.Printf(message, "CRYPTO_KEY", c.CryptoKey)
+	}
 }
 
 func UpdateSCFromFlags(c *ServerConfiguration) {
@@ -176,6 +187,8 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 		r = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
 		k = flag.String("k", dc.Key, "string key for hash signing")
 		d = flag.String("d", dc.DatabaseDsn, "database destination string")
+		cr = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a private key file ")
+		s = flag.Bool("s", dc.EnableHTTPS, "a bool flag whether HTTPS is supported")
 	)
 	flag.Parse()
 
@@ -206,6 +219,14 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 	if !c.EnvChanged["DATABASE_DSN"] {
 		c.DatabaseDsn = *d
 		log.Printf(message, "DATABASE_DSN", c.DatabaseDsn)
+	}
+	if !c.EnvChanged["CRYPTO_KEY"] {
+		c.CryptoKey = *cr
+		log.Printf(message, "CRYPTO_KEY", c.CryptoKey)
+	}
+	if !c.EnvChanged["ENABLE_HTTPS"] {
+		c.EnableHTTPS = *s
+		log.Printf(message, "ENABLE_HTTPS", c.EnableHTTPS)
 	}
 }
 

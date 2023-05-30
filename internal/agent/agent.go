@@ -1,15 +1,18 @@
 package agent
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"runtime"
 	"sync"
 
 	"github.com/alphaonly/harvester/internal/agent/workerpool"
+	"github.com/alphaonly/harvester/internal/common/crypto"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
 	sign "github.com/alphaonly/harvester/internal/signchecker"
@@ -72,11 +75,11 @@ type Agent struct {
 	baseURL       url.URL
 	Client        *resty.Client
 	Signer        sign.Signer
+	Rsa           crypto.CertificateManager
 	UpdateLocker  *sync.RWMutex
 }
 
-func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
-
+func NewAgent(c *conf.AgentConfiguration, client *resty.Client, rsa crypto.CertificateManager) Agent {
 
 	return Agent{
 		Configuration: c,
@@ -88,6 +91,7 @@ func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
 		Client:       client,
 		Signer:       sign.NewSHA256(c.Key),
 		UpdateLocker: new(sync.RWMutex),
+		Rsa:          rsa,
 	}
 }
 
@@ -232,7 +236,6 @@ func (sd sendData) SendData(client *resty.Client) error {
 
 	r := client.R().
 		SetHeaders(sd.keys)
-
 	if sd.JSONBody != nil {
 		r.SetBody(sd.JSONBody)
 	} else if sd.JSONBatchBody != nil {
@@ -249,7 +252,6 @@ func (sd sendData) SendData(client *resty.Client) error {
 	log.Println("agent:response status from server:" + resp.Status())
 	log.Printf("agent:response body from server:%v", string(resp.Body()))
 	log.Printf("Content-Encoding:%v", resp.Header().Get("Content-Encoding"))
-
 
 	return err
 }
@@ -297,7 +299,6 @@ repeatAgain:
 			metrics.TotalAlloc = Gauge(m.TotalAlloc)
 			metrics.RandomValue = Gauge(rand.Int63())
 			metrics.PollCount++
-
 
 			a.UpdateLocker.Unlock()
 			goto repeatAgain
@@ -349,29 +350,7 @@ repeatAgain:
 func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 
 	switch a.Configuration.CompressType {
-	// case "deflate":
-	// 	{
-	// 		for k := range data {
 
-	// 			var b bytes.Buffer
-
-	// 			w, err := flate.NewWriter(&b, flate.BestCompression)
-	// 			if err != nil {
-	// 				log.Fatalf("failed init compress writer: %v", err)
-	// 			}
-	// 			_, err = w.Write(*k.JSONBody)
-	// 			if err != nil {
-	// 				log.Fatalf("failed write data to compress temporary buffer: %v", err)
-	// 			}
-
-	// 			err = w.Close()
-	// 			if err != nil {
-	// 				log.Fatalf("failed compress data: %v", err)
-	// 			}
-	// 			body := b.Bytes()
-	// 			k.JSONBody = &body
-	// 		}
-	// 	}
 	case "gzip":
 		{
 			var body any
@@ -601,7 +580,7 @@ repeatAgain:
 				i++
 				name := fmt.Sprintf("Send metric job %v", i)
 				switch a.Configuration.RateLimit {
-				case 0,1:
+				case 0, 1:
 					{
 						err := key.SendData(a.Client)
 						if err != nil {
@@ -611,8 +590,8 @@ repeatAgain:
 					}
 				default:
 					{
-						job:=workerpool.Job[*sendData]{Name: name, Data: key, Func: f}
-						wp.SendJob(ctx,job)
+						job := workerpool.Job[*sendData]{Name: name, Data: key, Func: f}
+						wp.SendJob(ctx, job)
 					}
 				}
 			}
@@ -628,10 +607,31 @@ repeatAgain:
 
 func (a Agent) Run(ctx context.Context) {
 
-
 	metrics := Metrics{}
 	go a.Update(ctx, &metrics)
 	go a.UpdateGOPS(ctx, &metrics)
 	go a.Send(ctx, &metrics)
+
+}
+
+func (a *Agent) CheckCertificateFile(dataType crypto.DataType) error {
+	if a.Configuration.CryptoKey == "" {
+		log.Println("path to given public key file is not defined")
+		return nil
+	}
+	//Reading file with rsa key from os
+	file, err := os.OpenFile(a.Configuration.CryptoKey, os.O_RDWR|os.O_CREATE, 0777)
+	if err != nil {
+		log.Printf("error:file %v  is not read", file)
+		return err
+	}
+	//put data to read buffer
+	buf := bufio.NewReader(file)
+	_, err = a.Rsa.Receive(dataType, buf)
+	if err != nil {
+		log.Println("error:private rsa is not read")
+		return err
+	}
+	return nil
 
 }

@@ -38,4 +38,4 @@ internal/agent/agentjson/
 /cmd/tests/
 /cmd/tests/test.go
 /cmd/tests/restycheck.go
-
+/cmd/server/rsa/

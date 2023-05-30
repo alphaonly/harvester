@@ -8,7 +8,7 @@ require (
 	github.com/jackc/pgx/v5 v5.3.1
 	github.com/shirou/gopsutil/v3 v3.23.2
 	github.com/stretchr/testify v1.8.2
-	golang.org/x/net v0.10.0
+	golang.org/x/net v0.10.0 // indirect
 )
 
 require (

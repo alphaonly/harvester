@@ -21,12 +21,12 @@ type Configuration struct {
 }
 
 type Server struct {
-	configuration   *conf.ServerConfiguration
+	cfg             *conf.ServerConfiguration
 	InternalStorage stor.Storage
 	ExternalStorage stor.Storage
 	handlers        *handlers.Handlers
 	httpServer      *http.Server
-	crypto          cryptoCommon.CertificateManager
+	crypto          cryptoCommon.ServerCertificateManager
 }
 
 func NewConfiguration(serverPort string) *Configuration {
@@ -37,10 +37,10 @@ func New(
 	configuration *conf.ServerConfiguration,
 	ExStorage stor.Storage,
 	handlers *handlers.Handlers,
-	certificate cryptoCommon.CertificateManager) (server Server) {
+	certificate cryptoCommon.ServerCertificateManager) (server Server) {
 
 	return Server{
-		configuration:   configuration,
+		cfg:             configuration,
 		InternalStorage: handlers.Storage,
 		ExternalStorage: ExStorage,
 		handlers:        handlers,
@@ -51,11 +51,14 @@ func New(
 func (s Server) ListenData(ctx context.Context) {
 
 	var err error
-	if s.configuration.CryptoKey == "" {
+	if s.cfg.CryptoKey == "" {
 		err = s.httpServer.ListenAndServe()
-	} else if s.configuration.EnableHTTPS {
-		//"/home/asus/goProjects/harvester/cmd/server/rsa/private/cert.rsa"
-		err = s.httpServer.ListenAndServeTLS(s.configuration.CryptoKey, s.configuration.CryptoKey)
+	} else if s.cfg.EnableHTTPS {
+		if s.cfg.CryptoCert == "" {
+			log.Fatal("path to certificate file is undefined")
+		}
+		err = s.httpServer.ListenAndServeTLS(s.cfg.CryptoCert, s.cfg.CryptoKey)
+
 	}
 
 	if err != nil {
@@ -67,13 +70,11 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// маршрутизация запросов обработчику
 	s.httpServer = &http.Server{
-		Addr:    s.configuration.Address,
+		Addr:    s.cfg.Address,
 		Handler: s.handlers.NewRouter(),
 	}
 
 	s.restoreData(ctx, s.ExternalStorage)
-
-	s.CheckCertificateFile(cryptoCommon.Private())
 
 	go s.ListenData(ctx)
 	go s.ParkData(ctx, s.ExternalStorage)
@@ -98,7 +99,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 		log.Println("external storage  not initiated ")
 		return
 	}
-	if s.configuration.Restore {
+	if s.cfg.Restore {
 		mvList, err := storageFrom.GetAllMetrics(ctx)
 
 		if err != nil {
@@ -129,7 +130,7 @@ func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval))
+	ticker := time.NewTicker(time.Duration(s.cfg.StoreInterval))
 
 	defer ticker.Stop()
 
@@ -165,58 +166,30 @@ DoItAgain:
 }
 
 func (s *Server) CheckCertificateFile(dataType cryptoCommon.DataType) error {
-	if !s.configuration.EnableHTTPS {
+	if !s.cfg.EnableHTTPS {
 		return nil
 	}
-	if s.configuration.CryptoKey == "" {
+	if s.cfg.CryptoKey == "" {
 		//generate certificates in test folder
-		genCryptoFiles()
+		crypto.MakeCryptoFiles("rsa", s.cfg, nil)
 		log.Println("path to rsa files is not defined, new rsa files were generated in /rsa/ folder")
 		return nil
 	}
 
 	//Reading file with rsa key from os
-	file, err := os.OpenFile(s.configuration.CryptoKey, os.O_RDONLY, 0777)
+	file, err := os.OpenFile(s.cfg.CryptoKey, os.O_RDONLY, 0777)
 	if err != nil {
 		log.Printf("error:file %v  is not read", file)
 		return err
 	}
 	//put data to read buffer
 	buf := bufio.NewReader(file)
-	rsa := crypto.RSA{}
-	_, err = rsa.Receive(dataType, buf)
-	if err != nil {
+	rs := crypto.RSA{}
+	rs.Receive(dataType, buf)
+	if rs.Error() != nil {
 		log.Println("error:private rsa is not read")
-		return err
+		return rs.Error()
 	}
 	return nil
-
-}
-
-func genCryptoFiles() {
-	prefPath, _ := os.Getwd()
-	fileMap := cryptoCommon.DataTypeMap{
-		prefPath + "/rsa/cert.rsa":    cryptoCommon.Certificate,
-		prefPath + "/rsa/public.rsa":  cryptoCommon.Public,
-		prefPath + "/rsa/private.rsa": cryptoCommon.Private}
-
-	rsa := crypto.NewRSA(6996, &conf.ServerConfiguration{EnableHTTPS: true})
-	for filename, dataTypeFunc := range fileMap {
-		file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0777)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fileWriter := bufio.NewWriter(file)
-		rsa.Send(dataTypeFunc(), fileWriter)
-		err = fileWriter.Flush()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		err = file.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 
 }

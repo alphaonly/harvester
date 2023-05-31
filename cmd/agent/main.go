@@ -9,7 +9,6 @@ import (
 	"github.com/alphaonly/harvester/internal/agent"
 	acrypto "github.com/alphaonly/harvester/internal/agent/crypto"
 	"github.com/alphaonly/harvester/internal/common"
-	"github.com/alphaonly/harvester/internal/common/crypto"
 	"github.com/alphaonly/harvester/internal/common/logging"
 
 	conf "github.com/alphaonly/harvester/internal/configuration"
@@ -31,14 +30,25 @@ func main() {
 	//resty client
 	client := resty.New().SetRetryCount(10)
 
+	// //load rsa pem files
+	// if ac.CryptoKey != "" {
+	// 	cert, err := tls.LoadX509KeyPair(ac.CryptoCert, ac.CryptoKey)
+	// 	if err != nil {
+	// 		log.Fatalf("ERROR client certificate: %s", err)
+	// 	}
+
+	// 	client.Set
+	// }
+	//https://github.com/go-resty/resty#custom-root-certificates-and-client-certificates
+	//https://github.com/go-resty/resty/discussions/571
 	//check file for rsa
 	buf, err := acrypto.CheckCertificateFile(ac)
 	logging.LogFatal(err)
-	//get rsa private key
-	rsa, err := acrypto.NewRSA().Receive(crypto.Public(), buf)
-	logging.LogFatal(err)
+	//get cm public key
+	cm := acrypto.NewRSA(ac).ReceivePublic(buf)
+	logging.LogFatal(cm.Error())
 	//Run agent
-	agent.NewAgent(ac, client, rsa).Run(ctx)
+	agent.NewAgent(ac, client, cm).Run(ctx)
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)
 	signal.Notify(channel, os.Interrupt)

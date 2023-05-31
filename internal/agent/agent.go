@@ -1,13 +1,11 @@
 package agent
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"runtime"
 	"sync"
 
@@ -75,11 +73,11 @@ type Agent struct {
 	baseURL       url.URL
 	Client        *resty.Client
 	Signer        sign.Signer
-	Rsa           crypto.CertificateManager
+	Cm            crypto.AgentCertificateManager
 	UpdateLocker  *sync.RWMutex
 }
 
-func NewAgent(c *conf.AgentConfiguration, client *resty.Client, rsa crypto.CertificateManager) Agent {
+func NewAgent(c *conf.AgentConfiguration, client *resty.Client, cm crypto.AgentCertificateManager) Agent {
 
 	return Agent{
 		Configuration: c,
@@ -91,7 +89,7 @@ func NewAgent(c *conf.AgentConfiguration, client *resty.Client, rsa crypto.Certi
 		Client:       client,
 		Signer:       sign.NewSHA256(c.Key),
 		UpdateLocker: new(sync.RWMutex),
-		Rsa:          rsa,
+		Cm:           cm,
 	}
 }
 
@@ -243,7 +241,7 @@ func (sd sendData) SendData(client *resty.Client) error {
 	} else {
 		return errors.New("both bodies is nil")
 	}
-
+	
 	resp, err := r.
 		Post(sd.url.String())
 	if err != nil {
@@ -611,27 +609,5 @@ func (a Agent) Run(ctx context.Context) {
 	go a.Update(ctx, &metrics)
 	go a.UpdateGOPS(ctx, &metrics)
 	go a.Send(ctx, &metrics)
-
-}
-
-func (a *Agent) CheckCertificateFile(dataType crypto.DataType) error {
-	if a.Configuration.CryptoKey == "" {
-		log.Println("path to given public key file is not defined")
-		return nil
-	}
-	//Reading file with rsa key from os
-	file, err := os.OpenFile(a.Configuration.CryptoKey, os.O_RDWR|os.O_CREATE, 0777)
-	if err != nil {
-		log.Printf("error:file %v  is not read", file)
-		return err
-	}
-	//put data to read buffer
-	buf := bufio.NewReader(file)
-	_, err = a.Rsa.Receive(dataType, buf)
-	if err != nil {
-		log.Println("error:private rsa is not read")
-		return err
-	}
-	return nil
 
 }

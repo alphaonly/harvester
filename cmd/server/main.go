@@ -47,9 +47,8 @@ func main() {
 		Conf:    conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
 	}
 
-
-	certificate := crypto.NewRSA(9669,configuration)
-	Server := server.New(configuration, externalStorage, handlers, certificate)
+	certManager := crypto.NewRSA(9669, configuration)
+	Server := server.New(configuration, externalStorage, handlers, certManager)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

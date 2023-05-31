@@ -9,12 +9,15 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"io"
 	"log"
 	"math/big"
 	"net"
+	"os"
 	"time"
 
 	cryptoCommon "github.com/alphaonly/harvester/internal/common/crypto"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	"github.com/alphaonly/harvester/internal/configuration"
 )
 
@@ -22,12 +25,14 @@ type RSA struct {
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
 	certBytes  []byte
+	err        error
 }
 
-func NewRSA(serialNumber int64, configuration *configuration.ServerConfiguration) cryptoCommon.CertificateManager {
-	if !configuration.EnableHTTPS {
-		return &RSA{}
+func NewRSA(serialNumber int64, cfg *configuration.ServerConfiguration) cryptoCommon.ServerCertificateManager {
+	if !cfg.EnableHTTPS {
+		return nil
 	}
+
 	cert := &x509.Certificate{
 		// указываем уникальный номер сертификата
 		SerialNumber: big.NewInt(serialNumber),
@@ -49,126 +54,200 @@ func NewRSA(serialNumber int64, configuration *configuration.ServerConfiguration
 		KeyUsage:    x509.KeyUsageDigitalSignature,
 	}
 
-	// создаём новый приватный RSA-ключ длиной 4096 бит
-	// обратите внимание, что для генерации ключа и сертификата
-	// используется rand.Reader в качестве источника случайных данных
-	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		log.Fatal(err)
-	}
+	var privateKey *rsa.PrivateKey
+	var err error
+	//Analyze privateKeyData if it given create certificate based on it
+	if cfg.CryptoKey != "" {
+		//read file with private key
+		file, err := os.OpenFile(cfg.CryptoKey, os.O_RDONLY, 0777)
+		logging.LogFatal(err)
 
-	// создаём сертификат x.509
-	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		log.Fatal(err)
+		//make new instance of RSA to get private key data
+		r := &RSA{}
+		privateKeyBuf := r.Receive(cryptoCommon.PRIVATE, file).GetPrivate()
+		logging.LogFatal(r.Error())
+
+		//parsing PEM decoded
+		privateKey, err = x509.ParsePKCS1PrivateKey(privateKeyBuf.Bytes())
+		logging.LogFatal(err)
 	}
-	
-	return &RSA{privateKey: privateKey,
+	//if privateKeyData was not given, then generate  private key
+	if privateKey == nil {
+		privateKey, err = rsa.GenerateKey(rand.Reader, 4096)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	// create cert x.509
+	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privateKey.PublicKey, privateKey)
+	logging.LogFatal(err)
+
+	cm := &RSA{privateKey: privateKey,
 		publicKey: &privateKey.PublicKey,
 		certBytes: certBytes}
+
+	MakeCryptoFiles("/rsa/", cfg, cm)
+
+	return cm
 }
 
-func (r *RSA) GetPublic() (*bytes.Buffer, error) {
+func (r *RSA) GetPublic() *bytes.Buffer {
+	if r.Error() != nil {
+		logging.LogPrintln(r.Error())
+		return nil
+	}
+	b := x509.MarshalPKCS1PublicKey(r.publicKey)
 
-	if r.certBytes == nil {
-		return nil, errors.New("")
+	return bytes.NewBuffer(b)
+}
+func (r *RSA) GetPrivate() *bytes.Buffer {
+	if r.Error() != nil {
+		logging.LogPrintln(r.Error())
+		return nil
 	}
 
-	return bytes.NewBuffer(r.certBytes), nil
+	b := x509.MarshalPKCS1PrivateKey(r.privateKey)
+	return bytes.NewBuffer(b)
 }
-func (r *RSA) GetPrivate() (*bytes.Buffer, error) {
 
-	return nil, nil
-}
-func (r RSA) Send(dataType cryptoCommon.DataType, b *bufio.Writer) (err error) {
-	switch dataType.GetType() {
-	case cryptoCommon.CERTIFICATE_TYPE:
+// Sends encoded in PEM cert or keys in writer
+func (r *RSA) Send(dataType cryptoCommon.DataType, b io.Writer) cryptoCommon.ServerCertificateManager {
+	if r.Error() != nil {
+		return r
+	}
+	switch dataType {
+	case cryptoCommon.CERTIFICATE:
 		{
 			// encode certificate and public key in PEM format
 			err := pem.Encode(b, &pem.Block{
 				Type:  "CERTIFICATE",
 				Bytes: r.certBytes,
 			})
-			if err != nil {
-				return err
-			}
+			logging.LogPrintln(err)
+			r.err = err
 		}
-	case cryptoCommon.PUBLIC_TYPE:
+	case cryptoCommon.PUBLIC:
 		{
 			// encode  public key in PEM format
 			err := pem.Encode(b, &pem.Block{
 				Type:  "RSA PUBLIC KEY",
 				Bytes: x509.MarshalPKCS1PublicKey(r.publicKey),
 			})
-			if err != nil {
-				return err
-			}
+			logging.LogPrintln(err)
+			r.err = err
+
 		}
-	case cryptoCommon.PRIVATE_TYPE:
+	case cryptoCommon.PRIVATE:
 		{
 			// encode  private key in PEM format
 			err := pem.Encode(b, &pem.Block{
 				Type:  "RSA PRIVATE KEY",
 				Bytes: x509.MarshalPKCS1PrivateKey(r.privateKey),
 			})
-			if err != nil {
-				return err
-			}
+			logging.LogPrintln(err)
+			r.err = err
 		}
 	default:
-		return errors.New("unknown data type to publish")
+		r.err = errors.New("unknown data type to publish")
 	}
-
-	return nil
+	return r
 }
 
-func (r *RSA) Receive(dataType cryptoCommon.DataType, buf *bufio.Reader) (cryptoCommon.CertificateManager, error) {
+func (r *RSA) Receive(dataType cryptoCommon.DataType, buf io.Reader) cryptoCommon.ServerCertificateManager {
+	if r.err != nil {
+		return r
+	}
 
-	 bytesPEM := make([]byte,4096)
+	bytesPEM := make([]byte, 4096)
 	_, err := buf.Read(bytesPEM)
 	if err != nil {
 		log.Println(err)
-		return nil, err
+		r.err = err
+		return &RSA{err: err}
 	}
 
-	switch dataType.GetType() {
-	case cryptoCommon.CERTIFICATE_TYPE:
+	block, _ := pem.Decode(bytesPEM)
+
+	switch dataType {
+	case cryptoCommon.CERTIFICATE:
 		{
 			// decode certificate and public key in PEM format
-			block, _ := pem.Decode(bytesPEM)
 			if block == nil {
-				log.Fatal("certificate is not found")
+				r.err = errors.New("certificate is not found")
+				logging.LogPrintln(err)
+				return r
 			}
 			r.certBytes = block.Bytes
 		}
-	case cryptoCommon.PUBLIC_TYPE:
+	case cryptoCommon.PUBLIC:
 		{
 			// decode   public key in PEM format
-			block, _ := pem.Decode(bytesPEM)
 			if block == nil {
-				log.Fatal("public key is not found")
+				r.err = errors.New("public key is not found")
+				logging.LogPrintln(err)
+				return r
 			}
 			r.publicKey, err = x509.ParsePKCS1PublicKey(block.Bytes)
-			if err != nil {
-				log.Fatal(err)
-			}
-
+			r.err = err
+			logging.LogPrintln(err)
 		}
-	case cryptoCommon.PRIVATE_TYPE:
+	case cryptoCommon.PRIVATE:
 		{
 			// decode  private key in PEM format
-			block, _ := pem.Decode(bytesPEM)
 			if block == nil {
-				log.Fatal("private key is not found")
+				r.err = errors.New("private key is not found")
+				logging.LogPrintln(err)
+				return r
 			}
 
 			r.privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-			if err != nil {
-				log.Fatal(err)
-			}
+			r.err = err
+			logging.LogPrintln(err)
+
 		}
 	default:
-		return nil, errors.New("unknown data type to publish")
+		{
+			r.err = errors.New("unknown data type to publish")
+			logging.LogPrintln(err)
+			return r
+
+		}
 	}
-	return r, nil
+	return r
+}
+func (r *RSA) Error() error {
+	return r.err
+}
+
+// MakeCryptoFiles - Makes files from data in certificate manager to /rsa/ folder
+func MakeCryptoFiles(subFolder string, cfg *configuration.ServerConfiguration, cm cryptoCommon.ServerCertificateManager) {
+	prefPath, _ := os.Getwd()
+
+	//save cert and  keys in another folder
+	cfg.CryptoCert = prefPath + "/" + subFolder + "/cert.rsa"
+	cfg.CryptoPub = prefPath + "/" + subFolder + "/public.rsa"
+
+	fileMap := cryptoCommon.DataTypeMap{
+		cfg.CryptoCert: cryptoCommon.CERTIFICATE,
+		cfg.CryptoPub:  cryptoCommon.PUBLIC,
+		prefPath + "/" + subFolder + "/private.rsa": cryptoCommon.PRIVATE}
+	if cm == nil {
+		cm = NewRSA(6996, &configuration.ServerConfiguration{EnableHTTPS: true})
+	}
+	for fileName, dataType := range fileMap {
+		file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0777)
+		logging.LogFatal(err)
+		fileWriter := bufio.NewWriter(file)
+		//Send certificate manager data to file writer
+		cm.Send(dataType, fileWriter)
+		logging.LogFatal(cm.Error())
+		//write down data to file
+		err = fileWriter.Flush()
+		logging.LogFatal(err)
+
+		//close file
+		err = file.Close()
+		logging.LogFatal(err)
+	}
+
 }

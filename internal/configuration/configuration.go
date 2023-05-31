@@ -13,7 +13,7 @@ import (
 )
 
 const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":"","CRYPTO_KEY":"","ENABLE_HTTPS":false}`
-const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":""}`
+const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":"","CRYPTO_CERT":"/home/asus/goProjects/harvester/cmd/agent/rsa/public/cert.rsa"}`
 
 type AgentConfiguration struct {
 	Address        string          `json:"ADDRESS,omitempty"`
@@ -24,7 +24,8 @@ type AgentConfiguration struct {
 	UseJSON        int             `json:"USE_JSON,omitempty"`
 	Key            string          `json:"KEY,omitempty"`
 	RateLimit      int             `json:"RATE_LIMIT,omitempty"`
-	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"`
+	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"`  //path to public key file
+	CryptoCert     string          `json:"CRYPTO_CERT,omitempty"` //path to certificate file
 	EnvChanged     map[string]bool
 }
 
@@ -36,7 +37,9 @@ type ServerConfiguration struct {
 	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
 	Key           string          `json:"KEY,omitempty"`
 	DatabaseDsn   string          `json:"DATABASE_DSN,omitempty"`
-	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"`
+	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"`  //path to private key file
+	CryptoCert    string          `json:"CRYPTO_CERT,omitempty"` //path to certificate file, is felt internally
+	CryptoPub     string          `json:"CRYPTO_PUB,omitempty"`  //path to public key file, is felt internally
 	EnableHTTPS   bool            `json:"ENABLE_HTTPS,omitempty"`
 	EnvChanged    map[string]bool
 }
@@ -124,13 +127,13 @@ func UpdateSCFromEnvironment(c *ServerConfiguration) {
 func UpdateACFromFlags(c *AgentConfiguration) {
 	dc := NewAgentConfiguration()
 	var (
-		a = flag.String("a", dc.Address, "Domain name and :port")
-		p = flag.Duration("p", time.Duration(dc.PollInterval), "Poll interval")
-		r = flag.Duration("r", time.Duration(dc.ReportInterval), "Report interval")
-		j = flag.Int("j", dc.UseJSON, "Use JSON 0-No JSON,1- JSON, 2-JSON Batch")
-		t = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
-		k = flag.String("k", dc.Key, "string key for hash signing")
-		l = flag.Int("l", dc.RateLimit, "Number of parallel inbound requests ")
+		a  = flag.String("a", dc.Address, "Domain name and :port")
+		p  = flag.Duration("p", time.Duration(dc.PollInterval), "Poll interval")
+		r  = flag.Duration("r", time.Duration(dc.ReportInterval), "Report interval")
+		j  = flag.Int("j", dc.UseJSON, "Use JSON 0-No JSON,1- JSON, 2-JSON Batch")
+		t  = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
+		k  = flag.String("k", dc.Key, "string key for hash signing")
+		l  = flag.Int("l", dc.RateLimit, "Number of parallel inbound requests ")
 		cr = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a public key file ")
 	)
 
@@ -181,14 +184,14 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 	dc := NewServerConfiguration()
 
 	var (
-		a = flag.String("a", dc.Address, "Domain name and :port")
-		i = flag.Duration("i", time.Duration(dc.StoreInterval), "Store interval")
-		f = flag.String("f", dc.StoreFile, "Store file full path")
-		r = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
-		k = flag.String("k", dc.Key, "string key for hash signing")
-		d = flag.String("d", dc.DatabaseDsn, "database destination string")
+		a  = flag.String("a", dc.Address, "Domain name and :port")
+		i  = flag.Duration("i", time.Duration(dc.StoreInterval), "Store interval")
+		f  = flag.String("f", dc.StoreFile, "Store file full path")
+		r  = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
+		k  = flag.String("k", dc.Key, "string key for hash signing")
+		d  = flag.String("d", dc.DatabaseDsn, "database destination string")
 		cr = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a private key file ")
-		s = flag.Bool("s", dc.EnableHTTPS, "a bool flag whether HTTPS is supported")
+		s  = flag.Bool("s", dc.EnableHTTPS, "a bool flag whether HTTPS is supported")
 	)
 	flag.Parse()
 

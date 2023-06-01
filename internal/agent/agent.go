@@ -11,6 +11,7 @@ import (
 
 	"github.com/alphaonly/harvester/internal/agent/workerpool"
 	"github.com/alphaonly/harvester/internal/common/crypto"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
 	sign "github.com/alphaonly/harvester/internal/signchecker"
@@ -225,23 +226,26 @@ type sendData struct {
 	JSONBody       *schema.MetricsJSON
 	JSONBatchBody  *[]schema.MetricsJSON
 	compressedBody *[]byte
+	encryptedBody  *[]byte
 	signer         sign.Signer
 }
 
 func (sd sendData) SendData(client *resty.Client) error {
 
 	//a resty attempt
-
 	r := client.R().
 		SetHeaders(sd.keys)
-	if sd.JSONBody != nil {
+	switch {
+	case sd.encryptedBody != nil:
+		r.SetBody(sd.encryptedBody)
+	case sd.JSONBody != nil:
 		r.SetBody(sd.JSONBody)
-	} else if sd.JSONBatchBody != nil {
+	case sd.JSONBatchBody != nil:
 		r.SetBody(sd.JSONBatchBody)
-	} else {
+	default:
 		return errors.New("both bodies is nil")
 	}
-	
+
 	resp, err := r.
 		Post(sd.url.String())
 	if err != nil {
@@ -434,6 +438,14 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddGaugeDataJSONToBatch(data, metrics.FreeMemory, "FreeMemory")
 			AddGaugeDataJSONToBatch(data, metrics.CPUutilization1, "CPUutilization1")
 
+			//Encrypt data to send with TLS public key
+			if a.Configuration.CryptoKey != "" {
+				bts, err := json.Marshal(&data.JSONBatchBody)
+				logging.LogFatal(err)
+				data.encryptedBody = a.Cm.EncryptData(bts)
+				logging.LogFatal(a.Cm.Error())
+			}
+
 			m[data] = true
 		}
 	case 1: //JSON
@@ -493,6 +505,13 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			////AddCounterDataJSON(dataAPI, Counter(value2), "SetGet12344", m)
 			//AddCounterDataJSON(dataAPI, -1, "PollCount", m)
 			////log.Printf("sum:%v", value1+value2+value0)
+			// Encrypt data to send with TLS public key
+			if a.Configuration.CryptoKey != "" {
+				bts, err := json.Marshal(&data.JSONBody)
+				logging.LogFatal(err)
+				data.encryptedBody = a.Cm.EncryptData(bts)
+				logging.LogFatal(a.Cm.Error())
+			}
 		}
 	case 0:
 		{

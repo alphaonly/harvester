@@ -7,7 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/alphaonly/harvester/internal/agent"
-	acrypto "github.com/alphaonly/harvester/internal/agent/crypto"
+	"github.com/alphaonly/harvester/internal/agent/crypto"
 	"github.com/alphaonly/harvester/internal/common"
 	"github.com/alphaonly/harvester/internal/common/logging"
 
@@ -30,22 +30,61 @@ func main() {
 	//resty client
 	client := resty.New().SetRetryCount(10)
 
-	// //load rsa pem files
 	// if ac.CryptoKey != "" {
-	// 	cert, err := tls.LoadX509KeyPair(ac.CryptoCert, ac.CryptoKey)
-	// 	if err != nil {
-	// 		log.Fatalf("ERROR client certificate: %s", err)
-	// 	}
 
-	// 	client.Set
+		// file, err := os.OpenFile(ac.CryptoKey, os.O_RDONLY, 0777)
+		// logging.LogFatal(err)
+		// reader := bufio.NewReader(file)
+		// b := make([]byte, 4096)
+		// _, err = reader.Read(b)
+		// logging.LogFatal(err)
+		// publicKey, _ := pem.Decode(b)
+
+		// file, err := os.OpenFile(ac.CryptoCert, os.O_RDONLY, 0777)
+		// logging.LogFatal(err)
+		// reader := bufio.NewReader(file)
+		// b := make([]byte, 4096)
+		// _, err = reader.Read(b)
+		// logging.LogFatal(err)
+		// certBytes, _ := pem.Decode(b)
+
+		// cert2 := &x509.Certificate{
+
+		// 	SerialNumber: big.NewInt(1658),
+		// 	//
+		// 	Subject: pkix.Name{
+		// 		Organization: []string{"Yandex.Praktikum"},
+		// 		Country:      []string{"RU"},
+		// 	},
+		// 	//
+		// 	IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+		// 	//
+		// 	NotBefore: time.Now(),
+		// 	//
+		// 	NotAfter:     time.Now().AddDate(10, 0, 0),
+		// 	SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		// 	//
+		// 	//
+		// 	ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		// 	KeyUsage:    x509.KeyUsageDigitalSignature,
+		// 	PublicKey:   publicKey,
+		// }
+
+		// certFromFile, err := x509.ParseCertificate(certBytes.Bytes)
+		// logging.LogFatal(err)
+
+		// tlsCert := tls.Certificate{Certificate: [][]byte{certFromFile.Raw}, Leaf: certFromFile}
+
+		// client.SetCertificates(tlsCert)
+		// client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: false})
 	// }
-	//https://github.com/go-resty/resty#custom-root-certificates-and-client-certificates
-	//https://github.com/go-resty/resty/discussions/571
-	//check file for rsa
-	buf, err := acrypto.CheckCertificateFile(ac)
+
+	//load public key pem file
+	buf, err := crypto.ReadPublicKeyFile(ac)
 	logging.LogFatal(err)
-	//get cm public key
-	cm := acrypto.NewRSA(ac).ReceivePublic(buf)
+
+	//get public key for cm
+	cm := crypto.NewRSA(ac).ReceivePublic(buf)
 	logging.LogFatal(cm.Error())
 	//Run agent
 	agent.NewAgent(ac, client, cm).Run(ctx)

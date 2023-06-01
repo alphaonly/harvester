@@ -13,7 +13,7 @@ import (
 )
 
 const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":"","CRYPTO_KEY":"","ENABLE_HTTPS":false}`
-const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":"","CRYPTO_CERT":"/home/asus/goProjects/harvester/cmd/agent/rsa/public/cert.rsa"}`
+const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":""}`
 
 type AgentConfiguration struct {
 	Address        string          `json:"ADDRESS,omitempty"`
@@ -25,7 +25,6 @@ type AgentConfiguration struct {
 	Key            string          `json:"KEY,omitempty"`
 	RateLimit      int             `json:"RATE_LIMIT,omitempty"`
 	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"`  //path to public key file
-	CryptoCert     string          `json:"CRYPTO_CERT,omitempty"` //path to certificate file
 	EnvChanged     map[string]bool
 }
 
@@ -38,9 +37,6 @@ type ServerConfiguration struct {
 	Key           string          `json:"KEY,omitempty"`
 	DatabaseDsn   string          `json:"DATABASE_DSN,omitempty"`
 	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"`  //path to private key file
-	CryptoCert    string          `json:"CRYPTO_CERT,omitempty"` //path to certificate file, is felt internally
-	CryptoPub     string          `json:"CRYPTO_PUB,omitempty"`  //path to public key file, is felt internally
-	EnableHTTPS   bool            `json:"ENABLE_HTTPS,omitempty"`
 	EnvChanged    map[string]bool
 }
 
@@ -121,7 +117,6 @@ func UpdateSCFromEnvironment(c *ServerConfiguration) {
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
 	c.DatabaseDsn = getEnv("DATABASE_DSN", &StrValue{c.DatabaseDsn}, c.EnvChanged).(string)
 	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
-	c.EnableHTTPS = getEnv("ENABLE_HTTPS", &BoolValue{c.EnableHTTPS}, c.EnvChanged).(bool)
 }
 
 func UpdateACFromFlags(c *AgentConfiguration) {
@@ -191,7 +186,6 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 		k  = flag.String("k", dc.Key, "string key for hash signing")
 		d  = flag.String("d", dc.DatabaseDsn, "database destination string")
 		cr = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a private key file ")
-		s  = flag.Bool("s", dc.EnableHTTPS, "a bool flag whether HTTPS is supported")
 	)
 	flag.Parse()
 
@@ -226,10 +220,6 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 	if !c.EnvChanged["CRYPTO_KEY"] {
 		c.CryptoKey = *cr
 		log.Printf(message, "CRYPTO_KEY", c.CryptoKey)
-	}
-	if !c.EnvChanged["ENABLE_HTTPS"] {
-		c.EnableHTTPS = *s
-		log.Printf(message, "ENABLE_HTTPS", c.EnableHTTPS)
 	}
 }
 

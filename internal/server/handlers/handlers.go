@@ -444,6 +444,34 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
 	}
 }
+
+
+func (h *Handlers) Decrypt(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Decrypt invoked")
+		//validation
+		if !h.handlePostMetricJSONValidate(w, r) {
+			return
+		}
+		//Handle
+		//1. get body
+		bytesData, ok := h.getBody(w, r)
+		if !ok {
+			return
+		}
+		//2. JSON
+		
+		if next != nil {
+			//write handled body for further handle
+			ctx := context.WithValue(r.Context(), schema.PKey1, schema.PreviousBytes(bytesData))
+			//call further handler with context parameters
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
+	}
+}
+
 func (h *Handlers) HandlePostMetricJSONBatch(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("HandlePostMetricJSONBatch invoked")

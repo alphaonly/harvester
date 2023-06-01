@@ -10,6 +10,7 @@ import (
 	"time"
 
 	cryptoCommon "github.com/alphaonly/harvester/internal/common/crypto"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/crypto"
 	"github.com/alphaonly/harvester/internal/server/handlers"
@@ -50,20 +51,8 @@ func New(
 
 func (s Server) ListenData(ctx context.Context) {
 
-	var err error
-	if s.cfg.CryptoKey == "" {
-		err = s.httpServer.ListenAndServe()
-	} else if s.cfg.EnableHTTPS {
-		if s.cfg.CryptoCert == "" {
-			log.Fatal("path to certificate file is undefined")
-		}
-		err = s.httpServer.ListenAndServeTLS(s.cfg.CryptoCert, s.cfg.CryptoKey)
-
-	}
-
-	if err != nil {
-		log.Println(err)
-	}
+	err := s.httpServer.ListenAndServe()
+	logging.LogFatal(err)
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -165,10 +154,8 @@ DoItAgain:
 	goto DoItAgain
 }
 
-func (s *Server) CheckCertificateFile(dataType cryptoCommon.DataType) error {
-	if !s.cfg.EnableHTTPS {
-		return nil
-	}
+func (s *Server) CheckCertificateFile(dataType cryptoCommon.KeyType) error {
+
 	if s.cfg.CryptoKey == "" {
 		//generate certificates in test folder
 		crypto.MakeCryptoFiles("rsa", s.cfg, nil)

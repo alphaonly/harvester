@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -29,33 +30,79 @@ type RSA struct {
 }
 
 func NewRSA(serialNumber int64, cfg *configuration.ServerConfiguration) cryptoCommon.ServerCertificateManager {
-	if !cfg.EnableHTTPS {
+	if cfg.CryptoKey == "" {
 		return nil
 	}
+	ca := &x509.Certificate{
 
-	cert := &x509.Certificate{
-		// указываем уникальный номер сертификата
 		SerialNumber: big.NewInt(serialNumber),
-		// заполняем базовую информацию о владельце сертификата
+
 		Subject: pkix.Name{
 			Organization: []string{"Yandex.Praktikum"},
 			Country:      []string{"RU"},
 		},
-		// разрешаем использование сертификата для 127.0.0.1 и ::1
+
 		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
-		// сертификат верен, начиная со времени создания
+
 		NotBefore: time.Now(),
-		// время жизни сертификата — 10 лет
+
 		NotAfter:     time.Now().AddDate(10, 0, 0),
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		// устанавливаем использование ключа для цифровой подписи,
 		// а также клиентской и серверной авторизации
+		IsCA:        true,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
-		KeyUsage:    x509.KeyUsageDigitalSignature,
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+
+		DNSNames: []string{"localhost"},
 	}
 
-	var privateKey *rsa.PrivateKey
-	var err error
+	caPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	logging.LogFatal(err)
+
+	// create the CA
+	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
+	logging.LogFatal(err)
+
+	// pem encode
+	caPEM := new(bytes.Buffer)
+	pem.Encode(caPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: caBytes,
+	})
+
+	caPrivKeyPEM := new(bytes.Buffer)
+	pem.Encode(caPrivKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(caPrivKey),
+	})
+
+	cert := &x509.Certificate{
+
+		SerialNumber: big.NewInt(serialNumber),
+
+		Subject: pkix.Name{
+			Organization: []string{"Yandex.Praktikum"},
+			Country:      []string{"RU"},
+		},
+
+		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+
+		NotBefore: time.Now(),
+
+		NotAfter:     time.Now().AddDate(10, 0, 0),
+		SubjectKeyId: []byte{1, 2, 3, 4, 6},
+		// устанавливаем использование ключа для цифровой подписи,
+		// а также клиентской и серверной авторизации
+
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:    x509.KeyUsageDigitalSignature,
+
+		DNSNames: []string{"localhost"},
+	}
+
+	var certPrivateKey *rsa.PrivateKey
+	// var err error
 	//Analyze privateKeyData if it given create certificate based on it
 	if cfg.CryptoKey != "" {
 		//read file with private key
@@ -68,22 +115,37 @@ func NewRSA(serialNumber int64, cfg *configuration.ServerConfiguration) cryptoCo
 		logging.LogFatal(r.Error())
 
 		//parsing PEM decoded
-		privateKey, err = x509.ParsePKCS1PrivateKey(privateKeyBuf.Bytes())
+		certPrivateKey, err = x509.ParsePKCS1PrivateKey(privateKeyBuf.Bytes())
 		logging.LogFatal(err)
 	}
 	//if privateKeyData was not given, then generate  private key
-	if privateKey == nil {
-		privateKey, err = rsa.GenerateKey(rand.Reader, 4096)
+	if certPrivateKey == nil {
+		certPrivateKey, err = rsa.GenerateKey(rand.Reader, 4096)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 	// create cert x.509
-	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privateKey.PublicKey, privateKey)
+	certBytes, err := x509.CreateCertificate(rand.Reader, cert, ca, &certPrivateKey.PublicKey, certPrivateKey)
 	logging.LogFatal(err)
 
-	cm := &RSA{privateKey: privateKey,
-		publicKey: &privateKey.PublicKey,
+	certPEM := new(bytes.Buffer)
+	pem.Encode(certPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	})
+
+	certPrivKeyPEM := new(bytes.Buffer)
+	pem.Encode(certPrivKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(certPrivateKey),
+	})
+
+	// serverCert, err := tls.X509KeyPair(certPEM.Bytes(), certPrivKeyPEM.Bytes())
+	// logging.LogFatal(err)
+
+	cm := &RSA{privateKey: certPrivateKey,
+		publicKey: &certPrivateKey.PublicKey,
 		certBytes: certBytes}
 
 	MakeCryptoFiles("/rsa/", cfg, cm)
@@ -111,7 +173,7 @@ func (r *RSA) GetPrivate() *bytes.Buffer {
 }
 
 // Sends encoded in PEM cert or keys in writer
-func (r *RSA) Send(dataType cryptoCommon.DataType, b io.Writer) cryptoCommon.ServerCertificateManager {
+func (r *RSA) Send(dataType cryptoCommon.KeyType, b io.Writer) cryptoCommon.ServerCertificateManager {
 	if r.Error() != nil {
 		return r
 	}
@@ -153,7 +215,7 @@ func (r *RSA) Send(dataType cryptoCommon.DataType, b io.Writer) cryptoCommon.Ser
 	return r
 }
 
-func (r *RSA) Receive(dataType cryptoCommon.DataType, buf io.Reader) cryptoCommon.ServerCertificateManager {
+func (r *RSA) Receive(dataType cryptoCommon.KeyType, buf io.Reader) cryptoCommon.ServerCertificateManager {
 	if r.err != nil {
 		return r
 	}
@@ -215,6 +277,41 @@ func (r *RSA) Receive(dataType cryptoCommon.DataType, buf io.Reader) cryptoCommo
 	}
 	return r
 }
+
+// Decrypt -  Decrypts in data and return it to out
+func (r *RSA) DecryptData(in []byte) *[]byte {
+	var decryptedBytes []byte
+
+	//message length
+	msgLen := len(in)
+	//picked hash function
+	hash := sha256.New()
+	//message length for one interation
+	step := r.publicKey.Size() - 2*hash.Size() - 2
+
+	for start := 0; start < msgLen; start += step {
+		finish := start + step
+		if finish > msgLen {
+			finish = msgLen
+		}
+
+		encryptedPart, err := rsa.DecryptOAEP(
+			hash,
+			rand.Reader,
+			r.privateKey,
+			in[start:finish],
+			nil)
+		if err != nil {
+			r.err = err
+			logging.LogPrintln(err)
+			return nil
+		}
+		decryptedBytes = append(decryptedBytes, encryptedPart...)
+
+	}
+	return &decryptedBytes
+}
+
 func (r *RSA) Error() error {
 	return r.err
 }
@@ -224,15 +321,16 @@ func MakeCryptoFiles(subFolder string, cfg *configuration.ServerConfiguration, c
 	prefPath, _ := os.Getwd()
 
 	//save cert and  keys in another folder
-	cfg.CryptoCert = prefPath + "/" + subFolder + "/cert.rsa"
-	cfg.CryptoPub = prefPath + "/" + subFolder + "/public.rsa"
+	pathCert := prefPath + "/" + subFolder + "/cert.rsa"
+	pathPub := prefPath + "/" + subFolder + "/public.rsa"
+	pathPriv := prefPath + "/" + subFolder + "/private.rsa"
 
 	fileMap := cryptoCommon.DataTypeMap{
-		cfg.CryptoCert: cryptoCommon.CERTIFICATE,
-		cfg.CryptoPub:  cryptoCommon.PUBLIC,
-		prefPath + "/" + subFolder + "/private.rsa": cryptoCommon.PRIVATE}
+		pathCert: cryptoCommon.CERTIFICATE,
+		pathPub:  cryptoCommon.PUBLIC,
+		pathPriv: cryptoCommon.PRIVATE}
 	if cm == nil {
-		cm = NewRSA(6996, &configuration.ServerConfiguration{EnableHTTPS: true})
+		cm = NewRSA(6996, &configuration.ServerConfiguration{CryptoKey: pathPriv})
 	}
 	for fileName, dataType := range fileMap {
 		file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0777)

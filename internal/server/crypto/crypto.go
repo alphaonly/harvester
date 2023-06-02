@@ -279,15 +279,16 @@ func (r *RSA) Receive(dataType cryptoCommon.KeyType, buf io.Reader) cryptoCommon
 }
 
 // Decrypt -  Decrypts in data and return it to out
-func (r *RSA) DecryptData(in []byte) *[]byte {
+func (r *RSA) DecryptData(in []byte) []byte {
 	var decryptedBytes []byte
 
 	//message length
 	msgLen := len(in)
+
 	//picked hash function
 	hash := sha256.New()
 	//message length for one interation
-	step := r.publicKey.Size() - 2*hash.Size() - 2
+	step := r.privateKey.PublicKey.Size()
 
 	for start := 0; start < msgLen; start += step {
 		finish := start + step
@@ -295,25 +296,30 @@ func (r *RSA) DecryptData(in []byte) *[]byte {
 			finish = msgLen
 		}
 
-		encryptedPart, err := rsa.DecryptOAEP(
+		decryptedPart, err := rsa.DecryptOAEP(
 			hash,
 			rand.Reader,
 			r.privateKey,
 			in[start:finish],
+			// in,
 			nil)
 		if err != nil {
 			r.err = err
 			logging.LogPrintln(err)
 			return nil
 		}
-		decryptedBytes = append(decryptedBytes, encryptedPart...)
+		decryptedBytes = append(decryptedBytes, decryptedPart...)
 
 	}
-	return &decryptedBytes
+	return decryptedBytes
 }
 
 func (r *RSA) Error() error {
 	return r.err
+}
+
+func (r *RSA) IsError() bool {
+	return r.err != nil
 }
 
 // MakeCryptoFiles - Makes files from data in certificate manager to /rsa/ folder

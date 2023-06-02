@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bufio"
+	"errors"
 	"log"
 	"os"
 
@@ -10,8 +11,9 @@ import (
 
 func ReadPublicKeyFile(configuration *configuration.AgentConfiguration) (*bufio.Reader, error) {
 	if configuration.CryptoKey == "" {
-		log.Println("path to given public key file is not defined")
-		return nil, nil
+		mess := "path to given public key file is not defined"
+		log.Println(mess)
+		return nil, errors.New(mess)
 	}
 	//Reading file with rsa key from os
 	file, err := os.OpenFile(configuration.CryptoKey, os.O_RDONLY, 0777)

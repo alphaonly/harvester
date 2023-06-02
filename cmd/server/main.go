@@ -40,14 +40,18 @@ func main() {
 		externalStorage = nil
 		internalStorage = db.NewDBStorage(context.Background(), configuration.DatabaseDsn)
 	}
-
+	//Certificates for decryption
+	certManager := crypto.NewRSA(9669, configuration)
+	//Handlers
 	handlers := &handlers.Handlers{
 		Storage: internalStorage,
 		Signer:  signchecker.NewSHA256(configuration.Key),
-		Conf:    conf.ServerConfiguration{DatabaseDsn: configuration.DatabaseDsn},
+		Conf: conf.ServerConfiguration{
+			DatabaseDsn: configuration.DatabaseDsn,
+			CryptoKey:   configuration.CryptoKey},
+		CertManager: certManager,
 	}
 
-	certManager := crypto.NewRSA(9669, configuration)
 	Server := server.New(configuration, externalStorage, handlers, certManager)
 
 	ctx, cancel := context.WithCancel(context.Background())

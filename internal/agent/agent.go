@@ -225,8 +225,8 @@ type sendData struct {
 	keys           HeaderKeys
 	JSONBody       *schema.MetricsJSON
 	JSONBatchBody  *[]schema.MetricsJSON
-	compressedBody *[]byte
-	encryptedBody  *[]byte
+	compressedBody []byte
+	encryptedBody  []byte
 	signer         sign.Signer
 }
 

@@ -18,17 +18,20 @@ import (
 	"github.com/alphaonly/harvester/internal/signchecker"
 )
 
-var buildVersion string = "N/A"
-var buildDate string = "N/A"
-var buildCommit string = "N/A"
+var buildVersion = "N/A"
+var buildDate = "N/A"
+var buildCommit = "N/A"
 
 func main() {
 
 	//Build tags
 	common.PrintBuildTags(buildVersion, buildDate, buildCommit)
 	//Server Configuration
-	configuration := conf.NewServerConf(conf.UpdateSCFromEnvironment, conf.UpdateSCFromFlags)
-
+	configuration := conf.NewServerConf(
+		conf.UpdateSCFromEnvironment,
+		conf.UpdateSCFromFlags,
+		conf.UpdateSCFromConfigFile)
+	//Storages
 	var (
 		externalStorage stor.Storage
 		internalStorage stor.Storage

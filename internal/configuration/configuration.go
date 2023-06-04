@@ -1,8 +1,10 @@
 package configuration
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	"log"
 	"os"
 	"strconv"
@@ -24,7 +26,7 @@ type AgentConfiguration struct {
 	UseJSON        int             `json:"USE_JSON,omitempty"`
 	Key            string          `json:"KEY,omitempty"`
 	RateLimit      int             `json:"RATE_LIMIT,omitempty"`
-	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"`  //path to public key file
+	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"` //path to public key file
 	EnvChanged     map[string]bool
 }
 
@@ -36,7 +38,8 @@ type ServerConfiguration struct {
 	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
 	Key           string          `json:"KEY,omitempty"`
 	DatabaseDsn   string          `json:"DATABASE_DSN,omitempty"`
-	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"`  //path to private key file
+	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"` //path to private key file
+	Config        string          `json:"CONFIG,omitempty"`     //path to private key file
 	EnvChanged    map[string]bool
 }
 
@@ -117,6 +120,7 @@ func UpdateSCFromEnvironment(c *ServerConfiguration) {
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
 	c.DatabaseDsn = getEnv("DATABASE_DSN", &StrValue{c.DatabaseDsn}, c.EnvChanged).(string)
 	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
+	c.Config = getEnv("CONFIG", &StrValue{c.Config}, c.EnvChanged).(string)
 }
 
 func UpdateACFromFlags(c *AgentConfiguration) {
@@ -179,13 +183,15 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 	dc := NewServerConfiguration()
 
 	var (
-		a  = flag.String("a", dc.Address, "Domain name and :port")
-		i  = flag.Duration("i", time.Duration(dc.StoreInterval), "Store interval")
-		f  = flag.String("f", dc.StoreFile, "Store file full path")
-		r  = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
-		k  = flag.String("k", dc.Key, "string key for hash signing")
-		d  = flag.String("d", dc.DatabaseDsn, "database destination string")
-		cr = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a private key file ")
+		a   = flag.String("a", dc.Address, "Domain name and :port")
+		i   = flag.Duration("i", time.Duration(dc.StoreInterval), "Store interval")
+		f   = flag.String("f", dc.StoreFile, "Store file full path")
+		r   = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
+		k   = flag.String("k", dc.Key, "string key for hash signing")
+		d   = flag.String("d", dc.DatabaseDsn, "database destination string")
+		cr  = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a private key file ")
+		cf1 = flag.String("c", dc.Config, "string contains a full path to configuration JSON File")
+		cf2 = flag.String("config", dc.Config, "string contains a full path to configuration JSON File")
 	)
 	flag.Parse()
 
@@ -221,6 +227,71 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 		c.CryptoKey = *cr
 		log.Printf(message, "CRYPTO_KEY", c.CryptoKey)
 	}
+	if !c.EnvChanged["CONFIG"] {
+		switch {
+		case *cf1 != "":
+			c.Config = *cf1
+		case *cf2 != "":
+			c.Config = *cf2
+		}
+		log.Printf(message, "CONFIG", c.Config)
+	}
+
+}
+
+// UpdateSCFromConfigFile - read server configuration from JSON file
+func UpdateSCFromConfigFile(c *ServerConfiguration) {
+	fc := NewServerConfiguration()
+	//check if there is a previously given path to config JSON JSONConfigFile
+	if c.Config == "" {
+		return
+	}
+	//read JSONConfigFile
+	JSONConfigFile, err := os.Open(c.Config)
+	logging.LogFatal(err)
+
+	buf := bufio.NewReader(JSONConfigFile)
+	logging.LogFatal(err)
+	b := make([]byte, 4096)
+	readBytes, err := buf.Read(b)
+
+	//Unmarshal JSON bytes from file
+	err = json.Unmarshal(b[:readBytes], fc)
+	logging.LogFatal(err)
+	//Analyze which parameters are present and changed
+	message := "variable %v  updated from file configuration, value %v"
+
+	if !c.EnvChanged["ADDRESS"] {
+		c.Address = fc.Address
+		c.Port = ":" + strings.Split(c.Address, ":")[1]
+		log.Printf(message, "ADDRESS", c.Address)
+		log.Printf(message, "PORT", c.Port)
+	}
+	if !c.EnvChanged["STORE_INTERVAL"] {
+		c.StoreInterval = fc.StoreInterval
+		log.Printf(message, "STORE_INTERVAL", c.StoreInterval)
+	}
+	if !c.EnvChanged["STORE_FILE"] {
+		c.StoreFile = fc.StoreFile
+		log.Printf(message, "STORE_FILE", c.StoreFile)
+	}
+	if !c.EnvChanged["RESTORE"] {
+		c.Restore = fc.Restore
+		log.Printf(message, "RESTORE", c.Restore)
+	}
+	if !c.EnvChanged["KEY"] {
+		c.Key = fc.Key
+		log.Printf(message, "KEY", c.Key)
+	}
+	if !c.EnvChanged["DATABASE_DSN"] {
+		c.DatabaseDsn = fc.DatabaseDsn
+		log.Printf(message, "DATABASE_DSN", c.DatabaseDsn)
+	}
+	if !c.EnvChanged["CRYPTO_KEY"] {
+		c.CryptoKey = fc.CryptoKey
+		log.Printf(message, "CRYPTO_KEY", c.CryptoKey)
+	}
+
 }
 
 type VariableValue interface {

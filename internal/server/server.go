@@ -76,6 +76,8 @@ func (s *Server) Run(ctx context.Context) error {
 
 	return err
 }
+
+// shutdown
 func (s Server) Shutdown(ctx context.Context) error {
 	time.Sleep(time.Second * 2)
 	err := s.httpServer.Shutdown(ctx)

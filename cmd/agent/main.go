@@ -44,6 +44,7 @@ func main() {
 	agent.NewAgent(ac, client, cm).Run(ctx)
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)
+	//Graceful shutdown
 	signal.Notify(channel, os.Interrupt)
 
 	select {

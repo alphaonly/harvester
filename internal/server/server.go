@@ -72,6 +72,7 @@ func (s *Server) Run(ctx context.Context) error {
 	signal.Notify(osSignal, os.Interrupt)
 
 	<-osSignal
+	//Graceful shutdown
 	err := s.Shutdown(ctx)
 
 	return err

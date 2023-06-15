@@ -30,7 +30,7 @@ type ServerCertificateManager interface {
 type AgentCertificateManager interface {
 	GetPublic() *bytes.Buffer                        // returns public key bytes decoded from PEM
 	ReceivePublic(io.Reader) AgentCertificateManager // sets public key decode
-	EncryptData(in []byte) (out []byte)              // encrypts in data and returns to out
+	EncryptData(in []byte) (out []byte)              // encrypts data in reader and returns to out
 	Error() error                                    // returns error if appeared
 	IsError() bool                                   // returns true if error appeared
 }

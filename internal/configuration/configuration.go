@@ -1,9 +1,10 @@
 package configuration
 
-
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	"log"
 	"os"
 	"strconv"
@@ -13,8 +14,8 @@ import (
 	"github.com/alphaonly/harvester/internal/schema"
 )
 
-const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":""}`
-const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1}`
+const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":"","CRYPTO_KEY":"","ENABLE_HTTPS":false}`
+const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":""}`
 
 type AgentConfiguration struct {
 	Address        string          `json:"ADDRESS,omitempty"`
@@ -25,6 +26,7 @@ type AgentConfiguration struct {
 	UseJSON        int             `json:"USE_JSON,omitempty"`
 	Key            string          `json:"KEY,omitempty"`
 	RateLimit      int             `json:"RATE_LIMIT,omitempty"`
+	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"` //path to public key file
 	EnvChanged     map[string]bool
 }
 
@@ -36,6 +38,8 @@ type ServerConfiguration struct {
 	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
 	Key           string          `json:"KEY,omitempty"`
 	DatabaseDsn   string          `json:"DATABASE_DSN,omitempty"`
+	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"` //path to private key file
+	Config        string          `json:"CONFIG,omitempty"`     //path to private key file
 	EnvChanged    map[string]bool
 }
 
@@ -103,6 +107,7 @@ func UpdateACFromEnvironment(c *AgentConfiguration) {
 	c.UseJSON = getEnv("USE_JSON", &IntValue{c.UseJSON}, c.EnvChanged).(int)
 	c.Key = getEnv("KEY", &StrValue{c.Key}, c.EnvChanged).(string)
 	c.RateLimit = getEnv("RATE_LIMIT", &IntValue{c.RateLimit}, c.EnvChanged).(int)
+	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
 }
 
 func UpdateSCFromEnvironment(c *ServerConfiguration) {
@@ -114,18 +119,21 @@ func UpdateSCFromEnvironment(c *ServerConfiguration) {
 	//PORT is derived from ADDRESS
 	c.Port = ":" + strings.Split(c.Address, ":")[1]
 	c.DatabaseDsn = getEnv("DATABASE_DSN", &StrValue{c.DatabaseDsn}, c.EnvChanged).(string)
+	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
+	c.Config = getEnv("CONFIG", &StrValue{c.Config}, c.EnvChanged).(string)
 }
 
 func UpdateACFromFlags(c *AgentConfiguration) {
 	dc := NewAgentConfiguration()
 	var (
-		a = flag.String("a", dc.Address, "Domain name and :port")
-		p = flag.Duration("p", time.Duration(dc.PollInterval), "Poll interval")
-		r = flag.Duration("r", time.Duration(dc.ReportInterval), "Report interval")
-		j = flag.Int("j", dc.UseJSON, "Use JSON 0-No JSON,1- JSON, 2-JSON Batch")
-		t = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
-		k = flag.String("k", dc.Key, "string key for hash signing")
-		l = flag.Int("l", dc.RateLimit, "Number of parallel inbound requests ")
+		a  = flag.String("a", dc.Address, "Domain name and :port")
+		p  = flag.Duration("p", time.Duration(dc.PollInterval), "Poll interval")
+		r  = flag.Duration("r", time.Duration(dc.ReportInterval), "Report interval")
+		j  = flag.Int("j", dc.UseJSON, "Use JSON 0-No JSON,1- JSON, 2-JSON Batch")
+		t  = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
+		k  = flag.String("k", dc.Key, "string key for hash signing")
+		l  = flag.Int("l", dc.RateLimit, "Number of parallel inbound requests ")
+		cr = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a public key file ")
 	)
 
 	flag.Parse()
@@ -164,6 +172,10 @@ func UpdateACFromFlags(c *AgentConfiguration) {
 		c.RateLimit = *l
 		log.Printf(message, "RATE_LIMIT", c.RateLimit)
 	}
+	if !c.EnvChanged["CRYPTO_KEY"] {
+		c.CryptoKey = *cr
+		log.Printf(message, "CRYPTO_KEY", c.CryptoKey)
+	}
 }
 
 func UpdateSCFromFlags(c *ServerConfiguration) {
@@ -171,12 +183,15 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 	dc := NewServerConfiguration()
 
 	var (
-		a = flag.String("a", dc.Address, "Domain name and :port")
-		i = flag.Duration("i", time.Duration(dc.StoreInterval), "Store interval")
-		f = flag.String("f", dc.StoreFile, "Store file full path")
-		r = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
-		k = flag.String("k", dc.Key, "string key for hash signing")
-		d = flag.String("d", dc.DatabaseDsn, "database destination string")
+		a   = flag.String("a", dc.Address, "Domain name and :port")
+		i   = flag.Duration("i", time.Duration(dc.StoreInterval), "Store interval")
+		f   = flag.String("f", dc.StoreFile, "Store file full path")
+		r   = flag.Bool("r", dc.Restore, "Restore from external storage:true/false")
+		k   = flag.String("k", dc.Key, "string key for hash signing")
+		d   = flag.String("d", dc.DatabaseDsn, "database destination string")
+		cr  = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a private key file ")
+		cf1 = flag.String("c", dc.Config, "string contains a full path to configuration JSON File")
+		cf2 = flag.String("config", dc.Config, "string contains a full path to configuration JSON File")
 	)
 	flag.Parse()
 
@@ -208,6 +223,75 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 		c.DatabaseDsn = *d
 		log.Printf(message, "DATABASE_DSN", c.DatabaseDsn)
 	}
+	if !c.EnvChanged["CRYPTO_KEY"] {
+		c.CryptoKey = *cr
+		log.Printf(message, "CRYPTO_KEY", c.CryptoKey)
+	}
+	if !c.EnvChanged["CONFIG"] {
+		switch {
+		case *cf1 != "":
+			c.Config = *cf1
+		case *cf2 != "":
+			c.Config = *cf2
+		}
+		log.Printf(message, "CONFIG", c.Config)
+	}
+
+}
+
+// UpdateSCFromConfigFile - read server configuration from JSON file
+func UpdateSCFromConfigFile(c *ServerConfiguration) {
+	fc := NewServerConfiguration()
+	//check if there is a previously given path to config JSON JSONConfigFile
+	if c.Config == "" {
+		return
+	}
+	//read JSONConfigFile
+	JSONConfigFile, err := os.Open(c.Config)
+	logging.LogFatal(err)
+
+	buf := bufio.NewReader(JSONConfigFile)
+	logging.LogFatal(err)
+	b := make([]byte, 4096)
+	readBytes, err := buf.Read(b)
+
+	//Unmarshal JSON bytes from file
+	err = json.Unmarshal(b[:readBytes], fc)
+	logging.LogFatal(err)
+	//Analyze which parameters are present and changed
+	message := "variable %v  updated from file configuration, value %v"
+
+	if !c.EnvChanged["ADDRESS"] {
+		c.Address = fc.Address
+		c.Port = ":" + strings.Split(c.Address, ":")[1]
+		log.Printf(message, "ADDRESS", c.Address)
+		log.Printf(message, "PORT", c.Port)
+	}
+	if !c.EnvChanged["STORE_INTERVAL"] {
+		c.StoreInterval = fc.StoreInterval
+		log.Printf(message, "STORE_INTERVAL", c.StoreInterval)
+	}
+	if !c.EnvChanged["STORE_FILE"] {
+		c.StoreFile = fc.StoreFile
+		log.Printf(message, "STORE_FILE", c.StoreFile)
+	}
+	if !c.EnvChanged["RESTORE"] {
+		c.Restore = fc.Restore
+		log.Printf(message, "RESTORE", c.Restore)
+	}
+	if !c.EnvChanged["KEY"] {
+		c.Key = fc.Key
+		log.Printf(message, "KEY", c.Key)
+	}
+	if !c.EnvChanged["DATABASE_DSN"] {
+		c.DatabaseDsn = fc.DatabaseDsn
+		log.Printf(message, "DATABASE_DSN", c.DatabaseDsn)
+	}
+	if !c.EnvChanged["CRYPTO_KEY"] {
+		c.CryptoKey = fc.CryptoKey
+		log.Printf(message, "CRYPTO_KEY", c.CryptoKey)
+	}
+
 }
 
 type VariableValue interface {
@@ -312,9 +396,7 @@ func getEnv(variableName string, variableValue VariableValue, changed map[string
 	}
 	variableValue.Set(stringVal)
 	changed[variableName] = true
-	
-  log.Println("variable " + variableName + " presented in environment, value: " + stringVal)
+	log.Println("variable " + variableName + " presented in environment, value: " + stringVal)
 
 	return variableValue.Get()
-
 }

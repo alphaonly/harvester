@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"log"
 	"net/http"
@@ -8,58 +9,58 @@ import (
 	"os/signal"
 	"time"
 
-
+	cryptoCommon "github.com/alphaonly/harvester/internal/common/crypto"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	conf "github.com/alphaonly/harvester/internal/configuration"
+	"github.com/alphaonly/harvester/internal/server/crypto"
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
-
 )
 
 type Configuration struct {
 	serverPort string
-
 }
 
 type Server struct {
-
-	configuration   *conf.ServerConfiguration
+	cfg             *conf.ServerConfiguration
 	InternalStorage stor.Storage
 	ExternalStorage stor.Storage
 	handlers        *handlers.Handlers
 	httpServer      *http.Server
-
+	crypto          cryptoCommon.ServerCertificateManager
 }
 
 func NewConfiguration(serverPort string) *Configuration {
 	return &Configuration{serverPort: ":" + serverPort}
 }
 
-func New(configuration *conf.ServerConfiguration, ExStorage stor.Storage, handlers *handlers.Handlers) (server Server) {
-	return Server{
+func New(
+	configuration *conf.ServerConfiguration,
+	ExStorage stor.Storage,
+	handlers *handlers.Handlers,
+	certificate cryptoCommon.ServerCertificateManager) (server Server) {
 
-		configuration:   configuration,
+	return Server{
+		cfg:             configuration,
 		InternalStorage: handlers.Storage,
 		ExternalStorage: ExStorage,
 		handlers:        handlers,
-
+		crypto:          certificate,
 	}
 }
 
 func (s Server) ListenData(ctx context.Context) {
-	// err := http.ListenAndServe(s.configuration.Port, s.handlers.NewRouter())
-	err := s.httpServer.ListenAndServe()
 
-	if err != nil {
-		log.Println(err)
-	}
+	err := s.httpServer.ListenAndServe()
+	logging.LogFatal(err)
 }
 
 func (s *Server) Run(ctx context.Context) error {
 
 	// маршрутизация запросов обработчику
 	s.httpServer = &http.Server{
-		Addr: s.configuration.Address,
-		Handler:  s.handlers.NewRouter(),
+		Addr:    s.cfg.Address,
+		Handler: s.handlers.NewRouter(),
 	}
 
 	s.restoreData(ctx, s.ExternalStorage)
@@ -71,10 +72,13 @@ func (s *Server) Run(ctx context.Context) error {
 	signal.Notify(osSignal, os.Interrupt)
 
 	<-osSignal
+	//Graceful shutdown
 	err := s.Shutdown(ctx)
 
 	return err
 }
+
+// shutdown
 func (s Server) Shutdown(ctx context.Context) error {
 	time.Sleep(time.Second * 2)
 	err := s.httpServer.Shutdown(ctx)
@@ -87,7 +91,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 		log.Println("external storage  not initiated ")
 		return
 	}
-	if s.configuration.Restore {
+	if s.cfg.Restore {
 		mvList, err := storageFrom.GetAllMetrics(ctx)
 
 		if err != nil {
@@ -98,7 +102,6 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 			log.Println("file storage is empty, nothing to recover")
 			return
 		}
-
 
 		err = s.InternalStorage.SaveAllMetrics(ctx, mvList)
 		if err != nil {
@@ -119,7 +122,7 @@ func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval))
+	ticker := time.NewTicker(time.Duration(s.cfg.StoreInterval))
 
 	defer ticker.Stop()
 
@@ -152,4 +155,31 @@ DoItAgain:
 
 	}
 	goto DoItAgain
+}
+
+func (s *Server) CheckCertificateFile(dataType cryptoCommon.KeyType) error {
+
+	if s.cfg.CryptoKey == "" {
+		//generate certificates in test folder
+		crypto.MakeCryptoFiles("rsa", s.cfg, nil)
+		log.Println("path to rsa files is not defined, new rsa files were generated in /rsa/ folder")
+		return nil
+	}
+
+	//Reading file with rsa key from os
+	file, err := os.OpenFile(s.cfg.CryptoKey, os.O_RDONLY, 0777)
+	if err != nil {
+		log.Printf("error:file %v  is not read", file)
+		return err
+	}
+	//put data to read buffer
+	buf := bufio.NewReader(file)
+	rs := crypto.RSA{}
+	rs.Receive(dataType, buf)
+	if rs.Error() != nil {
+		log.Println("error:private rsa is not read")
+		return rs.Error()
+	}
+	return nil
+
 }

@@ -37,7 +37,7 @@ func TestUpdate(t *testing.T) {
 	agentConf:=C.NewAgentConf(C.UpdateACFromEnvironment,C.UpdateACFromFlags)
 
 	client := resty.New().SetRetryCount(10)
-	a := agent.NewAgent(agentConf, client)
+	a := agent.NewAgent(agentConf, client,nil)
 
 	for i, tt := range tests {
 		t.Run(tt.name, func(tst *testing.T) {

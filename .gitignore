@@ -36,6 +36,18 @@ internal/agent/agentjson/
 
 # tests
 /cmd/tests/
+/cmd/tests
 /cmd/tests/test.go
 /cmd/tests/restycheck.go
+/cmd/server/rsa/
 
+#bin
+/cmd/agent/agent
+/cmd/server/server
+
+#rsa keys
+/cmd/server/rsa/
+/cmd/agent/rsa/
+
+#conf
+/internal/configuration/configfile/

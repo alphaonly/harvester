@@ -46,7 +46,7 @@ func GZipCompressionHandler(next http.Handler) http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusNotImplemented)
 				return
 			}
-			bytesData = *compressedByteData
+			bytesData = compressedByteData
 		}
 		log.Printf("Check response Content-Encoding in final header, value:%v", w.Header().Get("Content-Encoding"))
 		log.Printf("Check response Content-Type in final header, value:%v", w.Header().Get("Content-Type"))
@@ -111,7 +111,7 @@ func GZipDeCompressionHandler(next http.Handler) http.HandlerFunc {
 	}
 }
 
-func GzipCompress(data []byte) (*[]byte, error) {
+func GzipCompress(data []byte) ([]byte, error) {
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
 
@@ -130,7 +130,7 @@ func GzipCompress(data []byte) (*[]byte, error) {
 
 	compressedBytes := b.Bytes()
 
-	return &compressedBytes, nil
+	return compressedBytes, nil
 }
 
 func GzipDecompress(data []byte) ([]byte, error) {

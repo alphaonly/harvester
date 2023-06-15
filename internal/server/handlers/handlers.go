@@ -5,12 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/alphaonly/harvester/internal/common/crypto"
+	"github.com/alphaonly/harvester/internal/server/handlers/common"
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	storage "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 
@@ -25,9 +28,10 @@ import (
 )
 
 type Handlers struct {
-	Storage storage.Storage
-	Signer  signchecker.Signer
-	Conf    configuration.ServerConfiguration
+	Storage     storage.Storage
+	Signer      signchecker.Signer
+	Conf        configuration.ServerConfiguration
+	CertManager crypto.ServerCertificateManager
 }
 
 func (h *Handlers) HandleGetMetricFieldListSimple(next http.Handler) http.HandlerFunc {
@@ -64,7 +68,7 @@ func (h *Handlers) HandleGetMetricFieldListSimple(next http.Handler) http.Handle
 				http.Error(w, err.Error(), http.StatusNotImplemented)
 				return
 			}
-			bytesData = *compressedByteData
+			bytesData = compressedByteData
 		}
 
 		//Add header keys
@@ -254,7 +258,6 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 	log.Println("HandlePostMetric invoked")
 
-
 	metricType := chi.URLParam(r, "TYPE")
 	metricName := chi.URLParam(r, "NAME")
 	metricValue := chi.URLParam(r, "VALUE")
@@ -382,6 +385,18 @@ func httpError(w http.ResponseWriter, err string, status int) {
 	}
 }
 
+func httpErrorF(w http.ResponseWriter, errStr string, err error, status int) {
+	var mes string
+	switch err {
+	case nil:
+		mes = fmt.Sprintf("server:"+errStr+" %v", errors.New("unknown error"))
+	default:
+		mes = fmt.Sprintf("server:"+errStr+" %v", err)
+	}
+	http.Error(w, mes, status)
+	log.Println(mes)
+}
+
 func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("HandlePostMetricJSON invoked")
@@ -444,6 +459,43 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
 	}
 }
+
+func (h *Handlers) Decrypt(next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("Decrypt handler invoked")
+
+		var decryptedBytes []byte
+		//validation
+		bytesData, ok := h.getBody(w, r)
+		if !ok {
+			httpError(w, "unable to get body", http.StatusBadRequest)
+			return
+		}
+		//select whether it needs to decrypt the body
+		switch h.Conf.CryptoKey {
+
+		//if there is not a key then pass body for further handling
+		case "":
+			decryptedBytes = bytesData
+		//decrypt body
+		default:
+			{
+				decryptedBytes = h.CertManager.DecryptData(bytesData)
+				if h.CertManager.IsError() {
+					httpErrorF(w, "unable to decrypt body", h.CertManager.Error(), http.StatusBadRequest)
+					return
+				}
+			}
+		}
+		//call further handler with context parameters
+		if next != nil {
+			common.RunNextHandler(common.NewRWDataComposite(r, w), next, decryptedBytes)
+			return
+		}
+		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
+	}
+}
+
 func (h *Handlers) HandlePostMetricJSONBatch(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("HandlePostMetricJSONBatch invoked")
@@ -547,6 +599,10 @@ func (h *Handlers) WriteResponseBodyHandler() http.HandlerFunc {
 		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			w.Header().Set("Content-Encoding", "gzip")
 		}
+		if strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+			w.Header().Add("Content-Type", "application/json")
+		}
+		//"Content-Type""application/json"
 		//Set Response Header
 		w.WriteHeader(http.StatusOK)
 		//write Response Body
@@ -580,18 +636,18 @@ func (h *Handlers) NewRouter() chi.Router {
 		writePost = h.WriteResponseBodyHandler
 		//writeList = h.WriteResponseBodyHandler
 
+		//Compresses data
 		compressPost = compression.GZipCompressionHandler
-		//compressList = compression.GZipCompressionHandler
-
+		//Handles POST request
 		handlePost      = h.HandlePostMetricJSON
 		handlePostBatch = h.HandlePostMetricJSONBatch
-		//handleList = h.HandleGetMetricFieldList
-		//handleList = h.HandleGetMetricFieldList
+		//Decrypts data from RSA
+		decrypt = h.Decrypt
 
 		//The sequence for post JSON and respond compressed JSON if no value
-		postJSONAndGetCompressed = handlePost(compressPost(writePost()))
+		postJSONAndGetCompressed = decrypt(handlePost(compressPost(writePost())))
 		//The sequence for post JSON and respond compressed JSON if no value receiving data in batch
-		postJSONAndGetCompressedBatch = handlePostBatch(compressPost(writePost()))
+		postJSONAndGetCompressedBatch = decrypt(handlePostBatch(compressPost(writePost())))
 
 		//The sequence for get compressed metrics html list
 		//getListCompressed = handleList(compressList(writeList()))
@@ -614,7 +670,6 @@ func (h *Handlers) NewRouter() chi.Router {
 		r.Post("/updates", postJSONAndGetCompressedBatch)
 		r.Post("/updates/", postJSONAndGetCompressedBatch)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
-
 
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
 		r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)

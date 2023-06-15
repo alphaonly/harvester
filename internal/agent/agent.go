@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"github.com/alphaonly/harvester/internal/agent/workerpool"
+	"github.com/alphaonly/harvester/internal/common/crypto"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
 	sign "github.com/alphaonly/harvester/internal/signchecker"
@@ -72,11 +74,11 @@ type Agent struct {
 	baseURL       url.URL
 	Client        *resty.Client
 	Signer        sign.Signer
+	Cm            crypto.AgentCertificateManager
 	UpdateLocker  *sync.RWMutex
 }
 
-func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
-
+func NewAgent(c *conf.AgentConfiguration, client *resty.Client, cm crypto.AgentCertificateManager) Agent {
 
 	return Agent{
 		Configuration: c,
@@ -88,6 +90,7 @@ func NewAgent(c *conf.AgentConfiguration, client *resty.Client) Agent {
 		Client:       client,
 		Signer:       sign.NewSHA256(c.Key),
 		UpdateLocker: new(sync.RWMutex),
+		Cm:           cm,
 	}
 }
 
@@ -222,22 +225,24 @@ type sendData struct {
 	keys           HeaderKeys
 	JSONBody       *schema.MetricsJSON
 	JSONBatchBody  *[]schema.MetricsJSON
-	compressedBody *[]byte
+	compressedBody []byte
+	encryptedBody  []byte
 	signer         sign.Signer
 }
 
 func (sd sendData) SendData(client *resty.Client) error {
 
 	//a resty attempt
-
 	r := client.R().
 		SetHeaders(sd.keys)
-
-	if sd.JSONBody != nil {
+	switch {
+	case sd.encryptedBody != nil:
+		r.SetBody(sd.encryptedBody)
+	case sd.JSONBody != nil:
 		r.SetBody(sd.JSONBody)
-	} else if sd.JSONBatchBody != nil {
+	case sd.JSONBatchBody != nil:
 		r.SetBody(sd.JSONBatchBody)
-	} else {
+	default:
 		return errors.New("both bodies is nil")
 	}
 
@@ -249,7 +254,6 @@ func (sd sendData) SendData(client *resty.Client) error {
 	log.Println("agent:response status from server:" + resp.Status())
 	log.Printf("agent:response body from server:%v", string(resp.Body()))
 	log.Printf("Content-Encoding:%v", resp.Header().Get("Content-Encoding"))
-
 
 	return err
 }
@@ -297,7 +301,6 @@ repeatAgain:
 			metrics.TotalAlloc = Gauge(m.TotalAlloc)
 			metrics.RandomValue = Gauge(rand.Int63())
 			metrics.PollCount++
-
 
 			a.UpdateLocker.Unlock()
 			goto repeatAgain
@@ -349,29 +352,7 @@ repeatAgain:
 func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 
 	switch a.Configuration.CompressType {
-	// case "deflate":
-	// 	{
-	// 		for k := range data {
 
-	// 			var b bytes.Buffer
-
-	// 			w, err := flate.NewWriter(&b, flate.BestCompression)
-	// 			if err != nil {
-	// 				log.Fatalf("failed init compress writer: %v", err)
-	// 			}
-	// 			_, err = w.Write(*k.JSONBody)
-	// 			if err != nil {
-	// 				log.Fatalf("failed write data to compress temporary buffer: %v", err)
-	// 			}
-
-	// 			err = w.Close()
-	// 			if err != nil {
-	// 				log.Fatalf("failed compress data: %v", err)
-	// 			}
-	// 			body := b.Bytes()
-	// 			k.JSONBody = &body
-	// 		}
-	// 	}
 	case "gzip":
 		{
 			var body any
@@ -457,6 +438,14 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddGaugeDataJSONToBatch(data, metrics.FreeMemory, "FreeMemory")
 			AddGaugeDataJSONToBatch(data, metrics.CPUutilization1, "CPUutilization1")
 
+			//Encrypt data to send with TLS public key
+			if a.Configuration.CryptoKey != "" {
+				bts, err := json.Marshal(&data.JSONBatchBody)
+				logging.LogFatal(err)
+				data.encryptedBody = a.Cm.EncryptData(bts)
+				logging.LogFatal(a.Cm.Error())
+			}
+
 			m[data] = true
 		}
 	case 1: //JSON
@@ -516,6 +505,13 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			////AddCounterDataJSON(dataAPI, Counter(value2), "SetGet12344", m)
 			//AddCounterDataJSON(dataAPI, -1, "PollCount", m)
 			////log.Printf("sum:%v", value1+value2+value0)
+			// Encrypt data to send with TLS public key
+			if a.Configuration.CryptoKey != "" {
+				bts, err := json.Marshal(&data.JSONBody)
+				logging.LogFatal(err)
+				data.encryptedBody = a.Cm.EncryptData(bts)
+				logging.LogFatal(a.Cm.Error())
+			}
 		}
 	case 0:
 		{
@@ -601,7 +597,7 @@ repeatAgain:
 				i++
 				name := fmt.Sprintf("Send metric job %v", i)
 				switch a.Configuration.RateLimit {
-				case 0,1:
+				case 0, 1:
 					{
 						err := key.SendData(a.Client)
 						if err != nil {
@@ -611,8 +607,8 @@ repeatAgain:
 					}
 				default:
 					{
-						job:=workerpool.Job[*sendData]{Name: name, Data: key, Func: f}
-						wp.SendJob(ctx,job)
+						job := workerpool.Job[*sendData]{Name: name, Data: key, Func: f}
+						wp.SendJob(ctx, job)
 					}
 				}
 			}
@@ -627,7 +623,6 @@ repeatAgain:
 }
 
 func (a Agent) Run(ctx context.Context) {
-
 
 	metrics := Metrics{}
 	go a.Update(ctx, &metrics)

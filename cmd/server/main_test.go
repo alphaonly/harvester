@@ -52,7 +52,7 @@ func TestRun(t *testing.T) {
 			}
 			handlers := &handlers.Handlers{}
 
-			server := server.New(sc, storage, handlers)
+			server := server.New(sc, storage, handlers,nil)
 
 			go func() {
 				err := server.Run(ctx)

@@ -50,8 +50,9 @@ func main() {
 		Storage: internalStorage,
 		Signer:  signchecker.NewSHA256(configuration.Key),
 		Conf: conf.ServerConfiguration{
-			DatabaseDsn: configuration.DatabaseDsn,
-			CryptoKey:   configuration.CryptoKey},
+			DatabaseDsn:   configuration.DatabaseDsn,
+			CryptoKey:     configuration.CryptoKey,
+			TrustedSubnet: configuration.TrustedSubnet},
 		CertManager: certManager,
 	}
 

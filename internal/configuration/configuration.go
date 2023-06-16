@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
-	"github.com/alphaonly/harvester/internal/common/logging"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alphaonly/harvester/internal/common/logging"
 
 	"github.com/alphaonly/harvester/internal/schema"
 )
@@ -38,8 +39,9 @@ type ServerConfiguration struct {
 	Port          string          `json:"PORT,omitempty"` //additionally for listen and serve func
 	Key           string          `json:"KEY,omitempty"`
 	DatabaseDsn   string          `json:"DATABASE_DSN,omitempty"`
-	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"` //path to private key file
-	Config        string          `json:"CONFIG,omitempty"`     //path to private key file
+	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"`     //path to private key file
+	Config        string          `json:"CONFIG,omitempty"`         //path to config file
+	TrustedSubnet string          `json:"TRUSTED_SUBNET,omitempty"` //trusted subnet declaration
 	EnvChanged    map[string]bool
 }
 
@@ -121,6 +123,7 @@ func UpdateSCFromEnvironment(c *ServerConfiguration) {
 	c.DatabaseDsn = getEnv("DATABASE_DSN", &StrValue{c.DatabaseDsn}, c.EnvChanged).(string)
 	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
 	c.Config = getEnv("CONFIG", &StrValue{c.Config}, c.EnvChanged).(string)
+	c.TrustedSubnet = getEnv("TRUSTED_SUBNET", &StrValue{c.TrustedSubnet}, c.EnvChanged).(string)
 }
 
 func UpdateACFromFlags(c *AgentConfiguration) {
@@ -192,6 +195,7 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 		cr  = flag.String("crypto-key", dc.CryptoKey, "string contains a full path to a private key file ")
 		cf1 = flag.String("c", dc.Config, "string contains a full path to configuration JSON File")
 		cf2 = flag.String("config", dc.Config, "string contains a full path to configuration JSON File")
+		t   = flag.String("t", dc.Config, "string contains a full path to configuration JSON File")
 	)
 	flag.Parse()
 
@@ -236,7 +240,10 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 		}
 		log.Printf(message, "CONFIG", c.Config)
 	}
-
+	if !c.EnvChanged["TRUSTED_SUBNET"] {
+		c.TrustedSubnet = *t
+		log.Printf(message, "TRUSTED_SUBNET", c.TrustedSubnet)
+	}
 }
 
 // UpdateSCFromConfigFile - read server configuration from JSON file
@@ -291,7 +298,10 @@ func UpdateSCFromConfigFile(c *ServerConfiguration) {
 		c.CryptoKey = fc.CryptoKey
 		log.Printf(message, "CRYPTO_KEY", c.CryptoKey)
 	}
-
+	if !c.EnvChanged["TRUSTED_SUBNET"] {
+		c.TrustedSubnet = fc.TrustedSubnet
+		log.Printf(message, "TRUSTED_SUBNET", c.TrustedSubnet)
+	}
 }
 
 type VariableValue interface {

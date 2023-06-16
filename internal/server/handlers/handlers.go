@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -630,11 +631,41 @@ func (h *Handlers) HandlePing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// Stats - checks whether request has come from trusted subnet
+func (h *Handlers) Stats(w http.ResponseWriter, r *http.Request) {
+	log.Println("Handle /api/internal/stats invoked")
+	//Validate
+	if h.Conf.TrustedSubnet == "" {
+		log.Println("Trusted net variable is missing to check, that is OK")
+		return
+	}
+	//get IPNet data
+	_, IPNet, err := net.ParseCIDR(h.Conf.TrustedSubnet)
+	if err != nil {
+		httpErrorF(w, "getting subnet error", err, http.StatusInternalServerError)
+		return
+	}
+	//get real IP address
+	remoteAddrStr := r.Header.Get("X-Real-IP")
+	if remoteAddrStr == "" {
+		log.Println("X-Real-IP is missing in http header,using Request.RemoteAddr instead")		
+		remoteAddrStr= r.RemoteAddr
+	}	
+	//Parse remote IP 
+	remoteAddress := net.ParseIP(remoteAddrStr)
+	if !IPNet.Contains(remoteAddress) {
+		httpError(w, "remote IP address do not satisfies the given subnet", http.StatusForbidden)
+		return
+	}
+	//respond status OK 
+	w.Write([]byte("200 OK"))
+	w.WriteHeader(http.StatusOK)
+}
+
 func (h *Handlers) NewRouter() chi.Router {
 
 	var (
 		writePost = h.WriteResponseBodyHandler
-		//writeList = h.WriteResponseBodyHandler
 
 		//Compresses data
 		compressPost = compression.GZipCompressionHandler
@@ -643,7 +674,6 @@ func (h *Handlers) NewRouter() chi.Router {
 		handlePostBatch = h.HandlePostMetricJSONBatch
 		//Decrypts data from RSA
 		decrypt = h.Decrypt
-
 		//The sequence for post JSON and respond compressed JSON if no value
 		postJSONAndGetCompressed = decrypt(handlePost(compressPost(writePost())))
 		//The sequence for post JSON and respond compressed JSON if no value receiving data in batch
@@ -656,24 +686,28 @@ func (h *Handlers) NewRouter() chi.Router {
 	r := chi.NewRouter()
 	//
 
-	// var p PingHandler
+	// Routes
 	r.Route("/", func(r chi.Router) {
+		//GET requests handlers
 		r.Get("/", getListCompressed)
 		r.Get("/ping", h.HandlePing)
-		r.Get("/ping/", h.HandlePing)
-		r.Get("/check/", h.HandleCheckHealth)
+		// r.Get("/ping/", h.HandlePing)
+		r.Get("/check", h.HandleCheckHealth)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
+		//POST requests handlers
 		r.Post("/value", postJSONAndGetCompressed)
-		r.Post("/value/", postJSONAndGetCompressed)
+		// r.Post("/value/", postJSONAndGetCompressed)
 		r.Post("/update", postJSONAndGetCompressed)
-		r.Post("/update/", postJSONAndGetCompressed)
+		// r.Post("/update/", postJSONAndGetCompressed)
 		r.Post("/updates", postJSONAndGetCompressedBatch)
-		r.Post("/updates/", postJSONAndGetCompressedBatch)
+		// r.Post("/updates/", postJSONAndGetCompressedBatch)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 
+		//Error patterns
 		r.Post("/update/{TYPE}/{NAME}/", h.HandlePostErrorPattern)
 		r.Post("/update/{TYPE}/", h.HandlePostErrorPatternNoName)
-
+		//Internal
+		r.Post("/api/internal/stats", h.Stats)
 	})
 
 	return r

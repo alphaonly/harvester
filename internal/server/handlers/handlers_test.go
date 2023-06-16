@@ -1,8 +1,10 @@
-package handlers
+package handlers_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"log"
 
 	"net/url"
 
@@ -10,9 +12,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/alphaonly/harvester/internal/common/logging"
+	"github.com/alphaonly/harvester/internal/configuration"
+	"github.com/alphaonly/harvester/internal/server"
+	"github.com/alphaonly/harvester/internal/server/handlers"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
+	"github.com/go-resty/resty/v2"
 )
-
 
 func TestHandleMetric(t *testing.T) {
 
@@ -102,8 +108,7 @@ func TestHandleMetric(t *testing.T) {
 	fmt.Println("start!")
 
 	s := mapstorage.New()
-	h := Handlers{Storage: s}
-
+	h := handlers.Handlers{Storage: s}
 
 	r := h.NewRouter()
 
@@ -142,6 +147,89 @@ func TestHandleMetric(t *testing.T) {
 			if err != nil {
 				t.Errorf("response body close error: %v response", response.Body)
 			}
+		})
+
+	}
+
+}
+
+type HeaderKeys map[string]string
+
+func TestStats(t *testing.T) {
+
+	type want struct {
+		code     int
+		response string
+	}
+	type requestParams struct {
+		method string
+		url    string
+	}
+
+	tests := []struct {
+		name          string
+		method        string
+		trustedSubnet string
+		want          want
+	}{
+		{
+			name: "test#1 positive",
+			want: want{},
+		},
+	}
+
+	// Server Configuration
+	conf := configuration.NewServerConf(
+		configuration.UpdateSCFromFlags,
+	)
+
+	// storage
+	storage := mapstorage.New()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			conf.TrustedSubnet = tt.trustedSubnet
+
+			// Handlers
+			handlers := &handlers.Handlers{
+				Storage: storage,
+				Conf:    *conf,
+			}
+
+			Server := server.New(conf, storage, handlers, nil)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			go func() {
+
+				err := Server.Run(ctx)
+				logging.LogFatal(err)
+			}()
+
+			keys := make(HeaderKeys)
+			keys["Content-Type"] = "plain/text"
+			keys["X-Real-IP"] = conf.Address
+
+			// resty client
+			client := resty.New().SetRetryCount(10)
+			//a resty attempt
+			r := client.R().
+				SetHeaders(keys).
+				SetBody([]byte("test body"))
+
+			response, err := r.
+				Post("http://" + conf.Address + ":" + conf.Address + "/api/internal/stats")
+			if err != nil {
+				log.Fatalf("send new request error:%v", err)
+			}
+
+			if response.StatusCode() != tt.want.code {
+				t.Errorf("error code %v want %v", response.StatusCode, tt.want.code)
+				fmt.Println(response)
+
+			}
+
 		})
 
 	}

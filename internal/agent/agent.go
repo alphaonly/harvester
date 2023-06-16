@@ -380,6 +380,9 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 	m := make(map[*sendData]bool)
 	keys := make(HeaderKeys)
 
+
+	keys["X-Real-IP"] = a.Configuration.Address
+
 	switch a.Configuration.CompressType {
 	case "deflate":
 		{
@@ -491,20 +494,6 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			AddGaugeDataJSON(data, metrics.FreeMemory, "FreeMemory", m)
 			AddGaugeDataJSON(data, metrics.CPUutilization1, "CPUutilization1", m)
 
-			//// value1, value2 := int64(rand.Int31()), int64(rand.Int31())
-			////// var value0 int64
-			////// value1, value2 := int64(1), int64(2)
-			////// // //check api no value POST with expected response
-			//baseURL := url.URL{Scheme: a.Configuration.Scheme, Host: a.Configuration.Address}
-			//dataAPI := sendData{
-			//	url:    baseURL.JoinPath("value"),
-			//	keys:   keys,
-			//	signer: a.Signer,
-			//}
-			////AddCounterDataJSON(dataAPI, Counter(value1), "SetGet12344", m)
-			////AddCounterDataJSON(dataAPI, Counter(value2), "SetGet12344", m)
-			//AddCounterDataJSON(dataAPI, -1, "PollCount", m)
-			////log.Printf("sum:%v", value1+value2+value0)
 			// Encrypt data to send with TLS public key
 			if a.Configuration.CryptoKey != "" {
 				bts, err := json.Marshal(&data.JSONBody)

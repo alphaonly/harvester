@@ -24,46 +24,43 @@ func TestRun(t *testing.T) {
 		want string
 	}{
 		{
-			name: "test#1 - Positive: server accessible",
+			name: "test#1 - Positive: srv accessible",
 			URL:  "http://localhost:8080/check/",
 			want: "200 OK",
 		},
 		{
-			name: "test#2 - Negative: server do not respond",
+			name: "test#2 - Negative: srv do not respond",
 			URL:  "http://localhost:8080/chek/",
 			want: "404 Not Found",
 		},
 	}
 
 	sc := conf.NewServerConf(conf.UpdateSCFromEnvironment, conf.UpdateSCFromFlags)
-	
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	var storage stor.Storage
+	if sc.DatabaseDsn == "" {
+		storage = fileStor.FileArchive{StoreFile: sc.StoreFile}
+	} else {
+		storage = db.NewDBStorage(ctx, sc.DatabaseDsn)
+	}
+	hnd := &handlers.Handlers{}
+
+	srv := server.New(sc, storage, hnd, nil)
+
+	go func() {
+		err := srv.Run(ctx)
+		if err != nil {
+			return
+		}
+
+	}()
+
 	for _, tt := range tests {
 
 		t.Run(tt.name, func(tst *testing.T) {
-			//Up server for 3 seconds
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-		
-			var storage stor.Storage
-			if sc.DatabaseDsn == "" {
-				storage = fileStor.FileArchive{StoreFile: sc.StoreFile}
-			} else {
-				storage = db.NewDBStorage(ctx, sc.DatabaseDsn)
-			}
-			handlers := &handlers.Handlers{}
-
-			server := server.New(sc, storage, handlers,nil)
-
-			go func() {
-				err := server.Run(ctx)
-				if err != nil {
-					return
-				}
-
-			}()
-
-			//wait for server is up
-			time.Sleep(time.Second * 2)
 
 			keys := make(map[string]string)
 			keys["Content-Type"] = "plain/text"
@@ -82,11 +79,8 @@ func TestRun(t *testing.T) {
 				t.Error("Server responded unexpectedly")
 
 			}
-			err=server.Shutdown(ctx)
-			if err!=nil{
-				t.Fatal(err)
-			}
+
 		})
 	}
-
+	cancel()
 }

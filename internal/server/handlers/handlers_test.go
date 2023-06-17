@@ -201,7 +201,7 @@ func TestStats(t *testing.T) {
 		Handler: Server.Handlers.NewRouter(),
 	}
 
-	go Server.ListenData(ctx)
+	go Server.ListenData()
 	go Server.ParkData(ctx, Server.ExternalStorage)
 
 	for _, tt := range tests {

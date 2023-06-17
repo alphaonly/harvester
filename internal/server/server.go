@@ -30,10 +30,6 @@ type Server struct {
 	Crypto          cryptoCommon.ServerCertificateManager
 }
 
-func NewConfiguration(serverPort string) *Configuration {
-	return &Configuration{serverPort: ":" + serverPort}
-}
-
 func New(
 	configuration *conf.ServerConfiguration,
 	ExStorage stor.Storage,
@@ -49,7 +45,7 @@ func New(
 	}
 }
 
-func (s Server) ListenData(ctx context.Context) {
+func (s Server) ListenData() {
 
 	err := s.HTTPServer.ListenAndServe()
 	logging.LogFatal(err)
@@ -65,7 +61,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	s.restoreData(ctx, s.ExternalStorage)
 
-	go s.ListenData(ctx)
+	go s.ListenData()
 	go s.ParkData(ctx, s.ExternalStorage)
 
 	osSignal := make(chan os.Signal, 1)
@@ -74,13 +70,13 @@ func (s *Server) Run(ctx context.Context) error {
 	<-osSignal
 	//Graceful shutdown
 	err := s.Shutdown(ctx)
+	logging.LogFatal(err)
 
 	return err
 }
 
 // shutdown
 func (s Server) Shutdown(ctx context.Context) error {
-	time.Sleep(time.Second * 2)
 	err := s.HTTPServer.Shutdown(ctx)
 	log.Println("Server shutdown")
 	return err

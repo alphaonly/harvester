@@ -706,6 +706,7 @@ func (h *Handlers) NewRouter() chi.Router {
 		r.Get("/ping", h.HandlePing)
 		r.Get("/ping/", h.HandlePing)
 		r.Get("/check", h.HandleCheckHealth)
+		r.Get("/check/", h.HandleCheckHealth)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		//POST requests handlers
 		r.Post("/value", postJSONAndGetCompressed)

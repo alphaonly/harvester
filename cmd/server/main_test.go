@@ -2,12 +2,10 @@ package main_test
 
 import (
 	"context"
+	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 	"testing"
 	"time"
 
-	db "github.com/alphaonly/harvester/internal/server/storage/implementations/dbstorage"
-	fileStor "github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
-	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
 
@@ -35,20 +33,15 @@ func TestRun(t *testing.T) {
 		},
 	}
 
-	sc := conf.NewServerConf(conf.UpdateSCFromEnvironment, conf.UpdateSCFromFlags)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	var storage stor.Storage
-	if sc.DatabaseDsn == "" {
-		storage = fileStor.FileArchive{StoreFile: sc.StoreFile}
-	} else {
-		storage = db.NewDBStorage(ctx, sc.DatabaseDsn)
-	}
-	hnd := &handlers.Handlers{}
-
-	srv := server.New(sc, storage, hnd, nil)
+	var (
+		cfg     = conf.NewServerConf()
+		storage = mapstorage.NewStorage()
+		hnd     = &handlers.Handlers{}
+		srv     = server.New(cfg, storage, hnd, nil)
+	)
 
 	go func() {
 		err := srv.Run(ctx)

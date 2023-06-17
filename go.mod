@@ -11,10 +11,11 @@ require (
 	golang.org/x/net v0.10.0 // indirect
 )
 
+require honnef.co/go/tools v0.4.3
+
 require (
 	golang.org/x/exp/typeparams v0.0.0-20221208152030-732eee02a75a // indirect
 	golang.org/x/mod v0.10.0 // indirect
-	honnef.co/go/tools v0.4.3 // indirect
 )
 
 require (

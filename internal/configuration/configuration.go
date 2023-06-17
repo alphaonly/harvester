@@ -315,9 +315,7 @@ type StrValue struct {
 func (v *StrValue) Get() interface{} {
 	return v.value
 }
-func NewStrValue(s string) VariableValue {
-	return &StrValue{value: s}
-}
+
 func (v *StrValue) Set(s string) {
 	v.value = s
 }
@@ -337,14 +335,6 @@ func (v *IntValue) Set(s string) {
 	}
 }
 
-func NewIntValue(s string) VariableValue {
-	changedValue, err := strconv.Atoi(s)
-	if err != nil {
-		log.Fatal("Int64 Parse error")
-	}
-	return &IntValue{value: changedValue}
-}
-
 type BoolValue struct {
 	value bool
 }
@@ -358,13 +348,6 @@ func (v *BoolValue) Set(s string) {
 	if err != nil {
 		log.Fatal("Bool Parse error")
 	}
-}
-func NewBoolValue(s string) VariableValue {
-	changedValue, err := strconv.ParseBool(s)
-	if err != nil {
-		log.Fatal("Bool Parse error")
-	}
-	return &BoolValue{value: changedValue}
 }
 
 type DurValue struct {
@@ -381,14 +364,6 @@ func (v *DurValue) Set(s string) {
 		log.Fatal("Duration Parse error")
 	}
 	v.value = schema.Duration(interval)
-}
-
-func NewDurValue(s string) VariableValue {
-	interval, err := time.ParseDuration(s)
-	if err != nil {
-		log.Fatal("Duration Parse error")
-	}
-	return &DurValue{value: schema.Duration(interval)}
 }
 
 func getEnv(variableName string, variableValue VariableValue, changed map[string]bool) (changedValue interface{}) {

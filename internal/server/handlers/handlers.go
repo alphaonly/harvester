@@ -704,16 +704,16 @@ func (h *Handlers) NewRouter() chi.Router {
 		//GET requests handlers
 		r.Get("/", getListCompressed)
 		r.Get("/ping", h.HandlePing)
-		// r.Get("/ping/", h.HandlePing)
+		r.Get("/ping/", h.HandlePing)
 		r.Get("/check", h.HandleCheckHealth)
 		r.Get("/value/{TYPE}/{NAME}", h.HandleGetMetricValue)
 		//POST requests handlers
 		r.Post("/value", postJSONAndGetCompressed)
-		// r.Post("/value/", postJSONAndGetCompressed)
+		r.Post("/value/", postJSONAndGetCompressed)
 		r.Post("/update", postJSONAndGetCompressed)
-		// r.Post("/update/", postJSONAndGetCompressed)
+		r.Post("/update/", postJSONAndGetCompressed)
 		r.Post("/updates", postJSONAndGetCompressedBatch)
-		// r.Post("/updates/", postJSONAndGetCompressedBatch)
+		r.Post("/updates/", postJSONAndGetCompressedBatch)
 		r.Post("/update/{TYPE}/{NAME}/{VALUE}", h.HandlePostMetric)
 
 		//Error patterns

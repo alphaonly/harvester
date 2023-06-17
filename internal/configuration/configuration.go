@@ -27,7 +27,7 @@ type AgentConfiguration struct {
 	UseJSON        int             `json:"USE_JSON,omitempty"`
 	Key            string          `json:"KEY,omitempty"`
 	RateLimit      int             `json:"RATE_LIMIT,omitempty"`
-	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"` //path to public key file
+	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"` //path to public key file_
 	EnvChanged     map[string]bool
 }
 

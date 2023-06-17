@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	"io"
 	"log"
 	"net"
@@ -490,7 +491,8 @@ func (h *Handlers) Decrypt(next http.Handler) http.HandlerFunc {
 		}
 		//call further handler with context parameters
 		if next != nil {
-			common.RunNextHandler(common.NewRWDataComposite(r, w), next, decryptedBytes)
+			err := common.RunNextHandler(common.NewRWDataComposite(r, w), next, decryptedBytes)
+			logging.LogFatal(err)
 			return
 		}
 		log.Fatal("HandlePostMetricJSON handler requires next handler not nil")
@@ -625,9 +627,19 @@ func (h *Handlers) HandlePing(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "server: ping handler: Unable to connect to database:"+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer conn.Close(context.Background())
+	err = conn.Close(r.Context())
+	if err != nil {
+		httpError(w, "server: ping handler: Unable to close the connection to database:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	log.Println("server: ping handler: connection established, 200 OK ")
-	w.Write([]byte("200 OK"))
+	_, err = w.Write([]byte("200 OK"))
+	if err != nil {
+		httpError(w, "server: ping handler: Unable to write back body:"+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -654,7 +666,8 @@ func (h *Handlers) Stats(w http.ResponseWriter, r *http.Request) {
 	//Parse remote IP
 	remoteAddress := net.ParseIP(remoteAddrStr)
 	if !IPNet.Contains(remoteAddress) {
-		httpError(w, "remote IP address do not satisfies the given subnet", http.StatusForbidden)
+		mess := fmt.Sprintf("remote IP %v address do not satisfies the given subnet %v", remoteAddress, IPNet.String())
+		httpError(w, mess, http.StatusForbidden)
 		return
 	}
 	//respond status OK

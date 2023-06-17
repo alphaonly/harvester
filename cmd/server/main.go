@@ -46,17 +46,17 @@ func main() {
 	//Certificates for decryption
 	certManager := crypto.NewRSA(9669, configuration)
 	//Handlers
-	handlers := &handlers.Handlers{
+	hndlrs := &handlers.Handlers{
 		Storage: internalStorage,
 		Signer:  signchecker.NewSHA256(configuration.Key),
-		Conf: conf.ServerConfiguration{
+		Conf: &conf.ServerConfiguration{
 			DatabaseDsn:   configuration.DatabaseDsn,
 			CryptoKey:     configuration.CryptoKey,
 			TrustedSubnet: configuration.TrustedSubnet},
 		CertManager: certManager,
 	}
 
-	Server := server.New(configuration, externalStorage, handlers, certManager)
+	Server := server.New(configuration, externalStorage, hndlrs, certManager)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

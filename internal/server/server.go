@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"log"
 	"net/http"
@@ -8,76 +9,75 @@ import (
 	"os/signal"
 	"time"
 
-
+	cryptoCommon "github.com/alphaonly/harvester/internal/common/crypto"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	conf "github.com/alphaonly/harvester/internal/configuration"
+	"github.com/alphaonly/harvester/internal/server/crypto"
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
-
 )
 
 type Configuration struct {
 	serverPort string
-
 }
 
 type Server struct {
-
-	configuration   *conf.ServerConfiguration
+	Cfg             *conf.ServerConfiguration
 	InternalStorage stor.Storage
 	ExternalStorage stor.Storage
-	handlers        *handlers.Handlers
-	httpServer      *http.Server
-
+	Handlers        *handlers.Handlers
+	HTTPServer      *http.Server
+	Crypto          cryptoCommon.ServerCertificateManager
 }
 
-func NewConfiguration(serverPort string) *Configuration {
-	return &Configuration{serverPort: ":" + serverPort}
-}
+func New(
+	configuration *conf.ServerConfiguration,
+	ExStorage stor.Storage,
+	handlers *handlers.Handlers,
+	certificate cryptoCommon.ServerCertificateManager) (server Server) {
 
-func New(configuration *conf.ServerConfiguration, ExStorage stor.Storage, handlers *handlers.Handlers) (server Server) {
 	return Server{
-
-		configuration:   configuration,
+		Cfg:             configuration,
 		InternalStorage: handlers.Storage,
 		ExternalStorage: ExStorage,
-		handlers:        handlers,
-
+		Handlers:        handlers,
+		Crypto:          certificate,
 	}
 }
 
-func (s Server) ListenData(ctx context.Context) {
-	// err := http.ListenAndServe(s.configuration.Port, s.handlers.NewRouter())
-	err := s.httpServer.ListenAndServe()
+func (s Server) ListenData() {
 
-	if err != nil {
-		log.Println(err)
-	}
+	err := s.HTTPServer.ListenAndServe()
+	logging.LogFatal(err)
 }
 
 func (s *Server) Run(ctx context.Context) error {
 
 	// маршрутизация запросов обработчику
-	s.httpServer = &http.Server{
-		Addr: s.configuration.Address,
-		Handler:  s.handlers.NewRouter(),
+	s.HTTPServer = &http.Server{
+		Addr:    s.Cfg.Address,
+		Handler: s.Handlers.NewRouter(),
 	}
 
 	s.restoreData(ctx, s.ExternalStorage)
 
-	go s.ListenData(ctx)
+	go s.ListenData()
 	go s.ParkData(ctx, s.ExternalStorage)
 
 	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, os.Interrupt)
 
 	<-osSignal
+	//Graceful shutdown
 	err := s.Shutdown(ctx)
+	logging.LogFatal(err)
 
 	return err
 }
+
+// shutdown
 func (s Server) Shutdown(ctx context.Context) error {
-	time.Sleep(time.Second * 2)
-	err := s.httpServer.Shutdown(ctx)
+	err := s.HTTPServer.Shutdown(ctx)
 	log.Println("Server shutdown")
 	return err
 }
@@ -87,7 +87,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 		log.Println("external storage  not initiated ")
 		return
 	}
-	if s.configuration.Restore {
+	if s.Cfg.Restore {
 		mvList, err := storageFrom.GetAllMetrics(ctx)
 
 		if err != nil {
@@ -98,7 +98,6 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 			log.Println("file storage is empty, nothing to recover")
 			return
 		}
-
 
 		err = s.InternalStorage.SaveAllMetrics(ctx, mvList)
 		if err != nil {
@@ -114,12 +113,12 @@ func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
 	if storageTo == nil {
 		return
 	}
-	if s.handlers.Storage == storageTo {
-		log.Fatal("a try to save to it is own")
+	if s.Handlers.Storage == storageTo {
+		log.Println("a try to save to it is own")
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval))
+	ticker := time.NewTicker(time.Duration(s.Cfg.StoreInterval))
 
 	defer ticker.Stop()
 
@@ -152,4 +151,31 @@ DoItAgain:
 
 	}
 	goto DoItAgain
+}
+
+func (s *Server) CheckCertificateFile(dataType cryptoCommon.KeyType) error {
+
+	if s.Cfg.CryptoKey == "" {
+		//generate certificates in test folder
+		crypto.MakeCryptoFiles("rsa", s.Cfg, nil)
+		log.Println("path to rsa files is not defined, new rsa files were generated in /rsa/ folder")
+		return nil
+	}
+
+	//Reading file with rsa key from os
+	file, err := os.OpenFile(s.Cfg.CryptoKey, os.O_RDONLY, 0777)
+	if err != nil {
+		log.Printf("error:file %v  is not read", file)
+		return err
+	}
+	//put data to read buffer
+	buf := bufio.NewReader(file)
+	rs := crypto.RSA{}
+	rs.Receive(dataType, buf)
+	if rs.Error() != nil {
+		log.Println("error:private rsa is not read")
+		return rs.Error()
+	}
+	return nil
+
 }

@@ -4,15 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	"log"
-
-	"net/url"
-
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
-	"github.com/alphaonly/harvester/internal/common/logging"
 	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server"
 	"github.com/alphaonly/harvester/internal/server/handlers"
@@ -173,8 +172,14 @@ func TestStats(t *testing.T) {
 		want          want
 	}{
 		{
-			name: "test#1 positive",
-			want: want{},
+			name:          "test#1 positive",
+			trustedSubnet: "127.0.0.1/30",
+			want:          want{http.StatusOK, ""},
+		},
+		{
+			name:          "test#2 negative",
+			trustedSubnet: "192.168.1.0/24",
+			want:          want{http.StatusForbidden, ""},
 		},
 	}
 
@@ -185,31 +190,41 @@ func TestStats(t *testing.T) {
 
 	// storage
 	storage := mapstorage.New()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handlers
+	hdlrs := &handlers.Handlers{
+		Storage: storage,
+		Conf:    conf,
+	}
+
+	Server := server.New(conf, storage, hdlrs, nil)
+
+	// маршрутизация запросов обработчику
+	Server.HTTPServer = &http.Server{
+		Addr:    Server.Cfg.Address,
+		Handler: Server.Handlers.NewRouter(),
+	}
+
+	go Server.ListenData(ctx)
+	go Server.ParkData(ctx, Server.ExternalStorage)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
 			conf.TrustedSubnet = tt.trustedSubnet
 
-			// Handlers
-			handlers := &handlers.Handlers{
-				Storage: storage,
-				Conf:    *conf,
-			}
-
-			Server := server.New(conf, storage, handlers, nil)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			go func() {
-
-				err := Server.Run(ctx)
-				logging.LogFatal(err)
-			}()
-
 			keys := make(HeaderKeys)
 			keys["Content-Type"] = "plain/text"
-			keys["X-Real-IP"] = conf.Address
+
+			host, _, err := net.SplitHostPort(conf.Address)
+			logging.LogFatal(err)
+			//find first IP by host
+			ip, err := net.LookupIP(host)
+			logging.LogFatal(err)
+			keys["X-Real-IP"] = ip[1].String()
 
 			// resty client
 			client := resty.New().SetRetryCount(10)
@@ -219,19 +234,19 @@ func TestStats(t *testing.T) {
 				SetBody([]byte("test body"))
 
 			response, err := r.
-				Post("http://" + conf.Address + ":" + conf.Address + "/api/internal/stats")
+				Post("http://" + conf.Address + "/api/internal/stats")
 			if err != nil {
 				log.Fatalf("send new request error:%v", err)
 			}
 
 			if response.StatusCode() != tt.want.code {
-				t.Errorf("error code %v want %v", response.StatusCode, tt.want.code)
+				t.Errorf("error code %v want %v", response.StatusCode(), tt.want.code)
 				fmt.Println(response)
-
 			}
 
 		})
 
 	}
-
+	//err := Server.HTTPServer.Shutdown(ctx)
+	//logging.LogFatal(err)
 }

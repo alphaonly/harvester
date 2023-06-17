@@ -31,7 +31,7 @@ import (
 type Handlers struct {
 	Storage     storage.Storage
 	Signer      signchecker.Signer
-	Conf        configuration.ServerConfiguration
+	Conf        *configuration.ServerConfiguration
 	CertManager crypto.ServerCertificateManager
 }
 
@@ -648,17 +648,17 @@ func (h *Handlers) Stats(w http.ResponseWriter, r *http.Request) {
 	//get real IP address
 	remoteAddrStr := r.Header.Get("X-Real-IP")
 	if remoteAddrStr == "" {
-		log.Println("X-Real-IP is missing in http header,using Request.RemoteAddr instead")		
-		remoteAddrStr= r.RemoteAddr
-	}	
-	//Parse remote IP 
+		log.Println("X-Real-IP is missing in http header,using Request.RemoteAddr instead")
+		remoteAddrStr = r.RemoteAddr
+	}
+	//Parse remote IP
 	remoteAddress := net.ParseIP(remoteAddrStr)
 	if !IPNet.Contains(remoteAddress) {
 		httpError(w, "remote IP address do not satisfies the given subnet", http.StatusForbidden)
 		return
 	}
-	//respond status OK 
-	w.Write([]byte("200 OK"))
+	//respond status OK
+	//w.Write([]byte("200 OK"))
 	w.WriteHeader(http.StatusOK)
 }
 

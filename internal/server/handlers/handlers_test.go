@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/alphaonly/harvester/internal/common/logging"
 	"log"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -160,11 +158,6 @@ func TestStats(t *testing.T) {
 		code     int
 		response string
 	}
-	type requestParams struct {
-		method string
-		url    string
-	}
-
 	tests := []struct {
 		name          string
 		method        string
@@ -219,12 +212,14 @@ func TestStats(t *testing.T) {
 			keys := make(HeaderKeys)
 			keys["Content-Type"] = "plain/text"
 
-			host, _, err := net.SplitHostPort(conf.Address)
-			logging.LogFatal(err)
-			//find first IP by host
-			ip, err := net.LookupIP(host)
-			logging.LogFatal(err)
-			keys["X-Real-IP"] = ip[1].String()
+			//host, _, err := net.SplitHostPort(conf.Address)
+			//logging.LogFatal(err)
+			//
+			////find first IP by host
+			//ip, err := net.LookupIP(host)
+			//logging.LogFatal(err)
+			//keys["X-Real-IP"] = ip[0].String()
+			keys["X-Real-IP"] = "127.0.0.1"
 
 			// resty client
 			client := resty.New().SetRetryCount(10)

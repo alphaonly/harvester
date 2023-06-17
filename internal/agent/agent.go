@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"runtime"
 	"sync"
 
@@ -379,10 +380,14 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 	m := make(map[*sendData]bool)
 	keys := make(HeaderKeys)
+	//Putting X-Real-IP key in header
+	host, _, err := net.SplitHostPort(a.Configuration.Address)
+	logging.LogFatal(err)
+	ip, err := net.LookupIP(host)
+	logging.LogFatal(err)
+	keys["X-Real-IP"] = ip[0].String()
 
-
-	keys["X-Real-IP"] = a.Configuration.Address
-
+	//Pick compress type key
 	switch a.Configuration.CompressType {
 	case "deflate":
 		{

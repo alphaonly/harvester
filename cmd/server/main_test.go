@@ -2,19 +2,45 @@ package main_test
 
 import (
 	"context"
+	"github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
-	"testing"
-	"time"
-
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
+	"net/http"
+	"testing"
 
-	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server"
 	"github.com/alphaonly/harvester/internal/server/handlers"
 )
 
 func TestRun(t *testing.T) {
+
+	// Server Configuration
+	conf := configuration.NewServerConf(
+		configuration.UpdateSCFromFlags,
+	)
+	// storage
+	storage := mapstorage.New()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handlers
+	hdlrs := &handlers.Handlers{
+		Storage: storage,
+		Conf:    conf,
+	}
+
+	Server := server.New(conf, storage, hdlrs, nil)
+
+	// маршрутизация запросов обработчику
+	Server.HTTPServer = &http.Server{
+		Addr:    Server.Cfg.Address,
+		Handler: Server.Handlers.NewRouter(),
+	}
+
+	go Server.ListenData()
+	go Server.ParkData(ctx, Server.ExternalStorage)
 
 	tests := []struct {
 		name string
@@ -23,35 +49,15 @@ func TestRun(t *testing.T) {
 	}{
 		{
 			name: "test#1 - Positive: srv accessible",
-			URL:  "http://localhost:8080/check/",
+			URL:  "http://" + conf.Address + "/check/",
 			want: "200 OK",
 		},
 		{
 			name: "test#2 - Negative: srv do not respond",
-			URL:  "http://localhost:8080/chek/",
+			URL:  "http://" + conf.Address + "/chek/",
 			want: "404 Not Found",
 		},
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
-	var (
-		cfg     = conf.NewServerConf()
-		storage = mapstorage.NewStorage()
-		hnd     = &handlers.Handlers{}
-		srv     = server.New(cfg, storage, hnd, nil)
-	)
-	cfg.Address = "localhost:8080"
-	cfg.Port = "8080"
-
-	go func() {
-		err := srv.Run(ctx)
-		if err != nil {
-			return
-		}
-
-	}()
 
 	for _, tt := range tests {
 

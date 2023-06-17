@@ -261,7 +261,7 @@ func UpdateSCFromConfigFile(c *ServerConfiguration) {
 	logging.LogFatal(err)
 	b := make([]byte, 4096)
 	readBytes, err := buf.Read(b)
-
+	logging.LogFatal(err)
 	//Unmarshal JSON bytes from file
 	err = json.Unmarshal(b[:readBytes], fc)
 	logging.LogFatal(err)

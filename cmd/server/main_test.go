@@ -42,6 +42,8 @@ func TestRun(t *testing.T) {
 		hnd     = &handlers.Handlers{}
 		srv     = server.New(cfg, storage, hnd, nil)
 	)
+	cfg.Address = "localhost:8080"
+	cfg.Port = "8080"
 
 	go func() {
 		err := srv.Run(ctx)

@@ -36,14 +36,14 @@ func TestRun(t *testing.T) {
 	}
 
 	sc := conf.NewServerConf(conf.UpdateSCFromEnvironment, conf.UpdateSCFromFlags)
-	
+
 	for _, tt := range tests {
 
 		t.Run(tt.name, func(tst *testing.T) {
 			//Up server for 3 seconds
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-		
+
 			var storage stor.Storage
 			if sc.DatabaseDsn == "" {
 				storage = fileStor.FileArchive{StoreFile: sc.StoreFile}
@@ -52,7 +52,7 @@ func TestRun(t *testing.T) {
 			}
 			handlers := &handlers.Handlers{}
 
-			server := server.New(sc, storage, handlers,nil)
+			server := server.New(sc, storage, handlers, nil,nil)
 
 			go func() {
 				err := server.Run(ctx)
@@ -82,8 +82,8 @@ func TestRun(t *testing.T) {
 				t.Error("Server responded unexpectedly")
 
 			}
-			err=server.Shutdown(ctx)
-			if err!=nil{
+			err = server.Shutdown(ctx)
+			if err != nil {
 				t.Fatal(err)
 			}
 		})

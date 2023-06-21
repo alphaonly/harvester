@@ -2,12 +2,13 @@ package main
 
 import (
 	"errors"
-	"github.com/alphaonly/harvester/internal/schema"
-	"github.com/go-resty/resty/v2"
 	"log"
 	"math/rand"
 	"net/http"
 	"strconv"
+
+	"github.com/alphaonly/harvester/internal/schema"
+	"github.com/go-resty/resty/v2"
 )
 
 // create HTTP client without redirects support
@@ -19,7 +20,7 @@ func CheckCounterGzipHandlers() {
 		return errRedirectBlocked
 	})
 	httpc := resty.New().
-	SetBaseURL("http://127.0.0.1:8080").
+		SetBaseURL("http://127.0.0.1:8080").
 		SetRedirectPolicy(redirPolicy)
 
 	id := "GetSetZip" + strconv.Itoa(rand.Intn(256))
@@ -29,9 +30,9 @@ func CheckCounterGzipHandlers() {
 		SetHeader("Accept-Encoding", "gzip").
 		SetHeader("Content-Type", "application/json")
 
-	var result schema.MetricsJSON
+	var result schema.Metrics
 	resp, err := req.
-		SetBody(&schema.MetricsJSON{
+		SetBody(&schema.Metrics{
 			ID:    id,
 			MType: "counter"}).
 		SetResult(&result).

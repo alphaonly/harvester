@@ -134,12 +134,12 @@ func logFatal(err error) {
 
 func AddGaugeDataJSONToBatch(common *sendData, val Gauge, name string) {
 	if common.JSONBatchBody == nil {
-		common.JSONBatchBody = new([]schema.MetricsJSON)
+		common.JSONBatchBody = new([]schema.Metrics)
 	}
 
 	v := float64(val)
 
-	mj := schema.MetricsJSON{
+	mj := schema.Metrics{
 		ID:    name,
 		MType: "gauge",
 		Value: &v,
@@ -154,11 +154,11 @@ func AddGaugeDataJSONToBatch(common *sendData, val Gauge, name string) {
 func AddCounterDataJSONToBatch(common *sendData, val Counter, name string) {
 
 	if common.JSONBatchBody == nil {
-		common.JSONBatchBody = new([]schema.MetricsJSON)
+		common.JSONBatchBody = new([]schema.Metrics)
 	}
 	v := int64(val)
 
-	mj := schema.MetricsJSON{
+	mj := schema.Metrics{
 		ID:    name,
 		MType: "counter",
 		Delta: &v,
@@ -173,7 +173,7 @@ func AddCounterDataJSONToBatch(common *sendData, val Counter, name string) {
 func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendData]bool) {
 	v := float64(val)
 
-	mj := schema.MetricsJSON{
+	mj := schema.Metrics{
 		ID:    name,
 		MType: "gauge",
 		Value: &v,
@@ -193,14 +193,14 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sendData]bool) {
 	v := int64(val)
 
-	mj := schema.MetricsJSON{
+	mj := schema.Metrics{
 		ID:    name,
 		MType: "counter",
 		Delta: &v,
 	}
 	if val == -1 {
 		//API /value check
-		mj = schema.MetricsJSON{
+		mj = schema.Metrics{
 			ID:    name,
 			MType: "counter",
 		}
@@ -223,8 +223,8 @@ type HeaderKeys map[string]string
 type sendData struct {
 	url            *url.URL
 	keys           HeaderKeys
-	JSONBody       *schema.MetricsJSON
-	JSONBatchBody  *[]schema.MetricsJSON
+	JSONBody       *schema.Metrics
+	JSONBatchBody  *[]schema.Metrics
 	compressedBody []byte
 	encryptedBody  []byte
 	signer         sign.Signer
@@ -380,7 +380,6 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 	m := make(map[*sendData]bool)
 	keys := make(HeaderKeys)
 
-
 	keys["X-Real-IP"] = a.Configuration.Address
 
 	switch a.Configuration.CompressType {
@@ -396,7 +395,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 		}
 	}
 
-	switch a.Configuration.UseJSON {
+	switch a.Configuration.Mode {
 
 	case 2: //JSON Batch
 		{

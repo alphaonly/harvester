@@ -12,8 +12,12 @@ require (
 )
 
 require (
+	github.com/golang/protobuf v1.5.3 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20221208152030-732eee02a75a // indirect
 	golang.org/x/mod v0.10.0 // indirect
+	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
+	google.golang.org/grpc v1.56.0 // indirect
+	google.golang.org/protobuf v1.30.0 // indirect
 	honnef.co/go/tools v0.4.3 // indirect
 )
 

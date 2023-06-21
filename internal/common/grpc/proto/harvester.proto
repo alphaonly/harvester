@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package harvester;
+
+option go_package = "harvester/proto";
+
+message Metric {
+  string name = 1;  // имя метрики
+  enum Type {     
+      GAUGE = 0;
+      COUNTER = 1;
+  }
+  Type type = 2;      // тип
+  double gauge = 3;   //значение gauge
+  int64   counter = 4;    //значение counter
+}
+
+message AddMetricRequest {
+  Metric metric = 1;
+}
+
+message AddMetricResponse {
+  string error = 1; // ошибка
+}
+
+message GetMetricRequest {
+  string name = 1;
+}
+
+message GetMetricResponse {
+  Metric   metric = 1;
+  string error = 2;
+}
+
+
+service Service {
+  rpc AddMetric(AddMetricRequest) returns (AddMetricResponse);
+  rpc AddMetricMulti( stream AddMetricRequest) returns ( stream AddMetricResponse);
+  rpc GetMetric(GetMetricRequest) returns (GetMetricResponse);
+  rpc GetMetricMulti(stream GetMetricRequest) returns (stream GetMetricResponse);
+} 

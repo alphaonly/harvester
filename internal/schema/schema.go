@@ -11,25 +11,31 @@ type ContextKey int
 
 const PKey1 ContextKey = 123455
 
-type duplicateChecker interface{
-	check(make(map[string]MetricsJSON))	
+const (
+	COUNTER_TYPE = "counter"
+	GAUGE_TYPE   = "gauge"
+)
+
+type duplicateChecker interface {
+	check(make map[string]Metrics)
 }
 
-type MetricsJSONSlice []MetricsJSON
-func (s *MetricsJSONSlice)check(m map[string]MetricsJSON){
+type MetricsJSONSlice []Metrics
+
+func (s *MetricsJSONSlice) check(m map[string]Metrics) {
 
 }
 
 // Если двойные записи в counter - суммируем в одну, gauge - оставляем последнюю
 func (s *MetricsJSONSlice) EnhancedDistinct() error {
-	m := make(map[string]MetricsJSON)
+	m := make(map[string]Metrics)
 	for _, e := range *s {
-		
-		if e.MType == "counter"{
+
+		if e.MType == "counter" {
 			c, exists := m[e.ID]
 			if exists {
 				sum := int64(*e.Delta + *c.Delta)
-				m[e.ID] = MetricsJSON{e.ID, e.MType, &sum, e.Value, ""}
+				m[e.ID] = Metrics{e.ID, e.MType, &sum, e.Value, ""}
 				continue
 			}
 		}
@@ -42,7 +48,7 @@ func (s *MetricsJSONSlice) EnhancedDistinct() error {
 	return nil
 }
 
-type MetricsJSON struct {
+type Metrics struct {
 	ID    string   `json:"id"`              // имя метрикИ
 	MType string   `json:"type"`            // параметр, пID    string   `json:"id"`              // имя метрикиринимающий значение gauge или counter
 	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
@@ -50,7 +56,7 @@ type MetricsJSON struct {
 	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
-func (m MetricsJSON) Equals(m2 MetricsJSON) bool {
+func (m Metrics) Equals(m2 Metrics) bool {
 	return m.ID == m2.ID
 }
 

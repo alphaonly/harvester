@@ -15,6 +15,7 @@ import (
 	fileStor "github.com/alphaonly/harvester/internal/server/storage/implementations/filestorage"
 	"github.com/alphaonly/harvester/internal/server/storage/implementations/mapstorage"
 
+	grpcservice "github.com/alphaonly/harvester/internal/common/grpc"
 	"github.com/alphaonly/harvester/internal/signchecker"
 )
 
@@ -55,8 +56,10 @@ func main() {
 			TrustedSubnet: configuration.TrustedSubnet},
 		CertManager: certManager,
 	}
-
-	Server := server.New(configuration, externalStorage, handlers, certManager)
+	//gRPC service
+	grpcService := grpcservice.NewGRPCService(internalStorage)
+	//server
+	Server := server.New(configuration, externalStorage, handlers, certManager, grpcService)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -15,7 +15,7 @@ import (
 	"github.com/alphaonly/harvester/internal/schema"
 )
 
-const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":"","CRYPTO_KEY":"","ENABLE_HTTPS":false}`
+const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":"","CRYPTO_KEY":"","ENABLE_HTTPS":false,"GRPC_PORT":""}`
 const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":""}`
 
 type AgentConfiguration struct {
@@ -24,7 +24,7 @@ type AgentConfiguration struct {
 	CompressType   string          `json:"COMPRESS_TYPE,omitempty"`
 	PollInterval   schema.Duration `json:"POLL_INTERVAL,omitempty"`
 	ReportInterval schema.Duration `json:"REPORT_INTERVAL,omitempty"`
-	UseJSON        int             `json:"USE_JSON,omitempty"`
+	Mode           int             `json:"USE_JSON,omitempty"`
 	Key            string          `json:"KEY,omitempty"`
 	RateLimit      int             `json:"RATE_LIMIT,omitempty"`
 	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"` //path to public key file
@@ -42,6 +42,7 @@ type ServerConfiguration struct {
 	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"`     //path to private key file
 	Config        string          `json:"CONFIG,omitempty"`         //path to config file
 	TrustedSubnet string          `json:"TRUSTED_SUBNET,omitempty"` //trusted subnet declaration
+	GRPCPort      string          `json:"GRPCPORT,omitempty"`       //starts gRPC using the port,must be different from PORT
 	EnvChanged    map[string]bool
 }
 
@@ -106,7 +107,7 @@ func UpdateACFromEnvironment(c *AgentConfiguration) {
 	c.PollInterval = getEnv("POLL_INTERVAL", &DurValue{c.PollInterval}, c.EnvChanged).(schema.Duration)
 	c.ReportInterval = getEnv("REPORT_INTERVAL", &DurValue{c.ReportInterval}, c.EnvChanged).(schema.Duration)
 	c.Scheme = getEnv("SCHEME", &StrValue{c.Scheme}, c.EnvChanged).(string)
-	c.UseJSON = getEnv("USE_JSON", &IntValue{c.UseJSON}, c.EnvChanged).(int)
+	c.Mode = getEnv("USE_JSON", &IntValue{c.Mode}, c.EnvChanged).(int)
 	c.Key = getEnv("KEY", &StrValue{c.Key}, c.EnvChanged).(string)
 	c.RateLimit = getEnv("RATE_LIMIT", &IntValue{c.RateLimit}, c.EnvChanged).(int)
 	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
@@ -124,6 +125,7 @@ func UpdateSCFromEnvironment(c *ServerConfiguration) {
 	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
 	c.Config = getEnv("CONFIG", &StrValue{c.Config}, c.EnvChanged).(string)
 	c.TrustedSubnet = getEnv("TRUSTED_SUBNET", &StrValue{c.TrustedSubnet}, c.EnvChanged).(string)
+	c.GRPCPort = getEnv("GRPC_PORT", &StrValue{c.GRPCPort}, c.EnvChanged).(string)
 }
 
 func UpdateACFromFlags(c *AgentConfiguration) {
@@ -132,7 +134,7 @@ func UpdateACFromFlags(c *AgentConfiguration) {
 		a  = flag.String("a", dc.Address, "Domain name and :port")
 		p  = flag.Duration("p", time.Duration(dc.PollInterval), "Poll interval")
 		r  = flag.Duration("r", time.Duration(dc.ReportInterval), "Report interval")
-		j  = flag.Int("j", dc.UseJSON, "Use JSON 0-No JSON,1- JSON, 2-JSON Batch")
+		j  = flag.Int("j", dc.Mode, "Use JSON 0-No JSON,1- JSON, 2-JSON Batch, 3-gRPC")
 		t  = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
 		k  = flag.String("k", dc.Key, "string key for hash signing")
 		l  = flag.Int("l", dc.RateLimit, "Number of parallel inbound requests ")
@@ -159,8 +161,8 @@ func UpdateACFromFlags(c *AgentConfiguration) {
 	}
 
 	if !c.EnvChanged["USE_JSON"] {
-		c.UseJSON = *j
-		log.Printf(message, "USE_JSON", c.UseJSON)
+		c.Mode = *j
+		log.Printf(message, "USE_JSON", c.Mode)
 	}
 
 	if !c.EnvChanged["COMPRESS_TYPE"] {
@@ -196,6 +198,7 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 		cf1 = flag.String("c", dc.Config, "string contains a full path to configuration JSON File")
 		cf2 = flag.String("config", dc.Config, "string contains a full path to configuration JSON File")
 		t   = flag.String("t", dc.Config, "string contains a full path to configuration JSON File")
+		g   = flag.String("gport", dc.GRPCPort, "string contains a port for gRPC server, starts if the port is mentioned")
 	)
 	flag.Parse()
 
@@ -243,6 +246,10 @@ func UpdateSCFromFlags(c *ServerConfiguration) {
 	if !c.EnvChanged["TRUSTED_SUBNET"] {
 		c.TrustedSubnet = *t
 		log.Printf(message, "TRUSTED_SUBNET", c.TrustedSubnet)
+	}
+	if !c.EnvChanged["GRPC_PORT"] {
+		c.GRPCPort = *g
+		log.Printf(message, "GRPC_PORT", c.GRPCPort)
 	}
 }
 

@@ -12,9 +12,9 @@ import (
 )
 
 type Signer interface {
-	IsValidSign(mj schema.MetricsJSON) bool
-	Hash(mj schema.MetricsJSON) (hash string, err error)
-	Sign(mj *schema.MetricsJSON) (err error)
+	IsValidSign(mj schema.Metrics) bool
+	Hash(mj schema.Metrics) (hash string, err error)
+	Sign(mj *schema.Metrics) (err error)
 }
 
 type CheckerSHA256 struct {
@@ -29,7 +29,7 @@ func logFatal(err error) {
 		log.Fatal(err)
 	}
 }
-func (c CheckerSHA256) IsValidSign(mj schema.MetricsJSON) (result bool) {
+func (c CheckerSHA256) IsValidSign(mj schema.Metrics) (result bool) {
 
 	if c.key == nil || len(c.key) == 0 {
 		return true
@@ -108,14 +108,14 @@ func (c CheckerSHA256) gaugeHash(id string, value *float64) ([]byte, error) {
 	return h.Sum(*new([]byte)), nil
 }
 
-func (c CheckerSHA256) Hash(mj schema.MetricsJSON) (hash string, err error) {
+func (c CheckerSHA256) Hash(mj schema.Metrics) (hash string, err error) {
 	err = c.Sign(&mj)
 	if err != nil {
 		return "", err
 	}
 	return mj.Hash, nil
 }
-func (c CheckerSHA256) Sign(mj *schema.MetricsJSON) (err error) {
+func (c CheckerSHA256) Sign(mj *schema.Metrics) (err error) {
 	if c.key == nil || len(c.key) == 0 {
 		return nil
 	}

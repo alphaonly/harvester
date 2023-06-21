@@ -4,17 +4,20 @@ import (
 	"bufio"
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
 	cryptoCommon "github.com/alphaonly/harvester/internal/common/crypto"
+	pb "github.com/alphaonly/harvester/internal/common/grpc/proto"
 	"github.com/alphaonly/harvester/internal/common/logging"
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/alphaonly/harvester/internal/server/crypto"
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
+	"google.golang.org/grpc"
 )
 
 type Configuration struct {
@@ -28,17 +31,16 @@ type Server struct {
 	handlers        *handlers.Handlers
 	httpServer      *http.Server
 	crypto          cryptoCommon.ServerCertificateManager
-}
-
-func NewConfiguration(serverPort string) *Configuration {
-	return &Configuration{serverPort: ":" + serverPort}
+	grpcService     pb.ServiceServer
+	grpcServer      *grpc.Server
 }
 
 func New(
 	configuration *conf.ServerConfiguration,
 	ExStorage stor.Storage,
 	handlers *handlers.Handlers,
-	certificate cryptoCommon.ServerCertificateManager) (server Server) {
+	certificate cryptoCommon.ServerCertificateManager,
+	grpcService pb.ServiceServer) (server Server) {
 
 	return Server{
 		cfg:             configuration,
@@ -46,10 +48,33 @@ func New(
 		ExternalStorage: ExStorage,
 		handlers:        handlers,
 		crypto:          certificate,
+		grpcService:     grpcService,
 	}
 }
 
-func (s Server) ListenData(ctx context.Context) {
+// ListenGRPC - starts listening gRPC server
+func (s *Server) ListenGRPC(ctx context.Context) {
+
+	//check necessary data
+	if s.cfg.GRPCPort == "" || s.grpcService != nil {
+		return
+	}
+	//listener configuration
+	listener, err := net.Listen("tcp", ":"+s.cfg.GRPCPort)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// create grpc
+	s.grpcServer = grpc.NewServer()
+	// register service
+	pb.RegisterServiceServer(s.grpcServer, s.grpcService)
+	log.Println("Start gRPC server")
+	if err := s.grpcServer.Serve(listener); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (s Server) listenHTTP(ctx context.Context) {
 
 	err := s.httpServer.ListenAndServe()
 	logging.LogFatal(err)
@@ -65,16 +90,28 @@ func (s *Server) Run(ctx context.Context) error {
 
 	s.restoreData(ctx, s.ExternalStorage)
 
-	go s.ListenData(ctx)
-	go s.ParkData(ctx, s.ExternalStorage)
+	go s.listenHTTP(ctx)
+	go s.ListenGRPC(ctx)
+
+	go s.parkData(ctx, s.ExternalStorage)
 
 	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, os.Interrupt)
 
-	<-osSignal
-	//Graceful shutdown
-	err := s.Shutdown(ctx)
-
+	shutdown := func(s *Server) error {
+		//Graceful gRPC shutdown
+		s.grpcServer.GracefulStop()
+		//Graceful http shutdown
+		err := s.Shutdown(ctx)
+		return err
+	}
+	var err error
+	select {
+	case <-osSignal:
+		err = shutdown(s)
+	case <-ctx.Done():
+		err = shutdown(s)
+	}
 	return err
 }
 
@@ -112,7 +149,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 
 }
 
-func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
+func (s Server) parkData(ctx context.Context, storageTo stor.Storage) {
 
 	if storageTo == nil {
 		return

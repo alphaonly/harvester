@@ -189,7 +189,7 @@ func (h *Handlers) HandleGetMetricValueJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	var requestMetricsJSON schema.MetricsJSON
+	var requestMetricsJSON schema.Metrics
 	err = json.Unmarshal(requestByteData, &requestMetricsJSON)
 	if err != nil {
 		http.Error(w, "Error json-marshal request data", http.StatusBadRequest)
@@ -412,7 +412,7 @@ func (h *Handlers) HandlePostMetricJSON(next http.Handler) http.HandlerFunc {
 			return
 		}
 		//2. JSON
-		var mj schema.MetricsJSON
+		var mj schema.Metrics
 		err := json.Unmarshal(bytesData, &mj)
 		if err != nil {
 			httpError(w, "unmarshal error:", http.StatusBadRequest)
@@ -648,16 +648,16 @@ func (h *Handlers) Stats(w http.ResponseWriter, r *http.Request) {
 	//get real IP address
 	remoteAddrStr := r.Header.Get("X-Real-IP")
 	if remoteAddrStr == "" {
-		log.Println("X-Real-IP is missing in http header,using Request.RemoteAddr instead")		
-		remoteAddrStr= r.RemoteAddr
-	}	
-	//Parse remote IP 
+		log.Println("X-Real-IP is missing in http header,using Request.RemoteAddr instead")
+		remoteAddrStr = r.RemoteAddr
+	}
+	//Parse remote IP
 	remoteAddress := net.ParseIP(remoteAddrStr)
 	if !IPNet.Contains(remoteAddress) {
 		httpError(w, "remote IP address do not satisfies the given subnet", http.StatusForbidden)
 		return
 	}
-	//respond status OK 
+	//respond status OK
 	w.Write([]byte("200 OK"))
 	w.WriteHeader(http.StatusOK)
 }
@@ -713,7 +713,7 @@ func (h *Handlers) NewRouter() chi.Router {
 	return r
 }
 
-func (h *Handlers) writeToStorageAndRespond(mj *schema.MetricsJSON, w http.ResponseWriter, r *http.Request) (err error) {
+func (h *Handlers) writeToStorageAndRespond(mj *schema.Metrics, w http.ResponseWriter, r *http.Request) (err error) {
 	switch mj.MType {
 	case "gauge":
 		{

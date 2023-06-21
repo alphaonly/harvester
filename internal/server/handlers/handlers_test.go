@@ -174,7 +174,7 @@ func TestStats(t *testing.T) {
 	}{
 		{
 			name: "test#1 positive",
-			want: want{},
+			want: want{200, ""},
 		},
 	}
 
@@ -196,7 +196,7 @@ func TestStats(t *testing.T) {
 				Conf:    *conf,
 			}
 
-			Server := server.New(conf, storage, handlers, nil)
+			Server := server.New(conf, storage, handlers, nil,nil)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

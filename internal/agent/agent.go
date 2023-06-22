@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/alphaonly/harvester/internal/agent/grpc/client"
 	"github.com/alphaonly/harvester/internal/agent/workerpool"
 	"github.com/alphaonly/harvester/internal/common/crypto"
 	"github.com/alphaonly/harvester/internal/common/logging"
@@ -72,13 +73,18 @@ type Metrics struct {
 type Agent struct {
 	Configuration *conf.AgentConfiguration
 	baseURL       url.URL
-	Client        *resty.Client
+	RestyClient   *resty.Client
+	GRPCClient    *client.GRPCClient
 	Signer        sign.Signer
 	Cm            crypto.AgentCertificateManager
 	UpdateLocker  *sync.RWMutex
 }
 
-func NewAgent(c *conf.AgentConfiguration, client *resty.Client, cm crypto.AgentCertificateManager) Agent {
+func NewAgent(
+	c *conf.AgentConfiguration,
+	client *resty.Client,
+	grpcClient *client.GRPCClient,
+	cm crypto.AgentCertificateManager) Agent {
 
 	return Agent{
 		Configuration: c,
@@ -87,7 +93,8 @@ func NewAgent(c *conf.AgentConfiguration, client *resty.Client, cm crypto.AgentC
 			Scheme: c.Scheme,
 			Host:   c.Address,
 		},
-		Client:       client,
+		RestyClient:  client,
+		GRPCClient: grpcClient,
 		Signer:       sign.NewSHA256(c.Key),
 		UpdateLocker: new(sync.RWMutex),
 		Cm:           cm,
@@ -220,6 +227,7 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sen
 }
 
 type HeaderKeys map[string]string
+
 type sendData struct {
 	url            *url.URL
 	keys           HeaderKeys
@@ -397,7 +405,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 
 	switch a.Configuration.Mode {
 
-	case 2: //JSON Batch
+	case conf.MODE_JSON_BATCH,conf.MODE_GRPC:  //JSON Batch or gRPC
 		{
 			keys["Content-Type"] = "application/json"
 			keys["Accept"] = "application/json"
@@ -450,7 +458,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 
 			m[data] = true
 		}
-	case 1: //JSON
+	case conf.MODE_JSON: //JSON
 		{
 			keys["Content-Type"] = "application/json"
 			keys["Accept"] = "application/json"
@@ -501,7 +509,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 				logging.LogFatal(a.Cm.Error())
 			}
 		}
-	case 0:
+	case conf.MODE_NO_JSON:
 		{
 
 			keys["Content-Type"] = "plain/text"
@@ -562,7 +570,7 @@ func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 
 	if a.Configuration.RateLimit > 0 {
 		f = func(key *sendData) workerpool.JobResult {
-			err := key.SendData(a.Client)
+			err := key.SendData(a.RestyClient)
 			if err != nil {
 				log.Println(err)
 				return workerpool.JobResult{Result: err.Error()}
@@ -587,7 +595,7 @@ repeatAgain:
 				switch a.Configuration.RateLimit {
 				case 0, 1:
 					{
-						err := key.SendData(a.Client)
+						err := key.SendData(a.RestyClient)
 						if err != nil {
 							log.Println(err)
 							return

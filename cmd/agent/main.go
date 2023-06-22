@@ -14,11 +14,12 @@ import (
 
 	conf "github.com/alphaonly/harvester/internal/configuration"
 	"github.com/go-resty/resty/v2"
+	grpcclient "github.com/alphaonly/harvester/internal/agent/grpc/client"
 )
 
-var buildVersion string = "N/A"
-var buildDate string = "N/A"
-var buildCommit string = "N/A"
+var buildVersion = "N/A"
+var buildDate = "N/A"
+var buildCommit = "N/A"
 
 func main() {
 	//Build tags
@@ -30,6 +31,8 @@ func main() {
 	ac := conf.NewAgentConf(conf.UpdateACFromEnvironment, conf.UpdateACFromFlags)
 	//resty client
 	client := resty.New().SetRetryCount(10)
+	//grpc client
+	grpcClient:= grpcclient.NewGRPCClient(ac.Address)
 
 	//load public key pem file
 	var cm cryptoCommon.AgentCertificateManager
@@ -41,7 +44,7 @@ func main() {
 		logging.LogFatal(cm.Error())
 	}
 	//Run agent
-	agent.NewAgent(ac, client, cm).Run(ctx)
+	agent.NewAgent(ac, client, grpcClient,cm).Run(ctx)
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)
 	//Graceful shutdown

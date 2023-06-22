@@ -20,10 +20,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-type Configuration struct {
-	serverPort string
-}
-
 type Server struct {
 	cfg             *conf.ServerConfiguration
 	InternalStorage stor.Storage
@@ -56,22 +52,21 @@ func New(
 func (s *Server) ListenGRPC(ctx context.Context) {
 
 	//check necessary data
-	if s.cfg.GRPCPort == "" || s.grpcService != nil {
+	if s.cfg.GRPCPort == "" || s.grpcService == nil {
 		return
 	}
 	//listener configuration
 	listener, err := net.Listen("tcp", ":"+s.cfg.GRPCPort)
-	if err != nil {
-		log.Fatal(err)
-	}
+	logging.LogFatal(err)
 	// create grpc
 	s.grpcServer = grpc.NewServer()
 	// register service
 	pb.RegisterServiceServer(s.grpcServer, s.grpcService)
 	log.Println("Start gRPC server")
-	if err := s.grpcServer.Serve(listener); err != nil {
-		log.Fatal(err)
-	}
+	//start
+	err = s.grpcServer.Serve(listener)
+	logging.LogFatal(err)
+
 }
 
 func (s Server) listenHTTP(ctx context.Context) {
@@ -100,7 +95,9 @@ func (s *Server) Run(ctx context.Context) error {
 
 	shutdown := func(s *Server) error {
 		//Graceful gRPC shutdown
-		s.grpcServer.GracefulStop()
+		if s.grpcServer != nil {
+			s.grpcServer.GracefulStop()
+		}
 		//Graceful http shutdown
 		err := s.Shutdown(ctx)
 		return err

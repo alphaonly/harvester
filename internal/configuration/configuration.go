@@ -15,6 +15,13 @@ import (
 	"github.com/alphaonly/harvester/internal/schema"
 )
 
+const (
+	MODE_NO_JSON    = 0
+	MODE_JSON       = 1
+	MODE_JSON_BATCH = 2
+	MODE_GRPC       = 3
+)
+
 const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":"","CRYPTO_KEY":"","ENABLE_HTTPS":false,"GRPC_PORT":""}`
 const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":""}`
 
@@ -24,7 +31,7 @@ type AgentConfiguration struct {
 	CompressType   string          `json:"COMPRESS_TYPE,omitempty"`
 	PollInterval   schema.Duration `json:"POLL_INTERVAL,omitempty"`
 	ReportInterval schema.Duration `json:"REPORT_INTERVAL,omitempty"`
-	Mode           int             `json:"USE_JSON,omitempty"`
+	Mode           int             `json:"MODE,omitempty"`
 	Key            string          `json:"KEY,omitempty"`
 	RateLimit      int             `json:"RATE_LIMIT,omitempty"`
 	CryptoKey      string          `json:"CRYPTO_KEY,omitempty"` //path to public key file
@@ -107,7 +114,7 @@ func UpdateACFromEnvironment(c *AgentConfiguration) {
 	c.PollInterval = getEnv("POLL_INTERVAL", &DurValue{c.PollInterval}, c.EnvChanged).(schema.Duration)
 	c.ReportInterval = getEnv("REPORT_INTERVAL", &DurValue{c.ReportInterval}, c.EnvChanged).(schema.Duration)
 	c.Scheme = getEnv("SCHEME", &StrValue{c.Scheme}, c.EnvChanged).(string)
-	c.Mode = getEnv("USE_JSON", &IntValue{c.Mode}, c.EnvChanged).(int)
+	c.Mode = getEnv("MODE", &IntValue{c.Mode}, c.EnvChanged).(int)
 	c.Key = getEnv("KEY", &StrValue{c.Key}, c.EnvChanged).(string)
 	c.RateLimit = getEnv("RATE_LIMIT", &IntValue{c.RateLimit}, c.EnvChanged).(int)
 	c.CryptoKey = getEnv("CRYPTO_KEY", &StrValue{c.CryptoKey}, c.EnvChanged).(string)
@@ -134,7 +141,7 @@ func UpdateACFromFlags(c *AgentConfiguration) {
 		a  = flag.String("a", dc.Address, "Domain name and :port")
 		p  = flag.Duration("p", time.Duration(dc.PollInterval), "Poll interval")
 		r  = flag.Duration("r", time.Duration(dc.ReportInterval), "Report interval")
-		j  = flag.Int("j", dc.Mode, "Use JSON 0-No JSON,1- JSON, 2-JSON Batch, 3-gRPC")
+		j  = flag.Int("j", dc.Mode, "Type of transport 0-No JSON,1-JSON, 2-JSON Batch, 3-gRPC")
 		t  = flag.String("t", dc.CompressType, "Compress type: \"deflate\" supported")
 		k  = flag.String("k", dc.Key, "string key for hash signing")
 		l  = flag.Int("l", dc.RateLimit, "Number of parallel inbound requests ")
@@ -160,9 +167,9 @@ func UpdateACFromFlags(c *AgentConfiguration) {
 		log.Printf(message, "REPORT_INTERVAL", c.ReportInterval)
 	}
 
-	if !c.EnvChanged["USE_JSON"] {
+	if !c.EnvChanged["MODE"] {
 		c.Mode = *j
-		log.Printf(message, "USE_JSON", c.Mode)
+		log.Printf(message, "MODE", c.Mode)
 	}
 
 	if !c.EnvChanged["COMPRESS_TYPE"] {

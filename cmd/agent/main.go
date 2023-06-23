@@ -29,8 +29,8 @@ func main() {
 	defer cancel()
 	//Configuration parameters
 	ac := conf.NewAgentConf(conf.UpdateACFromEnvironment, conf.UpdateACFromFlags)
-	//resty client
-	client := resty.New().SetRetryCount(10)
+	//resty restyClient
+	restyClient := resty.New().SetRetryCount(10)
 	//grpc client
 	grpcClient:= grpcclient.NewGRPCClient(ac.Address)
 
@@ -44,7 +44,7 @@ func main() {
 		logging.LogFatal(cm.Error())
 	}
 	//Run agent
-	agent.NewAgent(ac, client, grpcClient,cm).Run(ctx)
+	agent.NewAgent(ac, restyClient, grpcClient,cm).Run(ctx)
 	//wait SIGKILL
 	channel := make(chan os.Signal, 1)
 	//Graceful shutdown

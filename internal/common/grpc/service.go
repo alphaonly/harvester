@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"sync"
 
 	common "github.com/alphaonly/harvester/internal/common/grpc/common"
@@ -36,7 +37,7 @@ func (s *GRPCService) AddMetric(ctx context.Context, in *pb.AddMetricRequest) (*
 	}
 	//overwrite metric value
 	s.metrics.Store(metric.ID, metric)
-
+	log.Printf("metric %v saved through gRPC", metric)
 	return &response, nil
 }
 //AddMetricMulti - adds metric data from a stream to storage 
@@ -70,9 +71,13 @@ func (s *GRPCService) AddMetricMulti(in pb.Service_AddMetricMultiServer) error {
 		}
 		//save metric
 		s.metrics.Store(metric.ID, metric)
+		log.Printf("metric %v saved through gRPC", metric)
+		
+		//send response
+		err=in.Send(response)
+		logging.LogFatal(err)
 	}
 	return err
-
 }
 func (s *GRPCService) GetMetric(context.Context, *pb.GetMetricRequest) (*pb.GetMetricResponse, error) {
 	//I do not need it, left for a while 

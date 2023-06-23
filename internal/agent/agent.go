@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"runtime"
 	"sync"
@@ -12,6 +13,8 @@ import (
 	"github.com/alphaonly/harvester/internal/agent/grpc/client"
 	"github.com/alphaonly/harvester/internal/agent/workerpool"
 	"github.com/alphaonly/harvester/internal/common/crypto"
+	"github.com/alphaonly/harvester/internal/common/grpc/common"
+	"github.com/alphaonly/harvester/internal/common/grpc/proto"
 	"github.com/alphaonly/harvester/internal/common/logging"
 	"github.com/alphaonly/harvester/internal/schema"
 	"github.com/alphaonly/harvester/internal/server/compression"
@@ -94,27 +97,27 @@ func NewAgent(
 			Host:   c.Address,
 		},
 		RestyClient:  client,
-		GRPCClient: grpcClient,
+		GRPCClient:   grpcClient,
 		Signer:       sign.NewSHA256(c.Key),
 		UpdateLocker: new(sync.RWMutex),
 		Cm:           cm,
 	}
 }
 
-func AddCounterData(common sendData, val Counter, name string, data map[*sendData]bool) {
+func AddCounterData(common sender, val Counter, name string, data map[*sender]bool) {
 	URL := common.url.
 		JoinPath("counter").
 		JoinPath(name).
 		JoinPath(strconv.FormatUint(uint64(val), 10)) //value float
 
-	sd := sendData{
+	sd := sender{
 		url:  URL,
 		keys: common.keys,
 	}
 	data[&sd] = true
 
 }
-func AddGaugeData(common sendData, val Gauge, name string, data map[*sendData]bool) {
+func AddGaugeData(common sender, val Gauge, name string, data map[*sender]bool) {
 
 	URL := common.url.
 		JoinPath("gauge").
@@ -123,7 +126,7 @@ func AddGaugeData(common sendData, val Gauge, name string, data map[*sendData]bo
 
 	// empty := bytes.NewBufferString(URL.String()).Bytes()
 
-	sd := sendData{
+	sd := sender{
 		url:  URL,
 		keys: common.keys,
 		// body: &empty, //need to tranfser something
@@ -139,9 +142,9 @@ func logFatal(err error) {
 
 }
 
-func AddGaugeDataJSONToBatch(common *sendData, val Gauge, name string) {
-	if common.JSONBatchBody == nil {
-		common.JSONBatchBody = new([]schema.Metrics)
+func AddGaugeDataJSONToBatch(snd *sender, val Gauge, name string) {
+	if snd.JSONBatchBody == nil {
+		snd.JSONBatchBody = new([]schema.Metrics)
 	}
 
 	v := float64(val)
@@ -152,16 +155,16 @@ func AddGaugeDataJSONToBatch(common *sendData, val Gauge, name string) {
 		Value: &v,
 	}
 	//Вычисляем hash и помещаем в mj.Hash
-	err := common.signer.Sign(&mj)
+	err := snd.signer.Sign(&mj)
 	logFatal(err)
 
-	*common.JSONBatchBody = append(*common.JSONBatchBody, mj)
+	*snd.JSONBatchBody = append(*snd.JSONBatchBody, mj)
 }
 
-func AddCounterDataJSONToBatch(common *sendData, val Counter, name string) {
+func AddCounterDataJSONToBatch(snd *sender, val Counter, name string) {
 
-	if common.JSONBatchBody == nil {
-		common.JSONBatchBody = new([]schema.Metrics)
+	if snd.JSONBatchBody == nil {
+		snd.JSONBatchBody = new([]schema.Metrics)
 	}
 	v := int64(val)
 
@@ -171,13 +174,13 @@ func AddCounterDataJSONToBatch(common *sendData, val Counter, name string) {
 		Delta: &v,
 	}
 	//Вычисляем hash и помещаем в mj.Hash
-	err := common.signer.Sign(&mj)
+	err := snd.signer.Sign(&mj)
 	logFatal(err)
 
-	*common.JSONBatchBody = append(*common.JSONBatchBody, mj)
+	*snd.JSONBatchBody = append(*snd.JSONBatchBody, mj)
 }
 
-func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendData]bool) {
+func AddGaugeDataJSON(common sender, val Gauge, name string, data map[*sender]bool) {
 	v := float64(val)
 
 	mj := schema.Metrics{
@@ -189,7 +192,7 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 	err := common.signer.Sign(&mj)
 	logFatal(err)
 
-	sd := sendData{
+	sd := sender{
 		url:      common.url,
 		keys:     common.keys,
 		JSONBody: &mj,
@@ -197,7 +200,7 @@ func AddGaugeDataJSON(common sendData, val Gauge, name string, data map[*sendDat
 	data[&sd] = true
 
 }
-func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sendData]bool) {
+func AddCounterDataJSON(common sender, val Counter, name string, data map[*sender]bool) {
 	v := int64(val)
 
 	mj := schema.Metrics{
@@ -217,7 +220,7 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sen
 	err := common.signer.Sign(&mj)
 	logFatal(err)
 
-	sd := sendData{
+	sd := sender{
 		url:      common.url,
 		keys:     common.keys,
 		JSONBody: &mj,
@@ -228,7 +231,7 @@ func AddCounterDataJSON(common sendData, val Counter, name string, data map[*sen
 
 type HeaderKeys map[string]string
 
-type sendData struct {
+type sender struct {
 	url            *url.URL
 	keys           HeaderKeys
 	JSONBody       *schema.Metrics
@@ -238,7 +241,7 @@ type sendData struct {
 	signer         sign.Signer
 }
 
-func (sd sendData) SendData(client *resty.Client) error {
+func (sd sender) SendDataResty(client *resty.Client) error {
 
 	//a resty attempt
 	r := client.R().
@@ -266,6 +269,65 @@ func (sd sendData) SendData(client *resty.Client) error {
 	return err
 }
 
+// SendDataGRPC - sends batch metric data using gRPC client in stream
+func (sd sender) SendDataGRPC(ctx context.Context, grpcClient *client.GRPCClient) error {
+
+	//Do nothing if body is empty
+	if sd.JSONBatchBody == nil {
+		log.Fatal("body is nil")
+	}
+	var wg sync.WaitGroup
+	//get stream
+	stream, err := grpcClient.Client.AddMetricMulti(ctx)
+	logging.LogFatal(err)
+	//iterate the array on every metric data
+	for _, metric := range *sd.JSONBatchBody {
+		//Send data in parallel
+		wg.Add(1)
+		go func(metric schema.Metrics) {
+			//make metric gRPC structure
+			protoMetric := &proto.Metric{
+				Name: metric.ID,
+				Type: common.ConvertMetricType(metric.MType),
+			}
+			//determine which one of metric param is fulfilled
+			switch {
+			case metric.Value != nil:
+				protoMetric.Gauge = *metric.Value
+			case metric.Delta != nil:
+				protoMetric.Counter = *metric.Delta
+			}
+			//send data
+			err = stream.Send(&proto.AddMetricRequest{Metric: protoMetric})
+			logging.LogPrintln(err)
+			//mark routine as finished
+			wg.Done()
+		}(metric)
+	}
+	//wait for every routine is finished
+	wg.Wait()
+
+	//Capture response
+	var resp *proto.AddMetricResponse
+	go func(resp *proto.AddMetricResponse) {
+
+		wg.Add(1)
+		for {
+			//receive response
+			resp, err = stream.Recv()
+			if err == io.EOF {
+				log.Println("getting response is finished, everything is well")
+				wg.Done()
+				break
+			}
+			logging.LogFatal(err)
+		}
+	}(resp)
+
+	wg.Wait()
+
+	return err
+}
 func (a Agent) Update(ctx context.Context, metrics *Metrics) {
 	var m runtime.MemStats
 
@@ -357,7 +419,7 @@ repeatAgain:
 
 }
 
-func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
+func (a Agent) CompressData(data map[*sender]bool) map[*sender]bool {
 
 	switch a.Configuration.CompressType {
 
@@ -384,8 +446,8 @@ func (a Agent) CompressData(data map[*sendData]bool) map[*sendData]bool {
 
 	return data
 }
-func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
-	m := make(map[*sendData]bool)
+func (a Agent) prepareData(metrics *Metrics) map[*sender]bool {
+	m := make(map[*sender]bool)
 	keys := make(HeaderKeys)
 
 	keys["X-Real-IP"] = a.Configuration.Address
@@ -405,12 +467,12 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 
 	switch a.Configuration.Mode {
 
-	case conf.MODE_JSON_BATCH,conf.MODE_GRPC:  //JSON Batch or gRPC
+	case conf.MODE_JSON_BATCH, conf.MODE_GRPC: //JSON Batch or gRPC
 		{
 			keys["Content-Type"] = "application/json"
 			keys["Accept"] = "application/json"
 
-			data := &sendData{
+			data := &sender{
 				url:    a.baseURL.JoinPath("updates"),
 				keys:   keys,
 				signer: a.Signer,
@@ -463,7 +525,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			keys["Content-Type"] = "application/json"
 			keys["Accept"] = "application/json"
 
-			data := sendData{
+			data := sender{
 				url:    a.baseURL.JoinPath("update"),
 				keys:   keys,
 				signer: a.Signer,
@@ -515,7 +577,7 @@ func (a Agent) prepareData(metrics *Metrics) map[*sendData]bool {
 			keys["Content-Type"] = "plain/text"
 			keys["Accept"] = "text/html"
 
-			data := sendData{
+			data := sender{
 				url:  a.baseURL.JoinPath("update"),
 				keys: keys,
 			}
@@ -565,12 +627,13 @@ func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 	defer ticker.Stop()
 
 	//Worker pool
-	var f workerpool.TypicalJobFunction[*sendData]
-	var wp workerpool.WorkerPool[*sendData]
+	var f workerpool.TypicalJobFunction[*sender]
+	var wp workerpool.WorkerPool[*sender]
 
 	if a.Configuration.RateLimit > 0 {
-		f = func(key *sendData) workerpool.JobResult {
-			err := key.SendData(a.RestyClient)
+		//Initialize a job function for workerpool
+		f = func(key *sender) workerpool.JobResult {
+			err := key.SendDataResty(a.RestyClient)
 			if err != nil {
 				log.Println(err)
 				return workerpool.JobResult{Result: err.Error()}
@@ -578,8 +641,8 @@ func (a Agent) Send(ctx context.Context, metrics *Metrics) {
 
 			return workerpool.JobResult{Result: "OK"}
 		}
-		wp = workerpool.NewWorkerPool[*sendData](a.Configuration.RateLimit)
-		// worker pool function
+		wp = workerpool.NewWorkerPool[*sender](a.Configuration.RateLimit)
+		// worker pool start
 		wp.Start(ctx)
 	}
 repeatAgain:
@@ -595,15 +658,32 @@ repeatAgain:
 				switch a.Configuration.RateLimit {
 				case 0, 1:
 					{
-						err := key.SendData(a.RestyClient)
-						if err != nil {
-							log.Println(err)
-							return
+						//Client depends on Mode
+						switch a.Configuration.Mode {
+						case conf.MODE_GRPC: //gRPC Mode
+							{
+								err := key.SendDataGRPC(ctx, a.GRPCClient)
+								if err != nil {
+									log.Println(err)
+									return
+								}
+
+							}
+						default: //No gRPC MOde
+							{
+								err := key.SendDataResty(a.RestyClient)
+								if err != nil {
+									log.Println(err)
+									return
+								}
+
+							}
 						}
 					}
 				default:
 					{
-						job := workerpool.Job[*sendData]{Name: name, Data: key, Func: f}
+						//send a job to worker pool
+						job := workerpool.Job[*sender]{Name: name, Data: key, Func: f}
 						wp.SendJob(ctx, job)
 					}
 				}
@@ -612,6 +692,8 @@ repeatAgain:
 		}
 	case <-ctx.Done():
 		{
+
+			a.GRPCClient.Close()
 			break
 		}
 	}

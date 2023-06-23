@@ -9,11 +9,11 @@ import (
 
 type GRPCClient struct {
 	Client pb.ServiceClient
-	Conn   *grpc.ClientConn
+	conn   *grpc.ClientConn
 }
 
 func (g GRPCClient) Close() {
-	g.Conn.Close()
+	g.conn.Close()
 }
 
 func NewGRPCClient(address string) *GRPCClient {
@@ -23,5 +23,5 @@ func NewGRPCClient(address string) *GRPCClient {
 
 	return &GRPCClient{
 		Client: pb.NewServiceClient(conn),
-		Conn:   conn}
+		conn:   conn}
 }

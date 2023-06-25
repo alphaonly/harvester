@@ -669,7 +669,7 @@ repeatAgain:
 								}
 
 							}
-						default: //No gRPC MOde
+						default: //No gRPC Mode
 							{
 								err := key.SendDataResty(a.RestyClient)
 								if err != nil {

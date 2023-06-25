@@ -56,7 +56,7 @@ var message = []string{
 	10: "DBStorage:unable to commit, trying again",
 	11: "DBStorage:unable to prepare statement, fatal error",
 	12: "DBStorage:unable to lease a connection , try again",
-	13: "DBStorage:createOrUpdateIfExistsMetricsTable exec error",	
+	13: "DBStorage:createOrUpdateIfExistsMetricsTable exec error",
 	14: "DBStorage:unable to lease a connection after a few tries",
 }
 
@@ -118,7 +118,7 @@ func (s *DBStorage) connectDB(ctx context.Context) (ok bool) {
 		if err != nil {
 			log.Println(message[12] + " " + err.Error())
 			time.Sleep(time.Millisecond * 200)
-			continue	
+			continue
 		}
 		break
 	}
@@ -175,17 +175,17 @@ func (s DBStorage) GetMetric(ctx context.Context, name string, MType string) (mv
 	}
 	return mv, nil
 }
-func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricValue) (err error) {
+func (s DBStorage) SaveMetric(ctx context.Context, name string, mv mVal.MetricValue) (err error) {
 	var m mVal.MetricValue
 	if mv == nil {
 		return errors.New(message[6])
 	}
-	m = *mv
+	m = mv
 	if !s.connectDB(ctx) {
 		return errors.New(message[14])
 	}
 	defer s.conn.Release()
-	
+
 	var (
 		_type int
 		delta int64
@@ -207,7 +207,7 @@ func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricV
 		return errors.New(message[7])
 	}
 	tag, err := s.conn.Exec(ctx, createOrUpdateIfExistsMetricsTable, name, _type, delta, value)
-	logFatalf("",err)
+	logFatalf("", err)
 	log.Println(tag)
 	return err
 }
@@ -215,7 +215,7 @@ func (s DBStorage) SaveMetric(ctx context.Context, name string, mv *mVal.MetricV
 // GetAllMetrics Restore data from database to mem storage
 func (s DBStorage) GetAllMetrics(ctx context.Context) (mvList *metricsjson.MetricsMapType, err error) {
 	if !s.connectDB(ctx) {
-		return nil,errors.New(message[14])
+		return nil, errors.New(message[14])
 	}
 	defer s.conn.Release()
 	rows, err := s.conn.Query(ctx, selectAllMetricsTable)

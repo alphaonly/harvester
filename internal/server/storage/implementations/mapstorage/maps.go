@@ -5,15 +5,13 @@ import (
 	"errors"
 	"sync"
 
-
 	metricsJSON "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	metricvalueI "github.com/alphaonly/harvester/internal/server/metricvaluei"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
-
 )
 
 type MapStorage struct {
-	mutex      *sync.Mutex
+	mutex *sync.Mutex
 
 	metricsMap *metricsJSON.MetricsMapType
 }
@@ -54,15 +52,14 @@ func (m MapStorage) GetMetric(ctx context.Context, name string, MType string) (m
 	}
 	return _map[name], nil
 }
-func (m MapStorage) SaveMetric(ctx context.Context, name string, mv *metricvalueI.MetricValue) (r error) {
+func (m MapStorage) SaveMetric(ctx context.Context, name string, mv metricvalueI.MetricValue) (r error) {
 
-	(*m.metricsMap)[name] = *mv
+	(*m.metricsMap)[name] = mv
 
 	return nil
 }
 
 func (m MapStorage) GetAllMetrics(ctx context.Context) (mvList *metricsJSON.MetricsMapType, err error) {
-
 
 	if m.metricsMap == nil {
 		return nil, errors.New("map was not initialized")

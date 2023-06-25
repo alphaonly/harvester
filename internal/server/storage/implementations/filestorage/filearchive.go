@@ -6,7 +6,6 @@ import (
 	"github.com/alphaonly/harvester/internal/server/files"
 	metricsjson "github.com/alphaonly/harvester/internal/server/metricsJSON"
 	mVal "github.com/alphaonly/harvester/internal/server/metricvaluei"
-
 )
 
 // type Storage interface {
@@ -24,7 +23,7 @@ func (fa FileArchive) GetMetric(ctx context.Context, name string, MType string) 
 	//Not supported by the implementation
 	return nil, errors.New("not supported")
 }
-func (fa FileArchive) SaveMetric(ctx context.Context, name string, mv *mVal.MetricValue) (err error) {
+func (fa FileArchive) SaveMetric(ctx context.Context, name string, mv mVal.MetricValue) (err error) {
 	//Not supported by the implementation
 	return errors.New("not supported")
 }
@@ -40,7 +39,6 @@ func (fa FileArchive) GetAllMetrics(ctx context.Context) (mvList *metricsjson.Me
 	mvList, err = consumer.Read()
 	if err != nil {
 		emptyMap := make(metricsjson.MetricsMapType)
-
 
 		return &emptyMap, err
 	}

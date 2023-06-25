@@ -25,6 +25,11 @@ message AddMetricResponse {
 
 message GetMetricRequest {
   string name = 1;
+  enum Type {
+    GAUGE = 0;
+    COUNTER = 1;
+  }
+  Type type = 2;      // тип
 }
 
 message GetMetricResponse {

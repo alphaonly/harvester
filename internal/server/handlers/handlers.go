@@ -301,7 +301,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 
 					var m MVal.MetricValue = MVal.NewFloat(float64Value)
 
-					err = h.Storage.SaveMetric(r.Context(), metricName, &m)
+					err = h.Storage.SaveMetric(r.Context(), metricName, m)
 					if err != nil {
 						http.Error(w, "internal value add error", http.StatusInternalServerError)
 						return
@@ -321,7 +321,7 @@ func (h *Handlers) HandlePostMetric(w http.ResponseWriter, r *http.Request) {
 						prevMetricValue = MVal.NewCounterValue()
 					}
 					sum := MVal.NewInt(intValue).AddValue(prevMetricValue)
-					err = h.Storage.SaveMetric(r.Context(), metricName, &sum)
+					err = h.Storage.SaveMetric(r.Context(), metricName, sum)
 					if err != nil {
 						http.Error(w, "value: "+metricValue+" not saved in memStorage", http.StatusInternalServerError)
 						return
@@ -721,7 +721,7 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.Metrics, w http.ResponseW
 				mjVal := *mj.Value
 				//пишем если есть значение
 				mv := MVal.MetricValue(MVal.NewFloat(mjVal))
-				err := h.Storage.SaveMetric(r.Context(), mj.ID, &mv)
+				err := h.Storage.SaveMetric(r.Context(), mj.ID, mv)
 				if err != nil {
 					http.Error(w, "internal value add error", http.StatusInternalServerError)
 					return err
@@ -747,7 +747,7 @@ func (h *Handlers) writeToStorageAndRespond(mj *schema.Metrics, w http.ResponseW
 					prevMetricValue = MVal.NewCounterValue()
 				}
 				sum := MVal.NewInt(mjVal).AddValue(prevMetricValue)
-				err = h.Storage.SaveMetric(r.Context(), mj.ID, &sum)
+				err = h.Storage.SaveMetric(r.Context(), mj.ID, sum)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					w.WriteHeader(http.StatusInternalServerError)

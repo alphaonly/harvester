@@ -23,7 +23,7 @@ const (
 )
 
 const ServerDefaultJSON = `{"ADDRESS":"localhost:8080","STORE_INTERVAL": "300s","STORE_FILE":"/tmp/devops-metrics-db.json","RESTORE":true,"KEY":"","CRYPTO_KEY":"","ENABLE_HTTPS":false,"GRPC_PORT":""}`
-const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","USE_JSON":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":""}`
+const AgentDefaultJSON = `{"POLL_INTERVAL":"2s","REPORT_INTERVAL":"10s","ADDRESS":"localhost:8080","SCHEME":"http","MODE":1,"KEY":"","RATE_LIMIT":1,"CRYPTO_KEY":""}`
 
 type AgentConfiguration struct {
 	Address        string          `json:"ADDRESS,omitempty"`
@@ -49,7 +49,7 @@ type ServerConfiguration struct {
 	CryptoKey     string          `json:"CRYPTO_KEY,omitempty"`     //path to private key file
 	Config        string          `json:"CONFIG,omitempty"`         //path to config file
 	TrustedSubnet string          `json:"TRUSTED_SUBNET,omitempty"` //trusted subnet declaration
-	GRPCPort      string          `json:"GRPCPORT,omitempty"`       //starts gRPC using the port,must be different from PORT
+	GRPCPort      string          `json:"GRPC_PORT,omitempty"`      //starts gRPC using the port,must be different from PORT
 	EnvChanged    map[string]bool
 }
 
@@ -69,7 +69,7 @@ func UnMarshalAgentDefaults(s string) AgentConfiguration {
 	ac := AgentConfiguration{}
 	err := json.Unmarshal([]byte(s), &ac)
 	if err != nil {
-		log.Fatal("cannot unmarshal server configuration")
+		log.Fatal("cannot unmarshal agent configuration")
 	}
 	return ac
 }

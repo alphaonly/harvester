@@ -28,16 +28,36 @@ type GaugeValue struct {
 	valueFloat float64
 }
 
-func NewFloat(g float64) *GaugeValue {
+func NewFloat(g float64) MetricValue {
 	return &GaugeValue{
 
 		valueFloat: g,
 	}
 }
-func (v *GaugeValue) New(g Gauge) *GaugeValue {
+func NewCounterMetric(val int64) MetricValue {
+	return &CounterValue{
+
+		valueInt: val,
+	}
+}
+func NewGaugeMetric(val float64) MetricValue {
+	return &GaugeValue{
+		valueFloat: val,
+	}
+}
+
+func NewGauge(val float64) Gauge {
+	return Gauge(val)
+}
+func NewCounter(val int64) Counter {
+	return Counter(val)
+}
+
+func (v *GaugeValue) NewGauge(g Gauge) *GaugeValue {
 	v.valueFloat = float64(g)
 	return v
 }
+
 func (v *GaugeValue) SetValue(gauge MetricValue) {
 	v.valueFloat = gauge.(*GaugeValue).valueFloat
 }

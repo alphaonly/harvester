@@ -11,14 +11,14 @@ import (
 type MetricsMapType map[string]mVal.MetricValue
 
 func (m MetricsMapType) MarshalJSON() ([]byte, error) {
-	mjArray := make([]schema.MetricsJSON, len(m))
+	mjArray := make([]schema.Metrics, len(m))
 	i := 0
 	for k, v := range m {
 		switch value := v.(type) {
 		case *mVal.GaugeValue:
 			{
 				v := value.GetInternalValue().(float64)
-				mjArray[i] = schema.MetricsJSON{
+				mjArray[i] = schema.Metrics{
 					ID:    k,
 					MType: "gauge",
 					Value: &v,
@@ -27,7 +27,7 @@ func (m MetricsMapType) MarshalJSON() ([]byte, error) {
 		case *mVal.CounterValue:
 			{
 				v := value.GetInternalValue().(int64)
-				mjArray[i] = schema.MetricsJSON{
+				mjArray[i] = schema.Metrics{
 					ID:    k,
 					MType: "counter",
 					Delta: &v,
@@ -47,7 +47,7 @@ func (m MetricsMapType) MarshalJSON() ([]byte, error) {
 }
 
 func (m MetricsMapType) UnmarshalJSON(b []byte) error {
-	var mjArray []schema.MetricsJSON
+	var mjArray []schema.Metrics
 	if err := json.Unmarshal(b, &mjArray); err != nil {
 		return err
 	}

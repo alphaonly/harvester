@@ -1,80 +1,118 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
-
+	cryptoCommon "github.com/alphaonly/harvester/internal/common/crypto"
+	pb "github.com/alphaonly/harvester/internal/common/grpc/proto"
+	"github.com/alphaonly/harvester/internal/common/logging"
 	conf "github.com/alphaonly/harvester/internal/configuration"
+	"github.com/alphaonly/harvester/internal/server/crypto"
 	"github.com/alphaonly/harvester/internal/server/handlers"
 	stor "github.com/alphaonly/harvester/internal/server/storage/interfaces"
-
+	"google.golang.org/grpc"
 )
 
-type Configuration struct {
-	serverPort string
-
-}
-
 type Server struct {
-
-	configuration   *conf.ServerConfiguration
+	cfg             *conf.ServerConfiguration
 	InternalStorage stor.Storage
 	ExternalStorage stor.Storage
 	handlers        *handlers.Handlers
 	httpServer      *http.Server
-
+	crypto          cryptoCommon.ServerCertificateManager
+	grpcService     pb.ServiceServer
+	grpcServer      *grpc.Server
 }
 
-func NewConfiguration(serverPort string) *Configuration {
-	return &Configuration{serverPort: ":" + serverPort}
-}
+func New(
+	configuration *conf.ServerConfiguration,
+	ExStorage stor.Storage,
+	handlers *handlers.Handlers,
+	certificate cryptoCommon.ServerCertificateManager,
+	grpcService pb.ServiceServer) (server Server) {
 
-func New(configuration *conf.ServerConfiguration, ExStorage stor.Storage, handlers *handlers.Handlers) (server Server) {
 	return Server{
-
-		configuration:   configuration,
+		cfg:             configuration,
 		InternalStorage: handlers.Storage,
 		ExternalStorage: ExStorage,
 		handlers:        handlers,
-
+		crypto:          certificate,
+		grpcService:     grpcService,
 	}
 }
 
-func (s Server) ListenData(ctx context.Context) {
-	// err := http.ListenAndServe(s.configuration.Port, s.handlers.NewRouter())
-	err := s.httpServer.ListenAndServe()
+// ListenGRPC - starts listening gRPC server
+func (s *Server) ListenGRPC(ctx context.Context) {
 
-	if err != nil {
-		log.Println(err)
+	//check necessary data
+	if s.cfg.GRPCPort == "" || s.grpcService == nil {
+		return
 	}
+	//listener configuration
+	listener, err := net.Listen("tcp", ":"+s.cfg.GRPCPort)
+	logging.LogFatal(err)
+	// create grpc
+	s.grpcServer = grpc.NewServer()
+	// register service
+	pb.RegisterServiceServer(s.grpcServer, s.grpcService)
+	log.Println("Start gRPC server")
+	//start
+	err = s.grpcServer.Serve(listener)
+	logging.LogFatal(err)
+
+}
+
+func (s Server) listenHTTP(ctx context.Context) {
+
+	err := s.httpServer.ListenAndServe()
+	logging.LogFatal(err)
 }
 
 func (s *Server) Run(ctx context.Context) error {
 
 	// маршрутизация запросов обработчику
 	s.httpServer = &http.Server{
-		Addr: s.configuration.Address,
-		Handler:  s.handlers.NewRouter(),
+		Addr:    s.cfg.Address,
+		Handler: s.handlers.NewRouter(),
 	}
 
 	s.restoreData(ctx, s.ExternalStorage)
 
-	go s.ListenData(ctx)
-	go s.ParkData(ctx, s.ExternalStorage)
+	go s.listenHTTP(ctx)
+	go s.ListenGRPC(ctx)
+
+	go s.parkData(ctx, s.ExternalStorage)
 
 	osSignal := make(chan os.Signal, 1)
 	signal.Notify(osSignal, os.Interrupt)
 
-	<-osSignal
-	err := s.Shutdown(ctx)
-
+	shutdown := func(s *Server) error {
+		//Graceful gRPC shutdown
+		if s.grpcServer != nil {
+			s.grpcServer.GracefulStop()
+		}
+		//Graceful http shutdown
+		err := s.Shutdown(ctx)
+		return err
+	}
+	var err error
+	select {
+	case <-osSignal:
+		err = shutdown(s)
+	case <-ctx.Done():
+		err = shutdown(s)
+	}
 	return err
 }
+
+// shutdown
 func (s Server) Shutdown(ctx context.Context) error {
 	time.Sleep(time.Second * 2)
 	err := s.httpServer.Shutdown(ctx)
@@ -87,7 +125,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 		log.Println("external storage  not initiated ")
 		return
 	}
-	if s.configuration.Restore {
+	if s.cfg.Restore {
 		mvList, err := storageFrom.GetAllMetrics(ctx)
 
 		if err != nil {
@@ -99,7 +137,6 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 			return
 		}
 
-
 		err = s.InternalStorage.SaveAllMetrics(ctx, mvList)
 		if err != nil {
 			log.Fatal("cannot save metrics to internal storage")
@@ -109,7 +146,7 @@ func (s Server) restoreData(ctx context.Context, storageFrom stor.Storage) {
 
 }
 
-func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
+func (s Server) parkData(ctx context.Context, storageTo stor.Storage) {
 
 	if storageTo == nil {
 		return
@@ -119,7 +156,7 @@ func (s Server) ParkData(ctx context.Context, storageTo stor.Storage) {
 		return
 	}
 
-	ticker := time.NewTicker(time.Duration(s.configuration.StoreInterval))
+	ticker := time.NewTicker(time.Duration(s.cfg.StoreInterval))
 
 	defer ticker.Stop()
 
@@ -152,4 +189,31 @@ DoItAgain:
 
 	}
 	goto DoItAgain
+}
+
+func (s *Server) CheckCertificateFile(dataType cryptoCommon.KeyType) error {
+
+	if s.cfg.CryptoKey == "" {
+		//generate certificates in test folder
+		crypto.MakeCryptoFiles("rsa", s.cfg, nil)
+		log.Println("path to rsa files is not defined, new rsa files were generated in /rsa/ folder")
+		return nil
+	}
+
+	//Reading file with rsa key from os
+	file, err := os.OpenFile(s.cfg.CryptoKey, os.O_RDONLY, 0777)
+	if err != nil {
+		log.Printf("error:file %v  is not read", file)
+		return err
+	}
+	//put data to read buffer
+	buf := bufio.NewReader(file)
+	rs := crypto.RSA{}
+	rs.Receive(dataType, buf)
+	if rs.Error() != nil {
+		log.Println("error:private rsa is not read")
+		return rs.Error()
+	}
+	return nil
+
 }
